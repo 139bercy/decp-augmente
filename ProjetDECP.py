@@ -40,20 +40,21 @@ df.describe()
 df.info()
 
 ######################################################################
-#............... Quelques stats descriptives
+#............... Quelques stats descriptives AVANT nettoyages des données
+dfStat = df
 #Différentes sources des datas
-df["source"].value_counts(normalize=True).plot(kind='pie') #data.gouv.fr_aife - Marches-public.info
+dfStat["source"].value_counts(normalize=True).plot(kind='pie') #data.gouv.fr_aife - Marches-public.info
 plt.xlabel('')
 plt.ylabel('')
 plt.title("Source des marchés\n", fontsize=18, color='#3742fa')
 #Type de contrat
-df["_type"].value_counts(normalize=True).plot(kind='pie') #Marché : 127 574
+dfStat["_type"].value_counts(normalize=True).plot(kind='pie') #Marché : 127 574
 plt.xlabel('')
 plt.ylabel('')
 plt.title("Type de marchés\n", fontsize=18, color='#3742fa')
           
 #Nature des contrats
-dfNature = pd.DataFrame(df.groupby('nature')['uid'].nunique())
+dfNature = pd.DataFrame(dfStat.groupby('nature')['uid'].nunique())
 dfNature.reset_index(level=0, inplace=True) 
 dfNature = dfNature.sort_values(by = 'uid')
 sns.barplot(x=dfNature['nature'], y=dfNature['uid'], palette="Blues_r")
@@ -72,7 +73,7 @@ plt.xticks(rotation= 45)
 plt.tight_layout()
 
 #Montants en fonction des sources - Moyenne ! Pas somme, si sum -> Aife  
-sns.barplot(x=df['source'], y=df['montant'], palette="Reds_r")
+sns.barplot(x=dfStat['source'], y=dfStat['montant'], palette="Reds_r")
 plt.xlabel('\nSources', fontsize=15, color='#c0392b')
 plt.ylabel("Montant\n", fontsize=15, color='#c0392b')
 plt.title("Montant moyen en fonction des sources\n", fontsize=18, color='#e74c3c')
@@ -80,7 +81,7 @@ plt.xticks(rotation= 45)
 plt.tight_layout()
 #Montants en fonction des jours (date)
 df['montant'].fillna(0, inplace=True)
-GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
+GraphDate = pd.DataFrame(dfStat.groupby('datePublicationDonnees')['montant'].sum())
 GraphDate = GraphDate[GraphDate['montant'].between(10, 1.0e+8)] #Suppression des montants exhorbitants
 GraphDate.plot()
 plt.xlabel('\nJour', fontsize=15, color='#3742fa')
@@ -95,14 +96,241 @@ plt.title("Représentation des montants\n", fontsize=18, color='#3742fa')
 sum(GraphDate['montant'])/len(GraphDate['montant']) #Moyenne par jour : 273M à 15M
 sum(df['montant'])/len(df['montant']) #Moyenne par achat : 3 143 354
 df['montant'].describe() #Médiane : 71 560 !!!
-
 df['dureeMois'].describe() #Durée des contrats
+del [dfStat, dfNature, GraphDate]
 ######################################################################
 ######################################################################
-#...............    Suppression des variables "inutiles"
-#del df['donneesExecution']
-#del df['concessionnaires']
-#del df['uuid']       
+#...............    Nettoyage/formatage des données
+
+################### Identifier et supprimer les doublons -> environ 6000
+df = df.drop_duplicates(subset=['source', '_type', 'nature', 'dureeMois',
+                           'dateSignature', 'datePublicationDonnees',
+                           'dateDebutExecution', 'valeurGlobale',
+                           'lieuExecution.code', 'lieuExecution.typeCode',
+                           'lieuExecution.nom', 'objet','dateNotification',
+                           'montant', 'acheteur.id'], keep='first')
+# Impossible de tester avec ces colonnes (car listes) :
+# 'titulaires', 'concessionnaires', 'donneesExecution',
+    
+#Il faudrait peut-être réduire le nombre de variable pour définir les doublons
+#ce qui permettrait d'en supprimer d'avantage (mais risque de perte de données)
+
+################### Identifier les outliers - travail sur les montants
+### Valeur aberrantes ou valeurs atypiques ?
+#Suppression des variables qui n'auraient pas du être présentes
+df['montant'] = np.where(df['montant'] <= 1, np.NaN, df['montant']) #Identification des erreurs avant
+df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
+#Après avoir analysé cas par cas les données extrêmes, la barre des données
+#que l'on peut considérées comme aberrantes est placée au milliard d'€
+df['montant'] = np.where(df['montant'] >= 9.99e8, np.NaN, df['montant']) #Suppression des valeurs aberrantes
+#Il reste toujours des valeurs extrêmes mais elles sont vraisemblables
+#(surtout lorsque l'on sait que le budget annuel d'une ville comme Paris atteint les 10 milliards)
+GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
+plt.boxplot(GraphDate['montant'])
+#Vision des montants après néttoyage
+df.montant.describe()
+
+################### Régions / Départements ##################
+# Création de la colonne pour distinguer les départements
+df['codePostal'] = df['lieuExecution.code'].str[:2]
+# Remplacement des régions outre-mer YT - RE - ... par 97 ou 98
+df['codePostal'] = np.where(df['codePostal'] == 'YT', '976', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'RE', '974', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'PM', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'MQ', '972', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'MF', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'GP', '971', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'GF', '973', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'BL', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'WF', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'TF', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'PF', '98', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == 'NC', '98', df['codePostal'])
+
+# Vérification si c'est bien un code postal
+listeCP = ['01','02','03','04','05','06','07','08','09','10',
+           '11','12','13','14','15','16','17','18','19','20',
+           '21','22','23','24','25','26','27','28','29','30',
+           '31','32','33','34','35','36','37','38','39','40',
+           '41','42','43','44','45','46','47','48','49','50',
+           '51','52','53','54','55','56','57','58','59','60',
+           '61','62','63','64','65','66','67','68','69','70',
+           '71','72','73','74','75','76','77','78','79','80',
+           '81','82','83','84','85','86','87','88','89','90',
+           '91','92','93','94','95','2A','2B','98',
+           '976','974','972','971','973','97']
+def check_cp(codePostal):
+    if codePostal not in listeCP:
+        return np.NaN
+    return codePostal
+df['codePostal'] = df['codePostal'].apply(check_cp)
+#Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
+df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
+
+# Création de la colonne pour distinguer les régions
+df['codeRegion'] = df['codePostal']
+df['codeRegion'] = df['codeRegion'].astype(str)
+# Définition des codes des régions en fonctions des codes de départements
+liste84 = ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74']
+liste27 = ['21', '25', '39', '58', '70', '71', '89', '90']
+liste53 = ['35', '22', '56', '29']
+liste24 = ['18', '28', '36', '37', '41', '45']
+liste94 = ['2A', '2B', '20']
+liste44 = ['08', '10', '51', '52', '54', '55', '57', '67', '68', '88']
+liste32 = ['02', '59', '60', '62', '80']
+liste11 = ['75', '77', '78', '91', '92', '93', '94', '95']
+liste28 = ['14', '27', '50', '61', '76']
+liste75 = ['16', '17', '19', '23', '24', '33', '40', '47', '64', '79', '86', '87']
+liste76 = ['09', '11', '12', '30', '31', '32', '34', '46', '48', '65', '66', '81', '82']
+liste52 = ['44', '49', '53', '72', '85']
+liste93  =['04', '05', '06', '13', '83', '84']
+# Fonction pour attribuer les codes régions
+def code_region(codeRegion): 
+    if codeRegion in liste84: return '84'
+    if codeRegion in liste27: return '27'
+    if codeRegion in liste53: return '53'
+    if codeRegion in liste24: return '24'
+    if codeRegion in liste94: return '94'
+    if codeRegion in liste44: return '44'
+    if codeRegion in liste32: return '32'
+    if codeRegion in liste11: return '11'
+    if codeRegion in liste28: return '28'
+    if codeRegion in liste75: return '75'
+    if codeRegion in liste76: return '76'
+    if codeRegion in liste52: return '52'
+    if codeRegion in liste93: return '93'
+    return codeRegion
+df['codeRegion'] = df['codeRegion'].apply(code_region)
+
+# Mise à jour des codes des régions outres mer
+df['codeRegion'] = np.where(df['codeRegion'] == "976", "06", df['codeRegion'])
+df['codeRegion'] = np.where(df['codeRegion'] == "974", "04", df['codeRegion'])
+df['codeRegion'] = np.where(df['codeRegion'] == "972", "02", df['codeRegion'])
+df['codeRegion'] = np.where(df['codeRegion'] == "971", "01", df['codeRegion'])
+df['codeRegion'] = np.where(df['codeRegion'] == "973", "03", df['codeRegion'])
+# Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
+df['codeRegion'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegion'])
+df['codeRegion'] = df['codeRegion'].astype(str)
+# Vérification des codes région 
+listeReg = ['84', '27', '53', '24', '94', '44', '32',
+            '11', '28', '75', '76', '52', '93', 
+            '01', '02', '03', '04', '06', '98'] #98 = collectivité d'outre mer
+def check_reg(codeRegion):
+    if codeRegion not in listeReg:
+        return np.NaN
+    return codeRegion
+df['codeRegion'] = df['codeRegion'].apply(check_reg)
+#df['codeRegion'].describe()
+
+# Création de la colonne pour le nom des régions
+df['Region'] = df['codeRegion']
+df['Region'] = df['Region'].astype(str)
+# Lien entre codeRegion et nomRegion 
+def nom_region(Region): 
+    if Region == '84' : return 'Auvergne-Rhône-Alpes'
+    if Region == '27' : return 'Bourgogne-Franche-Comté'
+    if Region == '53' : return 'Bretagne'
+    if Region == '24' : return 'Centre-Val de Loire'
+    if Region == '94' : return 'Corse'
+    if Region == '44' : return 'Grand Est'
+    if Region == '32' : return 'Hauts-de-France'
+    if Region == '11' : return 'Île-de-France'
+    if Region == '28' : return 'Normandie'
+    if Region == '75' : return 'Nouvelle-Aquitaine'
+    if Region == '76' : return 'Occitanie'
+    if Region == '52' : return 'Pays de la Loire'
+    if Region == '93' : return 'Provence-Alpes-Côte d\'Azur'
+    if Region == '01' : return 'Guadeloupe'
+    if Region == '02' : return 'Martinique'
+    if Region == '03' : return 'Guyane'
+    if Region == '04' : return 'La Réunion'
+    if Region == '06' : return 'Mayotte'
+    if Region == '98' : return 'Collectivité d\'outre mer'
+    return Region
+df['Region'] = df['Region'].apply(nom_region)
+#df['Region'].describe()
+#del [liste11, liste24, liste27, liste28, liste32, liste44, liste52, liste53, liste75, liste76, liste84, liste93, liste94]
+
+################### Date / Temps ##################
+#..............Les différents types 
+#Duree
+df['dureeMois'].describe() # Duree également en jours...
+#Dates utiles
+df['datePublicationDonnees'].describe() # Date à laquelle les données sont saisies
+df['dateNotification'].describe() # Réel intérêt, plus que datePublicationDonnees
+#Dates utiles que pour les données concessionnaires 
+df['dateDebutExecution'].describe() # 137
+df['dateSignature'].describe() # 137
+
+#..............Travail sur la variable de la durée des marchés
+# Graph avec la médiane, très utile !
+GraphDate = pd.DataFrame(df.groupby('dureeMois')['montant'].median())
+GraphDate.reset_index(level=0, inplace=True)
+GraphDate = GraphDate[GraphDate['dureeMois'].between(1, 38)] 
+del GraphDate['dureeMois']
+GraphDate.plot()
+plt.plot([24, 24], [0, 250000], 'g-', lw=1) # 2 ans
+plt.plot([30, 30], [0, 250000], 'r-', lw=1) # 30 jours
+plt.plot([36, 36], [0, 250000], 'g-', lw=1) # 3 ans
+#plt.plot([48, 48], [0, 400000], 'g-', lw=2) # 4 ans
+plt.title("Montant médian par mois\n", fontsize=18, color='#000000')
+plt.xlabel('\nDurée en mois', fontsize=15, color='#000000')
+plt.ylabel("Montant\n", fontsize=15, color='#000000')
+          
+# Pourquoi le graph avec la moyenne ne donne rien d'utile
+# --> très certainement car il y a des données extrêmes qui fausses tout...           
+GraphDate = pd.DataFrame(df.groupby('dureeMois')['montant'].mean())
+GraphDate.reset_index(level=0, inplace=True)
+GraphDate = GraphDate[GraphDate['dureeMois'].between(1, 60)] 
+GraphDate = GraphDate[GraphDate['montant'].between(10, 1.0e+6)] 
+del GraphDate['dureeMois']
+GraphDate.plot()
+plt.plot([24, 24], [0, 2500000], 'g-', lw=1) # 2 ans
+plt.plot([30, 30], [0, 2500000], 'r-', lw=1) # 30 jours
+plt.plot([36, 36], [0, 2500000], 'g-', lw=1) # 3 ans
+plt.title("Montant moyen par mois\n", fontsize=18, color='#000000')
+plt.xlabel('\Durée en mois', fontsize=15, color='#000000')
+plt.ylabel("Montant\n", fontsize=15, color='#000000')
+
+           
+#..............Travail sur les variables de type date
+df.datePublicationDonnees.describe() 
+df.dateNotification.describe()
+           
+df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
+df.dateNotification = df.dateNotification.str[0:10] 
+#On récupère l'année de notification
+df['anneeNotification'] = df.dateNotification.str[0:4] 
+df['anneeNotification'] = df['anneeNotification'].astype(float)
+#On supprime les erreurs (0021 par exemple)
+df['dateNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['dateNotification'])
+df['anneeNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['anneeNotification'])
+#On récupère le mois de notification
+df['moisNotification'] = df.dateNotification.str[5:7] 
+
+#Graphique pour voir les résultats
+#... Médiane par année
+df['montant'].fillna(0, inplace=True)
+GraphDate = pd.DataFrame(df.groupby('anneeNotification')['montant'].median())
+GraphDate.plot()
+plt.xlabel('\nAnnée', fontsize=15, color='#000000')
+plt.ylabel("Montant\n", fontsize=15, color='#000000')
+plt.title("Médiane des montants par année\n", fontsize=18, color='#3742fa')
+#... Somme
+df['montant'].fillna(0, inplace=True)
+GraphDate = pd.DataFrame(df.groupby('moisNotification')['montant'].sum())
+GraphDate.plot()
+plt.xlabel('\nMois', fontsize=15, color='#000000')
+plt.ylabel("Montant\n", fontsize=15, color='#000000')
+plt.title("Somme des montants par mois\n", fontsize=18, color='#3742fa')
+#... Médiane
+df['montant'].fillna(0, inplace=True)
+GraphDate = pd.DataFrame(df.groupby('moisNotification')['montant'].median())
+GraphDate.plot()
+plt.xlabel('\nMois', fontsize=15, color='#000000')
+plt.ylabel("Montant\n", fontsize=15, color='#000000')
+plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
+
 ######################################################################
 #Check pour comprendre les différences de data entre les sources
 df['source'].describe() #5 sources différentes
@@ -185,16 +413,3 @@ plt.title("Montant des contrats de concession\n", fontsize=18, color='#3742fa')
 #........................... A noter
 # Ces variables sont très différentes des autres, elles n'ont même pas de montant
 # Il faut alors utiliser la colonne valeurGlobale        
-######################################################################
-#Identifier les montants non rempli ou incorrects
-(df['montant'].isnull()).sum() # Le nombre de contrat de concession
-(df['montant']<100).sum() # En dessous de 100, on peut penser que c'est des erreurs
-((df['montant']>10) & (df['montant']<40000)).sum() # En dessous de 40 000, ils ne devraient pas être mentionnés...
-((df['montant']>=40000) & (df['montant']<100000)).sum() # Si le projet de loi passe, ils ne seront plus mentionnés
-((df['montant']>=5e5) & (df['montant']<5e6)).sum() # Vérifier si ces données sont correctes
-(df['montant']>=5e6).sum() # Données très certainement fausses
-#........................... On a donc :
-((df['montant']<40000) | (df['montant']>=5e5)).sum()# Données supposées fausses
-((df['montant']>=40000) & (df['montant']<1.5e5)).sum()# Données supposées bonnes
-# A voir si la barre des 500 000 est bonne ou trop petite, peut-être que bcp de projets dépassent les millions
-# A continuer...
