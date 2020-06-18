@@ -41,7 +41,7 @@ df.info()
 
 ######################################################################
 #............... Quelques stats descriptives AVANT nettoyages des données
-dfStat = df
+dfStat = pd.DataFrame.copy(df, deep = True)
 #Différentes sources des datas
 dfStat["source"].value_counts(normalize=True).plot(kind='pie') #data.gouv.fr_aife - Marches-public.info
 plt.xlabel('')
@@ -80,7 +80,7 @@ plt.title("Montant moyen en fonction des sources\n", fontsize=18, color='#e74c3c
 plt.xticks(rotation= 45)
 plt.tight_layout()
 #Montants en fonction des jours (date)
-df['montant'].fillna(0, inplace=True)
+dfStat['montant'].fillna(0, inplace=True)
 GraphDate = pd.DataFrame(dfStat.groupby('datePublicationDonnees')['montant'].sum())
 GraphDate = GraphDate[GraphDate['montant'].between(10, 1.0e+8)] #Suppression des montants exhorbitants
 GraphDate.plot()
@@ -132,7 +132,15 @@ df.montant.describe()
 
 ################### Régions / Départements ##################
 # Création de la colonne pour distinguer les départements
-df['codePostal'] = df['lieuExecution.code'].str[:2]
+df['lieuExecution.code'] = df['lieuExecution.code'].astype(str)
+df['codePostal'] = df['lieuExecution.code'].str[:3]
+df['codePostal'] = np.where(df['codePostal'] == '976', 'YT', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == '974', 'RE', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == '972', 'MQ', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == '971', 'GP', df['codePostal'])
+df['codePostal'] = np.where(df['codePostal'] == '973', 'GF', df['codePostal'])
+
+df['codePostal'] = df['codePostal'].str[:2]
 # Remplacement des régions outre-mer YT - RE - ... par 97 ou 98
 df['codePostal'] = np.where(df['codePostal'] == 'YT', '976', df['codePostal'])
 df['codePostal'] = np.where(df['codePostal'] == 'RE', '974', df['codePostal'])
@@ -208,6 +216,7 @@ df['codeRegion'] = np.where(df['codeRegion'] == "974", "04", df['codeRegion'])
 df['codeRegion'] = np.where(df['codeRegion'] == "972", "02", df['codeRegion'])
 df['codeRegion'] = np.where(df['codeRegion'] == "971", "01", df['codeRegion'])
 df['codeRegion'] = np.where(df['codeRegion'] == "973", "03", df['codeRegion'])
+df['codeRegion'] = np.where(df['codeRegion'] == "97", "98", df['codeRegion'])
 # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
 df['codeRegion'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegion'])
 df['codeRegion'] = df['codeRegion'].astype(str)
@@ -246,7 +255,7 @@ def nom_region(Region):
     if Region == '04' : return 'La Réunion'
     if Region == '06' : return 'Mayotte'
     if Region == '98' : return 'Collectivité d\'outre mer'
-    return Region
+    return Region;
 df['Region'] = df['Region'].apply(nom_region)
 #df['Region'].describe()
 #del [liste11, liste24, liste27, liste28, liste32, liste44, liste52, liste53, liste75, liste76, liste84, liste93, liste94]
@@ -310,27 +319,158 @@ df['moisNotification'] = df.dateNotification.str[5:7]
 
 #Graphique pour voir les résultats
 #... Médiane par année
-df['montant'].fillna(0, inplace=True)
 GraphDate = pd.DataFrame(df.groupby('anneeNotification')['montant'].median())
 GraphDate.plot()
 plt.xlabel('\nAnnée', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Médiane des montants par année\n", fontsize=18, color='#3742fa')
 #... Somme
-df['montant'].fillna(0, inplace=True)
 GraphDate = pd.DataFrame(df.groupby('moisNotification')['montant'].sum())
 GraphDate.plot()
 plt.xlabel('\nMois', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Somme des montants par mois\n", fontsize=18, color='#3742fa')
 #... Médiane
-df['montant'].fillna(0, inplace=True)
 GraphDate = pd.DataFrame(df.groupby('moisNotification')['montant'].median())
 GraphDate.plot()
 plt.xlabel('\nMois', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
 
+
+######################################################################          
+
+# Vérification du nombre de nan dans les colonnes annee, mois, région, departement
+df['moisNotification'].isnull().sum() #1601
+df['anneeNotification'].isnull().sum() #1601
+df['codePostal'].isnull().sum() #2876
+(df['Region']=='nan').sum() #2495
+
+#On décide de supprimer les lignes ou la variable région est manquante
+#car ceux sont des données au niveau du pays ou internationales
+df = df[df.Region != 'nan']
+
+# Check du nombre de nan dans les montants          
+df['montant'].isnull().sum() #1188
+(df['montant']=='nan').sum() #0
+
+###################### Méthodes simples ########################
+#On va utiliser différentes méthodes pour gérer les valeurs manquantes   
+#......... Méthode 1 : Suppression des valeurs manquantes
+dfM1 = pd.DataFrame.copy(df, deep = True)
+dfM1 = dfM1[dfM1['montant'].notnull()]
+       
+#......... Méthode 2 : Remplacement des nan par la moyenne
+dfM2 = pd.DataFrame.copy(df, deep = True)
+dfM2['montant'] = np.where(dfM2['montant'].isnull(), dfM2['montant'].mean(), dfM2['montant'])
+
+#......... Méthode 3 : Remplacement des nan par la médiane
+dfM3 = pd.DataFrame.copy(df, deep = True)
+dfM3['montant'] = np.where(dfM3['montant'].isnull(), dfM3['montant'].median(), dfM3['montant'])
+
+
+###################### Méthodes plus complexes ########################
+########## Analysons les liens entre les variables et le montant
+dfM = pd.DataFrame.copy(df, deep = True)
+dfM = dfM[dfM['montant'].notnull()]
+dfM = dfM[dfM['Region'].notnull()]
+X = "Region"
+Y = "montant"
+sous_echantillon = dfM
+def eta_squared(x, y):
+    moyenne_y = y.mean()
+    classes = []
+    for classe in x.unique():
+        yi_classe = y[x==classe]
+        classes.append({'ni': len(yi_classe),
+        'moyenne_classe': yi_classe.mean()})
+    SCT = sum([(yj-moyenne_y)**2 for yj in y])
+    SCE = sum([c['ni']*(c['moyenne_classe']-moyenne_y)**2 for c in classes])
+    return SCE/SCT;
+eta_squared(sous_echantillon[X], sous_echantillon[Y])
+
+import scipy.stats as st
+dfM = pd.DataFrame.copy(df, deep = True)
+dfM = dfM[dfM['montant'].notnull()]
+dfM = dfM[dfM['moisNotification'].notnull()]
+df['montant'] = df['montant'].astype(float)
+df['moisNotification'] = df['moisNotification'].astype(float)
+st.pearsonr(dfM['moisNotification'], dfM['montant'])[0]
+
+'''
+Résultats : 
+source : 0.0026 (Rapport de corrélation - SCE/SCT)
+_type : 0 (Rapport de corrélation - SCE/SCT)
+nature : 0.0032 (Rapport de corrélation - SCE/SCT)
+procedure : 0.0076 (Rapport de corrélation - SCE/SCT)
+formePrix : 0.0017 (Rapport de corrélation - SCE/SCT)
+codePostal : 0.0267 (Rapport de corrélation - SCE/SCT)
+codeRegion : 0.0046 (Rapport de corrélation - SCE/SCT)
+Region : 0.0046 (Rapport de corrélation - SCE/SCT)
+anneeNotification : -0.0056 (Coefficient de corrélation - Pearson)
+moisNotification : 0.0080 (Coefficient de corrélation - Pearson)
+
+Conclusion : 
+    A première vue aucune variable n'influe sur le montant
+    Néanmoins, ces tests ne sont pas robustes face aux outliers
+    Or, nos données en contiennent énormément.. 
+    Donc, nous allons tenter de trouver des liens via d'autres moyens 
+'''
+# Quelques graphes :
+plt.scatter(dfM['moisNotification'], dfM['montant'])
+plt.scatter(dfM['anneeNotification'], dfM['montant'])
+plt.scatter(dfM['codeRegion'], dfM['montant'])
+
+
+
+
+
+'''
+#......... Méthode 4 : Remplacement des nan par la moyenne des strates
+dfM4 = pd.DataFrame.copy(df, deep = True)
+impute_grps = pd.pivot_table(dfM4, values=["montant"], 
+                               index=["Region", "moisNotification", "anneeNotification"], 
+                               aggfunc=[np.mean])
+impute_grps.describe()
+# source - _type - nature - procedure - formePrix - codePostal
+# codeRegion - Region - anneeNotification - moisNotification
+dfM4 = dfM4[dfM4[['montant']].fillna(df.groupby('Region').transform('mean'))]
+dfM4['montant'].isnull().sum() #1188 ou 1209 ?..
+dfM4.montant.describe()
+dfM4["montant"] = dfM4.groupby("Region").transform(dfM4.montant.isnull(dfM4.montant.mean()))
+dfM4 = pd.DataFrame(dfM4.groupby('Region')['montant'].isnull().transform('mean'))
+dfM4.groupby('Region')["montant"].median()
+grouped = dfM4.groupby('montant').mean()
+
+#......... Méthode 5 : Remplacement des nan par la médiane des strates
+dfM5 = pd.DataFrame.copy(df, deep = True)
+
+
+
+##### Conclusion - Quelle méthode on sélectionne :
+
+
+
+
+
+######################################################################
+# Vérification des données durée via le montant          
+'''         
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+'''          
 ######################################################################
 #Check pour comprendre les différences de data entre les sources
 df['source'].describe() #5 sources différentes
@@ -389,6 +529,8 @@ dfEnsemble['texte1'] = None
 #len("amelp7135sja2gf")==14
 #"0" in ttestt
 
+#df['test'] = df['test'].str.replace(',','-')
+
 # Utile quand le reste fonctionnera, pour l'instant non
 #del dfEnsemble['texte1']  
 #dfEnsemble.columns = ['code.Siret', 'nom.Entreprise']
@@ -413,3 +555,4 @@ plt.title("Montant des contrats de concession\n", fontsize=18, color='#3742fa')
 #........................... A noter
 # Ces variables sont très différentes des autres, elles n'ont même pas de montant
 # Il faut alors utiliser la colonne valeurGlobale        
+'''
