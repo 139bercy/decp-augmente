@@ -6,12 +6,14 @@ Created on Mon Jun 08
 ######################################################################
 import pandas as pd
 import numpy as np
+#import math
 import json
 from pandas.io.json import json_normalize #Pour corriger les données Json imbriquées
 #%matplotlib inline
 import matplotlib.pyplot as plt
 #plt.style.use('seaborn-whitegrid')
 import seaborn as sns
+import scipy.stats as st
 ######################################################################
 #Chargement des données
 chemin = "H:/Desktop/Data/Json/fichierPrincipal/decp.json"
@@ -115,6 +117,9 @@ df = df.drop_duplicates(subset=['source', '_type', 'nature', 'dureeMois',
 #Il faudrait peut-être réduire le nombre de variable pour définir les doublons
 #ce qui permettrait d'en supprimer d'avantage (mais risque de perte de données)
 
+# Correction afin que ces variables soient représentées pareil    
+df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
+    
 ################### Identifier les outliers - travail sur les montants
 ### Valeur aberrantes ou valeurs atypiques ?
 #Suppression des variables qui n'auraient pas du être présentes
@@ -337,7 +342,7 @@ plt.xlabel('\nMois', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
 
-
+######################################################################
 ######################################################################          
 
 # Vérification du nombre de nan dans les colonnes annee, mois, région, departement
@@ -346,30 +351,17 @@ df['anneeNotification'].isnull().sum() #1601
 df['codePostal'].isnull().sum() #2876
 (df['Region']=='nan').sum() #2495
 
+######################################################################
 #On décide de supprimer les lignes ou la variable région est manquante
 #car ceux sont des données au niveau du pays ou internationales
 df = df[df.Region != 'nan']
+
+######################################################################
 
 # Check du nombre de nan dans les montants          
 df['montant'].isnull().sum() #1188
 (df['montant']=='nan').sum() #0
 
-###################### Méthodes simples ########################
-#On va utiliser différentes méthodes pour gérer les valeurs manquantes   
-#......... Méthode 1 : Suppression des valeurs manquantes
-dfM1 = pd.DataFrame.copy(df, deep = True)
-dfM1 = dfM1[dfM1['montant'].notnull()]
-       
-#......... Méthode 2 : Remplacement des nan par la moyenne
-dfM2 = pd.DataFrame.copy(df, deep = True)
-dfM2['montant'] = np.where(dfM2['montant'].isnull(), dfM2['montant'].mean(), dfM2['montant'])
-
-#......... Méthode 3 : Remplacement des nan par la médiane
-dfM3 = pd.DataFrame.copy(df, deep = True)
-dfM3['montant'] = np.where(dfM3['montant'].isnull(), dfM3['montant'].median(), dfM3['montant'])
-
-
-###################### Méthodes plus complexes ########################
 ########## Analysons les liens entre les variables et le montant
 dfM = pd.DataFrame.copy(df, deep = True)
 dfM = dfM[dfM['montant'].notnull()]
@@ -389,13 +381,14 @@ def eta_squared(x, y):
     return SCE/SCT;
 eta_squared(sous_echantillon[X], sous_echantillon[Y])
 
-import scipy.stats as st
 dfM = pd.DataFrame.copy(df, deep = True)
 dfM = dfM[dfM['montant'].notnull()]
 dfM = dfM[dfM['moisNotification'].notnull()]
 df['montant'] = df['montant'].astype(float)
 df['moisNotification'] = df['moisNotification'].astype(float)
 st.pearsonr(dfM['moisNotification'], dfM['montant'])[0]
+
+del [X, Y, sous_echantillon, dfM]
 
 '''
 Résultats : 
@@ -416,76 +409,211 @@ Conclusion :
     Or, nos données en contiennent énormément.. 
     Donc, nous allons tenter de trouver des liens via d'autres moyens 
 '''
+#Recherchons des liens via des graphiques :
+dfM = pd.DataFrame.copy(df, deep = True)
+# On sélectionne la variable formePrix
+dfM = dfM[dfM['formePrix'].notnull()]
+plt.scatter(dfM['formePrix'], dfM['montant'])
+dfM.groupby('formePrix')['montant'].median()
+# Et la variable codeRegion 
+plt.scatter(dfM['Region'], dfM['montant'])
+dfM.groupby('Region')['montant'].median()
+
+#dfM = dfM[dfM['montant'].between(0, 5000000)] #Suppression des montants exhorbitants
+#plt.scatter(dfM['Region'], dfM['montant'])
+#dfM.groupby('Region')['montant'].median()
+## D'après les graph ces deux variables ont une influence sur le montant 
+#..... Regardons le résultat de ces variables combinés
+dfM = pd.DataFrame.copy(df, deep = True)
+dfMnull = dfM[dfM['montant'].isnull()]
+(dfMnull['formePrix']=='nan').sum() # 137, donc c'est normal !
 # Quelques graphes :
-plt.scatter(dfM['moisNotification'], dfM['montant'])
-plt.scatter(dfM['anneeNotification'], dfM['montant'])
-plt.scatter(dfM['codeRegion'], dfM['montant'])
+dfM['Region'] = dfM['Region'].astype(str)
+dfM['formePrix'] = dfM['formePrix'].astype(str)
+dfM['reg_FP'] = dfM['Region'] + dfM['formePrix']
+(dfM['reg_FP']=='nannan').sum() # 0 = tout est bon !
+plt.scatter(dfM['reg_FP'], dfM['montant'])
+medianeRegFP = dfM.groupby('reg_FP')['montant'].median()
 
+# On retient : les variables Region et formePrix
 
+##############################################################################
+##############################################################################
+#......... Méthode 1 : Suppression des valeurs manquantes
+dfM1 = pd.DataFrame.copy(df, deep = True)
+dfM1 = dfM1[dfM1['montant'].notnull()]
+(1 - len(dfM1) / len(df)) * 100
+# On perd 1.5% de données, donc cette méthode est à éviter
 
+# Testons d'autres méthodes
+listeM2 = []; listeM3 = []; listeM4 = []; listeM5 = []; listeM6 = []
+for i in range(100):
+    dfM = pd.DataFrame.copy(df, deep = True)
+    dfM = dfM[dfM['montant'].notnull()]
+    dfM['Region'] = dfM['Region'].astype(str)
+    dfM['formePrix'] = dfM['formePrix'].astype(str)
+    dfM['reg_FP'] = dfM['Region'] + dfM['formePrix']
+    dfM['montantTest'] = dfM['montant']
+    nb = (dfM['montantTest'].notnull()).sum()
+    dfM.reset_index(level=0, inplace=True)
+    dfM.reset_index(level=0, inplace=True)
+    del dfM['index']
+      
+    for i in range(1200): 
+        dfM['montantTest'] = np.where(dfM['level_0'] == np.random.randint(0,nb), np.NaN, dfM['montantTest'])
+    
+    dfM2 = pd.DataFrame.copy(dfM, deep = True)
+    dfM3 = pd.DataFrame.copy(dfM, deep = True)
+    dfM4 = pd.DataFrame.copy(dfM, deep = True)
+    dfM5 = pd.DataFrame.copy(dfM, deep = True)
+    
+    # Methode 2
+    dfM2['montantTest'] = np.where(dfM2['montantTest'].isnull(), dfM2['montantTest'].mean(), dfM2['montantTest'])
+    dfM2['diffMontant'] = dfM2['montant'] - dfM2['montantTest']
+    
+    dfM2['diffMontant'] = dfM2['diffMontant'].abs()
+    dfM2['diffMontant'] = np.where(dfM2['diffMontant'] == 0, np.NaN, dfM2['diffMontant'])
+    listeM2 = listeM2 + [dfM2['diffMontant'].mean()]
+    
+    # Methode 3
+    dfM3['montantTest'] = np.where(dfM3['montantTest'].isnull(), dfM3['montantTest'].median(), dfM3['montantTest'])
+    dfM3['diffMontant'] = dfM3['montant'] - dfM3['montantTest']    
+    
+    dfM3['diffMontant'] = dfM3['diffMontant'].abs()
+    dfM3['diffMontant'] = np.where(dfM3['diffMontant'] == 0, np.NaN, dfM3['diffMontant'])
+    listeM3 = listeM3 + [dfM3['diffMontant'].mean()]
+    
+    # Methode 4
+    moyenneRegFP = dfM4.groupby('reg_FP')['montantTest'].mean()
+    moyenneRegFP = pd.DataFrame(moyenneRegFP)
+    moyenneRegFP.reset_index(level=0, inplace=True)
+    moyenneRegFP.columns = ['reg_FP','montantEstimation']
+    dfM4 = pd.merge(dfM4, moyenneRegFP, on='reg_FP')    
+    
+    dfM4['montantTest'] = np.where(dfM4['montantTest'].isnull(), dfM4['montantEstimation'], dfM4['montantTest'])
+    dfM4['diffMontant'] = dfM4['montant'] - dfM4['montantTest']
+    dfM4['diffMontant'] = dfM4['diffMontant'].abs()
+    dfM4['diffMontant'] = np.where(dfM4['diffMontant'] == 0, np.NaN, dfM4['diffMontant'])
+    listeM4 = listeM4 + [dfM4['diffMontant'].mean()]
+    
+    # Methode 5
+    medianeRegFP = dfM5.groupby('reg_FP')['montantTest'].median()
+    medianeRegFP = pd.DataFrame(medianeRegFP)
+    medianeRegFP.reset_index(level=0, inplace=True)
+    medianeRegFP.columns = ['reg_FP','montantEstimation']
+    dfM5 = pd.merge(dfM5, medianeRegFP, on='reg_FP')
 
+    dfM5['montantTest'] = np.where(dfM5['montantTest'].isnull(), dfM5['montantEstimation'], dfM5['montantTest'])
+    dfM5['diffMontant'] = dfM5['montant'] - dfM5['montantTest']
+    dfM5['diffMontant'] = dfM5['diffMontant'].abs()
+    dfM5['diffMontant'] = np.where(dfM5['diffMontant'] == 0, np.NaN, dfM5['diffMontant'])
+    listeM5 = listeM5 + [dfM5['diffMontant'].mean()]
+    
+    # Methode 6
+    dfM6 = pd.DataFrame.copy(dfM, deep = True)
+    dfM6['codePostal'] = dfM6['codePostal'].astype(str)
+    dfM6['source'] = dfM6['source'].astype(str)
+    dfM6['nature'] = dfM6['nature'].astype(str)
+    dfM6['procedure'] = dfM6['procedure'].astype(str)
+    dfM6['moisNotification'] = dfM6['moisNotification'].astype(str)
+    dfM6['anneeNotification'] = dfM6['anneeNotification'].astype(str)
+    dfM6['conca'] = dfM6['codePostal'] + dfM6['formePrix'] + dfM6['source'] + dfM6['nature'] + dfM6['procedure'] + dfM6['moisNotification'] + dfM6['anneeNotification']
+    
+    medianeRegFP = dfM6.groupby('conca')['montantTest'].median()
+    medianeRegFP = pd.DataFrame(medianeRegFP)
+    medianeRegFP.reset_index(level=0, inplace=True)
+    medianeRegFP.columns = ['conca','montantEstimation']
+    dfM6 = pd.merge(dfM6, medianeRegFP, on='conca')
 
-'''
-#......... Méthode 4 : Remplacement des nan par la moyenne des strates
-dfM4 = pd.DataFrame.copy(df, deep = True)
-impute_grps = pd.pivot_table(dfM4, values=["montant"], 
-                               index=["Region", "moisNotification", "anneeNotification"], 
-                               aggfunc=[np.mean])
-impute_grps.describe()
-# source - _type - nature - procedure - formePrix - codePostal
-# codeRegion - Region - anneeNotification - moisNotification
-dfM4 = dfM4[dfM4[['montant']].fillna(df.groupby('Region').transform('mean'))]
-dfM4['montant'].isnull().sum() #1188 ou 1209 ?..
-dfM4.montant.describe()
-dfM4["montant"] = dfM4.groupby("Region").transform(dfM4.montant.isnull(dfM4.montant.mean()))
-dfM4 = pd.DataFrame(dfM4.groupby('Region')['montant'].isnull().transform('mean'))
-dfM4.groupby('Region')["montant"].median()
-grouped = dfM4.groupby('montant').mean()
+    dfM6['montantTest'] = np.where(dfM6['montantTest'].isnull(), dfM6['montantEstimation'], dfM6['montantTest'])
+    dfM6['diffMontant'] = dfM6['montant'] - dfM6['montantTest']
+    dfM6['diffMontant'] = dfM6['diffMontant'].abs()
+    dfM6['diffMontant'] = np.where(dfM6['diffMontant'] == 0, np.NaN, dfM6['diffMontant'])
+    listeM6 = listeM6 + [dfM6['diffMontant'].mean()]
 
-#......... Méthode 5 : Remplacement des nan par la médiane des strates
-dfM5 = pd.DataFrame.copy(df, deep = True)
+Minimum = []; Moyenne = []; Mediane = []; Ecart_type = []; Maximum = [];
+for dfM in [listeM2, listeM3, listeM4, listeM5, listeM6]:
+    Minimum += [pd.DataFrame(dfM).abs().min()] 
+    Moyenne += [pd.DataFrame(dfM).abs().mean()]
+    Mediane += [pd.DataFrame(dfM).abs().median()]
+    Ecart_type += [pd.DataFrame(dfM).abs().std()]
+    Maximum += [pd.DataFrame(dfM).abs().max()]
+    
+Minimum = pd.DataFrame(Minimum, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Minimum.columns = ['Minimum']   
+Moyenne = pd.DataFrame(Moyenne, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Moyenne.columns = ['Moyenne']
+Mediane = pd.DataFrame(Mediane, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Mediane.columns = ['Mediane']
+Ecart_type = pd.DataFrame(Ecart_type, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Ecart_type.columns = ['Ecart_type']
+Maximum = pd.DataFrame(Maximum, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Maximum.columns = ['Maximum']
+dfResultats = Minimum.join(Moyenne).join(Mediane).join(Ecart_type).join(Maximum)    
 
-
+del [Minimum, Moyenne, Mediane, Ecart_type, dfM, dfM1, dfM2, dfM3, dfM4, dfM5, dfM6,
+     listeM2, listeM3, listeM4, listeM5, medianeRegFP, moyenneRegFP, i, nb, listeM6]
+##############################################################################
+##############################################################################
 
 ##### Conclusion - Quelle méthode on sélectionne :
+dfResultats.idxmin()  
 
+# Colonne supplémentaire pour indiquer si la valeur est estimée ou non
+df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
 
+# Utilisation de la méthode 5 pour estimer les valeurs manquantes
+df['Region'] = df['Region'].astype(str)
+df['formePrix'] = df['formePrix'].astype(str)
+df['reg_FP'] = df['Region'] + df['formePrix']
+df.reset_index(level=0, inplace=True)
+df.reset_index(level=0, inplace=True)
+del df['index']
+# Calcul de la médiane par classe
+medianeRegFP = pd.DataFrame(df.groupby('reg_FP')['montant'].median())
+medianeRegFP.reset_index(level=0, inplace=True)
+medianeRegFP.columns = ['reg_FP','montantEstimation']
+df = pd.merge(df, medianeRegFP, on='reg_FP')
+# Remplacement des valeurs manquantes par la médiane du groupe
+df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
 
+# Division du dataframe en 2 
+#dfMT = df[(df['montant'].notnull()) & (df['valeurGlobale'].isnull())] # données titulaires
+#dfMC = df[df['valeurGlobale'].notnull()] # données concessionnaires
 
 
 ######################################################################
-# Vérification des données durée via le montant          
-'''         
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-'''          
-######################################################################
-#Check pour comprendre les différences de data entre les sources
-df['source'].describe() #5 sources différentes
-df['source'].unique() 
-#Regardons les 5 sources indépendemment :
-dfGouvAife = df.loc[df['source'] == 'data.gouv.fr_aife'] #Normal !
-dfMpInfo = df.loc[df['source'] == 'marches-publics.info'] #denomination en premier...
-dfGouvPes = df.loc[df['source'] == 'data.gouv.fr_pes'] #Normal !
-dfMpE = df.loc[df['source'] == 'e-marchespublics'] #Normal !
-dfGrandLyon = df.loc[df['source'] == 'grandlyon'] #id en premier ...
+#..............Travail sur la variable de la durée des marchés
+### Analyse de la composition de la duree par rapport au montant
+dfDuree = pd.DataFrame.copy(df, deep = True)
+dfDuree['rationMoisMontant'] = dfDuree['montant'] / dfDuree['dureeMois']
+dfDuree['rationMoisMontant'].describe()
+dfDuree = dfDuree[dfDuree['rationMoisMontant'].notnull()]
+l = [i for i in np.arange(0,0.3,0.01)]
+Rq = pd.DataFrame(np.quantile(dfDuree['rationMoisMontant'], l )); Rq.columns = ['Resultats']  
+q = pd.DataFrame(l); q.columns = ['Quantiles']  
+Quantiles = Rq.join(q)
+plt.plot(Quantiles['Resultats'])
 
+### Application sur le jeu de données principal df
+df['dureeMoisEstime'] = np.where((df['montant']/df['dureeMois'] < 1000)
+  | ((df['dureeMois'] > 12) & (df['montant']/df['dureeMois'] < 5000))
+  | (df['dureeMois'] > 120), "Oui", "Non")
+df['dureeMois'] = np.where(df['montant']/df['dureeMois'] < 1000, round(df['dureeMois']/30,0), df['dureeMois'])
+df['dureeMois'] = np.where((df['dureeMois'] > 12) & (df['montant']/df['dureeMois'] < 5000), round(df['dureeMois']/30,0), df['dureeMois'])
+df['dureeMois'] = np.where(df['dureeMois'] > 120, round(df['dureeMois']/30,0), df['dureeMois'])
+df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
+#df = df(math.ceil(df['dureeMois']))
+
+##### Check du nombre de données estimées
+# Nombre de données estimées pour la durée 
+(df['dureeMoisEstime'] == "Oui").sum()
+# Nombre de données estimées pour le montant et la durée 
+((df['dureeMoisEstime'] == "Oui") & (df['montantEstime'] == "Oui")).sum()
+# Nombre de données estimées pour le montant &/OU la durée 
+((df['dureeMoisEstime'] == "Oui") | (df['montantEstime'] == "Oui")).sum()
+
+
+#del [GraphDate, Quantiles, Rq, chemin, data, dfDuree, l, listeCP, listeReg, medianeRegFP, q]
+######################################################################
+######################################################################
 ######################################################################
 # Début de récupération des données des titulaires "à la main"
-#............... Résultats partiels, non finis
-
 df.uid.value_counts() #Vérifie que les uid sont uniques
 #df avec titulaires et uid
 mycolumns = ['uid', 'titulaires'] 
@@ -494,65 +622,58 @@ dfTitulaires = df[mycolumns]
 dfDegroupe = np.where(dfTitulaires[['titulaires']].isnull(), "[{'typeIdentifiant': 'nan', 'id': 'nan', 'denominationSociale': 'nan'}]", df[['titulaires']])
 dfDegroupe = pd.DataFrame(dfDegroupe, columns = ['ensemble'])
 dfDegroupe = dfDegroupe.applymap(str)
-#Découpage de la colonne titualire pour récupérer la première variable
-dfEnsemble1 = dfDegroupe['ensemble'].str.split("\': \'", 1, expand=True)
-dfEnsemble1 = dfEnsemble1[1].str.split("\', \'", 1, expand=True)
-dfEnsemble = pd.DataFrame(dfEnsemble1[0])
-dfEnsemble.columns = ['texte1']
-#Découpage de la colonne titualire pour récupérer la deuxième variable
-dfEnsemble1 = dfEnsemble1[1].str.split("\': \'", 1, expand=True)
-dfEnsemble1 = dfEnsemble1[1].str.split("\'", 1, expand=True)
-dfEnsemble = pd.concat([dfEnsemble, dfEnsemble1[0]], axis = 1)
-dfEnsemble.columns = ['texte1', 'texte2']
-#Découpage de la colonne titualire pour récupérer la troisième variable
-dfEnsemble1 = dfEnsemble1[1].str.split("\': \'", 1, expand=True)
-dfEnsemble1 = dfEnsemble1[1].str.split("\'}", 1, expand=True)
-#Groupage des 3 variables récupérées permettant d'identifier entièrement une entreprise
-dfEnsemble = pd.concat([dfEnsemble, dfEnsemble1[0]], axis = 1)
-dfEnsemble.columns = ['texte1', 'texte2', 'texte3']
-#Tri des variables car elles sont dans le désordre 
-dfEnsemble['texte1'] = np.where(dfEnsemble['texte1'] == 'SIRET', None, dfEnsemble['texte1'])
-dfEnsemble['texte2'] = np.where(dfEnsemble['texte2'] == 'SIRET', None, dfEnsemble['texte2'])
-dfEnsemble['texte3'] = np.where(dfEnsemble['texte3'] == 'SIRET', None, dfEnsemble['texte3'])
-dfEnsemble['texte1'] = np.where(dfEnsemble['texte1'] == 'nan', None, dfEnsemble['texte1'])
-dfEnsemble['texte2'] = np.where(dfEnsemble['texte2'] == 'nan', None, dfEnsemble['texte2'])
-dfEnsemble['texte3'] = np.where(dfEnsemble['texte3'] == 'nan', None, dfEnsemble['texte3'])
-#Regroupement des variables 
-dfEnsemble['texte3'] = np.where(dfEnsemble['texte3'].isnull(), dfEnsemble['texte1'], dfEnsemble['texte3'])
-dfEnsemble['texte3'] = np.where(dfEnsemble['texte3'] == dfEnsemble['texte1'], dfEnsemble['texte2'], dfEnsemble['texte3'])
-dfEnsemble['texte2'] = np.where(dfEnsemble['texte3'] == dfEnsemble['texte2'], dfEnsemble['texte1'], dfEnsemble['texte2'])
-dfEnsemble['texte1'] = None
-
-###### Test pour différencier les deux colonnes, ne fonctionnent pas.. 
-#isinstance(dfEnsemble['texte3'], int
-#s.startswith('0') == True
-#len("amelp7135sja2gf")==14
-#"0" in ttestt
-
-#df['test'] = df['test'].str.replace(',','-')
-
-# Utile quand le reste fonctionnera, pour l'instant non
-#del dfEnsemble['texte1']  
-#dfEnsemble.columns = ['code.Siret', 'nom.Entreprise']
-#........... A continuer pour les autres entreprises (si aucune autre solution)
-
 ######################################################################
-#........................... Identifier les variables peu représentées
-print(df.isnull().sum())
-#Sur 127 711 lignes il y a pour 6 variables 127 574 valeurs manquantes 
-#ce qui représente que 99.89% des valeurs
-df['_type'].describe()
-#Ces variables sont de _type contrat de concession, il faudra sans doute les traiter à part
-dfCttConcession = pd.DataFrame(df.loc[df['_type'] == 'Contrat de concession'])
-#Graphiques pour ces données
-dfCttConcession['valeurGlobale'] = dfCttConcession['valeurGlobale'].astype('float')
-plt.boxplot(dfCttConcession['valeurGlobale']) #Boite à moustache des montants
-plt.title("Montant des contrats de concession\n", fontsize=18, color='#3742fa')
-#Sans les plus grandes valeurs
-dfCttConcession = dfCttConcession[dfCttConcession['valeurGlobale'].between(-1, 1.0e+7)]
-plt.boxplot(dfCttConcession['valeurGlobale']) #Boite à moustache des montants
-plt.title("Montant des contrats de concession\n", fontsize=18, color='#3742fa')
-#........................... A noter
-# Ces variables sont très différentes des autres, elles n'ont même pas de montant
-# Il faut alors utiliser la colonne valeurGlobale        
-'''
+dfEnsemble = dfDegroupe['ensemble'].str.split("\'", 12, expand=True)
+######################################################################
+dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble[1] == 'typeIdentifiant') &  (dfEnsemble[2] == ': '), dfEnsemble[3], np.NaN)
+dfEnsemble['id'] = np.where((dfEnsemble[5] == 'id') &  (dfEnsemble[6] == ': '), dfEnsemble[7], np.NaN)
+dfEnsemble['denominationSociale'] = np.where((dfEnsemble[9] == 'denominationSociale') &  (dfEnsemble[10] == ': '), dfEnsemble[11], np.NaN)
+######################################################################
+dfEnsemble['OK'] = np.where((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) , 'OK!', np.NaN)
+dfEnsemble['DS'] = np.where(dfEnsemble['OK'] == 'nan', dfEnsemble[10] +  "'" + dfEnsemble[11], np.NaN)
+dfEnsemble.reset_index(level=0, inplace=True)
+dfEnsembleDS = dfEnsemble['DS'].str.split('\"', 2, expand=True)
+dfEnsembleDS.columns = ['t1', 'DS1', 't2']
+dfEnsembleDS.reset_index(level=0, inplace=True)
+dfEnsemble = pd.merge(dfEnsemble, dfEnsembleDS, on='index')
+dfEnsemble['denominationSociale'] = np.where(dfEnsemble['DS1'].notnull(), dfEnsemble['DS1'], dfEnsemble['denominationSociale'])
+######################################################################
+dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble[9] == 'typeIdentifiant') &  (dfEnsemble[10] == ': '), dfEnsemble[11], dfEnsemble['typeIdentifiant'])
+dfEnsemble['denominationSociale'] = np.where((dfEnsemble[1] == 'denominationSociale') &  (dfEnsemble[2] == ': '), dfEnsemble[3], dfEnsemble['denominationSociale'])
+######################################################################
+dfEnsemble['OK'] = np.where((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) , 'OK!', np.NaN)
+dfEnsemble['DS'] = np.where((dfEnsemble['OK'] == 'nan') & (dfEnsemble[0] == '[{') & (dfEnsemble[1] == 'denominationSociale'), dfEnsemble[2] +  "'" + dfEnsemble[3] + "'" + dfEnsemble[4], np.NaN)
+dfEnsemble.reset_index(level=0, inplace=True)
+dfEnsembleDS = dfEnsemble['DS'].str.split('\"', 2, expand=True)
+dfEnsembleDS.columns = ['t1', 'DS2', 't2']
+dfEnsembleDS.reset_index(level=0, inplace=True)
+dfEnsemble = pd.merge(dfEnsemble, dfEnsembleDS, on='index')
+dfEnsemble['denominationSociale'] = np.where(dfEnsemble['DS2'].notnull(), dfEnsemble['DS2'], dfEnsemble['denominationSociale'])
+######################################################################
+dfEnsemble['denominationSociale'] = np.where((dfEnsemble['denominationSociale'].isnull()) & (dfEnsemble[5] == "denominationSociale") & (dfEnsemble[6] == ": "), dfEnsemble[7], dfEnsemble['denominationSociale'])
+dfEnsemble['id'] = np.where((dfEnsemble['id'].isnull()) & (dfEnsemble[9] == "id") & (dfEnsemble[10] == ": "), dfEnsemble[11], dfEnsemble['id'])
+######################################################################
+dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[5] == 'typeIdentifiant') & (dfEnsemble[6] == ": "), dfEnsemble[7], dfEnsemble['typeIdentifiant']) 
+######################################################################
+#dfEnsemble['typeIdentifiant'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[5] == 'denominationSociale') & (dfEnsemble[6] == ': ')), dfEnsemble[6], dfEnsemble['typeIdentifiant'])
+#dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[1] == 'id') & (dfEnsemble[2] == ': ')), dfEnsemble[3], dfEnsemble['id'])
+######################################################################
+dfEnsemble['typeIdentifiant'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[8] == 'typeIdentifiant') & (dfEnsemble[9] == ': ')), dfEnsemble[10], dfEnsemble['typeIdentifiant'])
+dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[4] == 'id') & (dfEnsemble[5] == ': ')), dfEnsemble[6], dfEnsemble['id'])
+######################################################################
+dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[1] == 'id') & (dfEnsemble[2] == ': ')), dfEnsemble[3], dfEnsemble['id'])
+dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[6] == 'id') & (dfEnsemble[7] == ': ')), dfEnsemble[8], dfEnsemble['id'])
+######################################################################
+dfEnsemble = dfEnsemble[(dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble['id'].notnull())]
+dfTitulaires = dfEnsemble[['index', 'typeIdentifiant', 'id', 'denominationSociale']]
+dfTitulaires.columns = ['index', 'typeIdentifiant', 'idTitulaires', 'denominationSociale']
+myList = list(df.columns); myList[0] = 'index'; df.columns = myList
+df = df.sort_values(['index'], ascending=[True])
+df = pd.merge(df, dfTitulaires, how='left', on='index')
+
+del [dfDegroupe, dfEnsemble, dfEnsembleDS, dfTitulaires, myList, mycolumns]
+###############################################################################
+##################### Nettoyage de ces nouvelles colonnes ##################### 
+###############################################################################
+
+#... en cours
