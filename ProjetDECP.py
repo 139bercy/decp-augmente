@@ -682,7 +682,7 @@ df['typeIdentifiant'].describe()
 del [dfDegroupe, dfEnsemble, dfEnsembleDS, dfTitulaires, myList, mycolumns]
 
 ##################### Nettoyage de ces nouvelles colonnes #####################
-dfSIRET = df[['idTitulaires', 'typeIdentifiant']]
+dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
 dfSIRET = dfSIRET[dfSIRET['typeIdentifiant'] == 'SIRET']
 dfSIRET.idTitulaires.astype(str)
 dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
@@ -752,7 +752,7 @@ pd.merge(df,data,"inner", on='index')
 #StockEtablissement_utf8
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
-dfSIRET.columns = ['siret']
+dfSIRET.columns = ['siret', 'denominationSociale']
 dfSIRET['siret'] = dfSIRET['siret'].astype(str)
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
                                                                'siret', 'typeVoieEtablissement', 
@@ -770,13 +770,13 @@ del [resultTemp, gm_chunk, chemin]
 
 nanSiret = dfSIRET.merge(result, indicator=True, how='outer')
 nanSiret = nanSiret[nanSiret['_merge'] == 'left_only']
-nanSiret = pd.DataFrame(nanSiret['siret'])
+nanSiret = pd.DataFrame(nanSiret[['siret', 'denominationSociale']])
 nanSiret.reset_index(inplace=True)
-del nanSiret['index'] 
+nanSiret.columns = ['siren', 'siret', 'denominationSociale'] 
+nanSiret['siren'] = nanSiret['siren'].astype(str)
 for i in range(len(nanSiret)):
-    nanSiret.siret[i] = nanSiret.siret[i][0:9]
+    nanSiret.siren[i] = nanSiret.siret[i][0:9]
 
-nanSiret.columns = ['siren']
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
@@ -793,15 +793,15 @@ for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8'
 result2 = result2.drop_duplicates(subset=['siren'], keep='first')
 del [resultTemp, gm_chunk, chemin]
    
-
-nanSiren = nanSiret.merge(result2, indicator=True, how='outer')
+nanSiren = nanSiret.merge(result2, indicator=True, how='outer', on='siren')
 nanSiren = nanSiren[nanSiren['_merge'] == 'left_only']
-nanSiren = pd.DataFrame(nanSiren['siren'])
+nanSiren = pd.DataFrame(nanSiren[['siren', 'siret_x', 'denominationSociale_x']])
+nanSiren.columns = ["siren", "siret", "a" ,"denominationSociale"]
 nanSiren.reset_index(inplace=True)
-del nanSiren['index'] 
+del nanSiren['index']; del nanSiren['a']
 
 ######################################################################
-''' #....... Autre solution / solution complémentaire :
+''' #....... Solution complémentaire pour ceux non-identifié : selenium pour click button
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(nanSiren)):
     try:
