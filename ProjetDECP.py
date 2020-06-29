@@ -16,6 +16,9 @@ import seaborn as sns
 import scipy.stats as st
 from lxml import html
 import requests
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import time
 ######################################################################
 #Chargement des données
 chemin = "H:/Desktop/Data/Json/fichierPrincipal/decp.json"
@@ -617,69 +620,35 @@ df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
 
 #del [GraphDate, Quantiles, Rq, chemin, data, dfDuree, l, listeCP, listeReg, medianeRegFP, q]
 ######################################################################
-
-
-
+############## Arranger le format des données titulaires #############
 ######################################################################
-# Début de récupération des données des titulaires "à la main"
-df.uid.value_counts() #Vérifie que les uid sont uniques
-#df avec titulaires et uid
-mycolumns = ['uid', 'titulaires'] 
-dfTitulaires = df[mycolumns]
-#Format json appliqué même pour les variables manquantes
-dfDegroupe = np.where(dfTitulaires[['titulaires']].isnull(), "[{'typeIdentifiant': 'nan', 'id': 'nan', 'denominationSociale': 'nan'}]", df[['titulaires']])
-dfDegroupe = pd.DataFrame(dfDegroupe, columns = ['ensemble'])
-dfDegroupe = dfDegroupe.applymap(str)
 
-dfEnsemble = dfDegroupe['ensemble'].str.split("\'", 12, expand=True)
+df.titulaires.fillna('0', inplace=True)
+dfO = df[df['titulaires'] == '0']
+df = df[df['titulaires'] != '0']
 
-dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble[1] == 'typeIdentifiant') &  (dfEnsemble[2] == ': '), dfEnsemble[3], np.NaN)
-dfEnsemble['id'] = np.where((dfEnsemble[5] == 'id') &  (dfEnsemble[6] == ': '), dfEnsemble[7], np.NaN)
-dfEnsemble['denominationSociale'] = np.where((dfEnsemble[9] == 'denominationSociale') &  (dfEnsemble[10] == ': '), dfEnsemble[11], np.NaN)
+def reorga(x):
+    return pd.DataFrame.from_dict(x,orient='index').T
 
-dfEnsemble['OK'] = np.where((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) , 'OK!', np.NaN)
-dfEnsemble['DS'] = np.where(dfEnsemble['OK'] == 'nan', dfEnsemble[10] +  "'" + dfEnsemble[11], np.NaN)
-dfEnsemble.reset_index(level=0, inplace=True)
-dfEnsembleDS = dfEnsemble['DS'].str.split('\"', 2, expand=True)
-dfEnsembleDS.columns = ['t1', 'DS1', 't2']
-dfEnsembleDS.reset_index(level=0, inplace=True)
-dfEnsemble = pd.merge(dfEnsemble, dfEnsembleDS, on='index')
-dfEnsemble['denominationSociale'] = np.where(dfEnsemble['DS1'].notnull(), dfEnsemble['DS1'], dfEnsemble['denominationSociale'])
+liste_col = []
+for index, liste in enumerate(df.titulaires) :
+    for i in liste :
+        col = reorga(i)
+        col["index"] = index
+        liste_col.append(col)
 
-dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble[9] == 'typeIdentifiant') &  (dfEnsemble[10] == ': '), dfEnsemble[11], dfEnsemble['typeIdentifiant'])
-dfEnsemble['denominationSociale'] = np.where((dfEnsemble[1] == 'denominationSociale') &  (dfEnsemble[2] == ': '), dfEnsemble[3], dfEnsemble['denominationSociale'])
-
-dfEnsemble['OK'] = np.where((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) , 'OK!', np.NaN)
-dfEnsemble['DS'] = np.where((dfEnsemble['OK'] == 'nan') & (dfEnsemble[0] == '[{') & (dfEnsemble[1] == 'denominationSociale'), dfEnsemble[2] +  "'" + dfEnsemble[3] + "'" + dfEnsemble[4], np.NaN)
-dfEnsemble.reset_index(level=0, inplace=True)
-dfEnsembleDS = dfEnsemble['DS'].str.split('\"', 2, expand=True)
-dfEnsembleDS.columns = ['t1', 'DS2', 't2']
-dfEnsembleDS.reset_index(level=0, inplace=True)
-dfEnsemble = pd.merge(dfEnsemble, dfEnsembleDS, on='index')
-dfEnsemble['denominationSociale'] = np.where(dfEnsemble['DS2'].notnull(), dfEnsemble['DS2'], dfEnsemble['denominationSociale'])
-
-dfEnsemble['denominationSociale'] = np.where((dfEnsemble['denominationSociale'].isnull()) & (dfEnsemble[5] == "denominationSociale") & (dfEnsemble[6] == ": "), dfEnsemble[7], dfEnsemble['denominationSociale'])
-dfEnsemble['id'] = np.where((dfEnsemble['id'].isnull()) & (dfEnsemble[9] == "id") & (dfEnsemble[10] == ": "), dfEnsemble[11], dfEnsemble['id'])
-
-dfEnsemble['typeIdentifiant'] = np.where((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].notnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[5] == 'typeIdentifiant') & (dfEnsemble[6] == ": "), dfEnsemble[7], dfEnsemble['typeIdentifiant']) 
-
-dfEnsemble['typeIdentifiant'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[8] == 'typeIdentifiant') & (dfEnsemble[9] == ': ')), dfEnsemble[10], dfEnsemble['typeIdentifiant'])
-dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].notnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[4] == 'id') & (dfEnsemble[5] == ': ')), dfEnsemble[6], dfEnsemble['id'])
-
-dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[1] == 'id') & (dfEnsemble[2] == ': ')), dfEnsemble[3], dfEnsemble['id'])
-dfEnsemble['id'] = np.where(((dfEnsemble['typeIdentifiant'].isnull()) & (dfEnsemble['id'].isnull()) & (dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble[6] == 'id') & (dfEnsemble[7] == ': ')), dfEnsemble[8], dfEnsemble['id'])
-
-dfEnsemble = dfEnsemble[(dfEnsemble['denominationSociale'].notnull()) & (dfEnsemble['id'].notnull())]
-dfTitulaires = dfEnsemble[['index', 'typeIdentifiant', 'id', 'denominationSociale']]
-dfTitulaires.columns = ['index', 'typeIdentifiant', 'idTitulaires', 'denominationSociale']
+del df['level_0']
+df.reset_index(level=0, inplace=True) # drop = true
+del df['index']
+df.reset_index(level=0, inplace=True) 
 myList = list(df.columns); myList[0] = 'index'; df.columns = myList
-df = df.sort_values(['index'], ascending=[True])
-df = pd.merge(df, dfTitulaires, how='left', on='index')
 
-df['denominationSociale'].describe()
-df['id'].describe()
-df['typeIdentifiant'].describe()
-del [dfDegroupe, dfEnsemble, dfEnsembleDS, dfTitulaires, myList, mycolumns]
+dfTitulaires = pd.concat(liste_col, sort = False)
+dfTitulaires.reset_index(level=0, inplace=True) 
+
+df = pd.merge(df, dfTitulaires, on=['index'])
+myList = list(df.columns); myList[41] = 'idTitulaires'; df.columns = myList
+#del i, index, liste, liste_col, col, dfTitulaires, myList
 
 ##################### Nettoyage de ces nouvelles colonnes #####################
 dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
@@ -703,52 +672,14 @@ for i in range (len(dfSIRET)):
 dfSIRET = dfSIRET[dfSIRET['typeIdentifiant'] == 'Oui']
 del dfSIRET['typeIdentifiant'], dfSIRET['index']
 
+######## Récupération code NIC
+df.idTitulaires = df.idTitulaires.astype(str)
+for i in range(len(df)):
+    df['nic'][i] = df.idTitulaires[i][-5:]
+# Supprimer le code NIC plus tard si aucune correspondance INSEE/scraping 
 
-######################################################################
-########## Test gestion différentes colonnes titulaire ###############
-######################################################################
-#df[['titulaires']] = np.where(df[['titulaires']].isnull(), "[{'typeIdentifiant': 'nan', 'id': 'nan', 'denominationSociale': 'nan'}]", df[['titulaires']])
-#df.groupby(level=0).apply(lambda df: df.xs(df.name)[colname].to_dict()).to_dict() 
-'''
-dfTitulaires = pd.DataFrame(df['titulaires'])
-dfTitulaires['titulaires'] = np.where(dfTitulaires['titulaires'].isnull(), '[]', dfTitulaires['titulaires'])
-dfTitulaires['titulaires'] = dfTitulaires['titulaires'].astype(str)
-dfTitulaires = pd.DataFrame(dfTitulaires.titulaires.str.split('[',1).tolist(),
-                                   columns = ['txt1','titulaires'])
-dfTitulaires = pd.DataFrame(dfTitulaires.titulaires.str.split(']',1).tolist(),
-                                   columns = ['titulaires','txt2'])
-del dfTitulaires['txt2']
-dfTitulaires['titulaires'] = np.where(dfTitulaires['titulaires'] == '', '{}', dfTitulaires['titulaires'])
-#dfTitulaires = pd.DataFrame(dfTitulaires.values.tolist())
-dfTitulaires = pd.DataFrame(dfTitulaires.groupby(level=0).apply(lambda dfTitulaires: dfTitulaires.xs(dfTitulaires.name).to_dict()).to_dict()).T 
-
-######################################################################
-
-dfTest = pd.DataFrame.copy(df, deep = True)
-dfTest.titulaires.dropna(inplace=True)
-dfTest.titulaires[1].values
-pd.DataFrame.from_dict(dfTest.titulaires[1],orient='index').T
-
-def reorga(x):
-    return pd.DataFrame.from_dict(x,orient='index').T
-
-liste_col = []
-for index, liste in enumerate(dfTitulaires[:100]) :
-    for i in liste :
-        if i is not np.nan:
-            col = reorga(i)
-            col["index"] = index
-            liste_col.append(col)
-            
-data = pd.concat(liste_col)
-
-#df.reset_index(level=0, inplace=True) 
-df['index'] = list(range(df.shape[0]))
-pd.merge(df,data,"inner", on='index')
-'''
 ######################################################################
 ######## Enrichissement des données via les codes siret/siren ########
-
 #StockEtablissement_utf8
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
@@ -801,11 +732,11 @@ nanSiren.reset_index(inplace=True)
 del nanSiren['index']; del nanSiren['a']
 
 ######################################################################
-''' #....... Solution complémentaire pour ceux non-identifié : selenium pour click button
+#....... Solution complémentaire pour ceux non-identifié dans la BDD
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(nanSiren)):
     try:
-        url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.idTitulaires[i]
+        url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siren[i]
         
         page = requests.get(url)
         tree = html.fromstring(page.content)
@@ -814,6 +745,7 @@ for i in range(len(nanSiren)):
         infos = tree.xpath('//p/text()')
         details = tree.xpath('//a/text()')
         
+        print(i)
         index = i
         rue = rueSiret[1]
         siret = rueSiret[5].replace(" ","")
@@ -822,7 +754,7 @@ for i in range(len(nanSiren)):
         codeType = infos[16].replace(" : ","")
         detailsType1 = details[28]
         detailsType2 = details[29]
-        verification = (siret == nanSiren.idTitulaires[i])
+        verification = (siret == nanSiren.siret[i])
         if (detailsType1 ==' '):
             detailType = detailsType2
         else:
@@ -840,7 +772,7 @@ for i in range(len(nanSiren)):
             #codeType = infos[12].replace(" : ","")
             detailsType = infos[11]
             #detailsType2 = infos[29]
-            verification = (siret == nanSiren.idTitulaires[i])
+            verification = (siret == nanSiren.siret[i])
     
         scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
         df_scrap = pd.concat([df_scrap, scrap], axis=0)
@@ -850,14 +782,74 @@ for i in range(len(nanSiren)):
         df_scrap = pd.concat([df_scrap, scrap], axis=0)
         pass
 
-# Résultat : 97% des données sont enrichies
+del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, verification, ville 
+######################################################################
+######################################################################
+
+dfDS = nanSiren.merge(df_scrap, indicator=True, how='outer', on='siret')
+dfDS = dfDS[dfDS['_merge'] == 'left_only']
+dfDS = dfDS.iloc[:,:3]  
+
+def requete(nom):
+    pager.get('https://www.infogreffe.fr/recherche-siret-entreprise/chercher-siret-entreprise.html')
+    pager.find_element_by_xpath('//*[@id="p1_deno"]').send_keys(nom, Keys.ENTER)
+    time.sleep(2)
+    url = pager.current_url
+    return url
+pager = webdriver.Firefox(executable_path = "H:/Desktop/Data/geckodriver.exe")
+
+df_scrap2 = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
+for i in range(len(dfDS)):
+    try:
+        url = requete(dfDS.denominationSociale[i])
+        
+        page = requests.get(url)
+        tree = html.fromstring(page.content)
+        
+        rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
+        infos = tree.xpath('//p/text()')
+        details = tree.xpath('//a/text()')
+        
+        print(i)
+        index = i
+        rue = rueSiret[1]
+        siret = rueSiret[5].replace(" ","")
+        ville = infos[7]
+        typeEntreprise = infos[15]
+        codeType = infos[16].replace(" : ","")
+        detailsType1 = details[28]
+        detailsType2 = details[29]
+        verification = (siret == dfDS.siret[i])
+        if (detailsType1 ==' '):
+            detailType = detailsType2
+        else:
+            detailsType = detailsType1
+        
+        scrap2 = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+        df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
+    except:
+        index = i
+        scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+        df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
+        pass
+
+dfDS2 = df_scrap2.merge(df_scrap, indicator=True, how='outer', on='siret')
+dfDS2 = dfDS2[dfDS2['_merge'] == 'left_only']
+
+
+# Résultat : 99% des données sont enrichies
 df_codeEntreprise = df_scrap[['codeType', 'detailsType']]
 df_codeEntreprise = df_codeEntreprise.drop_duplicates(subset=['detailsType'], keep='first')
 
-test = pd.DataFrame(df[df['idTitulaires'] == '79020892000023'])
-'''
 ######################################################################
 # Analyse géographique - carte 
+
+
+
+
+
+
+
 
 
 
@@ -877,10 +869,7 @@ d[0].describe()
 #dfMT = df[(df['montant'].notnull()) & (df['valeurGlobale'].isnull())] # données titulaires
 #dfMC = df[df['valeurGlobale'].notnull()] # données concessionnaires
 
-# Interroger Api pour code SIRET (voir INSEE)
-# mettre en cache 
-#   7 juillet web insee
+# conférence API Insee 7 juillet web insee
 
-#installer git sur pc
-#mettre une nouvelle branche sur github
+#apprendre à utiliser git sur pc
 ######################################################################
