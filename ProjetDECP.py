@@ -841,35 +841,3 @@ dfDS2 = dfDS2[dfDS2['_merge'] == 'left_only']
 df_codeEntreprise = df_scrap[['codeType', 'detailsType']]
 df_codeEntreprise = df_codeEntreprise.drop_duplicates(subset=['detailsType'], keep='first')
 
-######################################################################
-# Analyse géographique - carte 
-
-
-
-
-
-
-
-
-
-
-######################################################################
-# régression - random forest pour les modèles du montant
-# REGEX pour les communes
-# Revenir sur region avec les dict
-(df['lieuExecution.typeCode']=='CODE COMMUNE').sum()
-(df['lieuExecution.typeCode']=='Code commune').sum()
-df['lieuExecution.typeCode'].unique()
-df["lieuExecution.typeCode"].value_counts(normalize=True).plot(kind='pie')
-
-# Gérer les concessionnaires à part
-d = df.iloc[0]['concessionnaires']
-d[0].describe()
-# Division du dataframe en 2 
-#dfMT = df[(df['montant'].notnull()) & (df['valeurGlobale'].isnull())] # données titulaires
-#dfMC = df[df['valeurGlobale'].notnull()] # données concessionnaires
-
-# conférence API Insee 7 juillet web insee
-
-#apprendre à utiliser git sur pc
-######################################################################
