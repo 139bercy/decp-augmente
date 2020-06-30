@@ -19,6 +19,10 @@ import requests
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
+from sklearn.ensemble import RandomForestRegressor
+######################################################################
+#import warnings
+#warnings.filterwarnings("ignore")
 ######################################################################
 #Chargement des données
 chemin = "H:/Desktop/Data/Json/fichierPrincipal/decp.json"
@@ -125,12 +129,13 @@ df = df.drop_duplicates(subset=['source', '_type', 'nature', 'dureeMois',
 
 # Correction afin que ces variables soient représentées pareil    
 df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
+df['formePrix'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
     
 ################### Identifier les outliers - travail sur les montants
 ### Valeur aberrantes ou valeurs atypiques ?
 #Suppression des variables qui n'auraient pas du être présentes
-df['montant'] = np.where(df['montant'] <= 1, np.NaN, df['montant']) #Identification des erreurs avant
-df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
+df['montant'] = np.where(df['montant'] <= 200, np.NaN, df['montant']) # Règle à discuter
+#df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
 #Après avoir analysé cas par cas les données extrêmes, la barre des données
 #que l'on peut considérées comme aberrantes est placée au milliard d'€
 df['montant'] = np.where(df['montant'] >= 9.99e8, np.NaN, df['montant']) #Suppression des valeurs aberrantes
@@ -554,12 +559,64 @@ dfResultats = Minimum.join(Moyenne).join(Mediane).join(Ecart_type).join(Maximum)
 
 del [Minimum, Moyenne, Mediane, Ecart_type, dfM, dfM1, dfM2, dfM3, dfM4, dfM5, dfM6,
      listeM2, listeM3, listeM4, listeM5, medianeRegFP, moyenneRegFP, i, nb, listeM6]
+
 ##############################################################################
 ### Autre méthode à tester
-# Random forest 
+############ Random Forest
+def binateur(data, to_bin):
+    data = data.copy()
+    X = data[to_bin]
+    X = pd.get_dummies(X)
+    data = data.drop(columns=to_bin)
+    X = X.fillna(0)
+    return pd.concat([data, X], axis=1)
 
+colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'dateSignature', 'dateDebutExecution',  
+                     'valeurGlobale', 'montantSubventionPublique', 'donneesExecution', 
+                     'concessionnaires', 'modifications', 'autoriteConcedante.id', 'acheteur.id', 
+                     'codeRegion', 'autoriteConcedante.nom', 'lieuExecution.code', 'titulaires', 
+                     'acheteur.nom', 'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 
+                     'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'dateNotification']
 
+dfmontant = pd.DataFrame(df['montant'])
+dfNoMontant = df.drop(columns='montant')
+dfNoMontant = dfNoMontant.drop(columns=colonnes_inutiles)
 
+dfNoMontant = binateur(dfNoMontant, dfNoMontant.columns)
+
+dfRF = dfmontant.join(dfNoMontant)
+dfRF.head(5)
+
+df_Train = dfRF[dfRF.montant.notnull()]
+df_Predict = dfRF[dfRF.montant.isnull()]
+
+X = df_Train.drop(columns=['montant'])
+y = df_Train['montant']
+regressor = RandomForestRegressor()
+regressor.fit(X, y)
+
+X_test = df_Predict.drop(columns=['montant'])
+y_predict = df_Predict['montant']
+y_test = regressor.predict(X_test)
+
+df.reset_index(level=0, inplace=True)
+df.reset_index(level=0, inplace=True)
+dfIM = df.loc[df['montant'].isnull()]
+dfIM = dfIM['level_0']
+y_test = pd.DataFrame(y_test)
+dfIM = pd.DataFrame(dfIM)
+
+dfIM.reset_index(inplace=True)
+del dfIM['index']
+dfIM.reset_index(inplace=True)
+y_test.reset_index(inplace=True)
+
+predict = pd.merge(y_test, dfIM, on='index')
+del predict['index']
+predict.columns = ['montantEstime', 'level_0']
+df = pd.merge(df, predict, how='outer' ,on=["level_0"])
+df.montant = np.where(df.montant.isnull(), df.montantEstime, df.montant)
+df.montant.isnull().sum()
 
 ##############################################################################
 ##############################################################################
@@ -841,3 +898,35 @@ dfDS2 = dfDS2[dfDS2['_merge'] == 'left_only']
 df_codeEntreprise = df_scrap[['codeType', 'detailsType']]
 df_codeEntreprise = df_codeEntreprise.drop_duplicates(subset=['detailsType'], keep='first')
 
+######################################################################
+# Analyse géographique - carte 
+
+
+
+
+
+
+
+
+
+
+######################################################################
+# régression - random forest pour les modèles du montant
+# REGEX pour les communes
+# Revenir sur region avec les dict
+(df['lieuExecution.typeCode']=='CODE COMMUNE').sum()
+(df['lieuExecution.typeCode']=='Code commune').sum()
+df['lieuExecution.typeCode'].unique()
+df["lieuExecution.typeCode"].value_counts(normalize=True).plot(kind='pie')
+
+# Gérer les concessionnaires à part
+d = df.iloc[0]['concessionnaires']
+d[0].describe()
+# Division du dataframe en 2 
+#dfMT = df[(df['montant'].notnull()) & (df['valeurGlobale'].isnull())] # données titulaires
+#dfMC = df[df['valeurGlobale'].notnull()] # données concessionnaires
+
+# conférence API Insee 7 juillet web insee
+
+#apprendre à utiliser git sur pc
+######################################################################
