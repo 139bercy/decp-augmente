@@ -457,8 +457,8 @@ dfM1 = dfM1[dfM1['montant'].notnull()]
 # On perd 1.5% de données, donc cette méthode est à éviter
 
 # Testons d'autres méthodes
-listeM2 = []; listeM3 = []; listeM4 = []; listeM5 = []; listeM6 = []
-for i in range(100):
+listeM2 = []; listeM3 = []; listeM4 = []; listeM5 = []; listeM6 = []; listeM7 = []
+for i in range(25):
     dfM = pd.DataFrame.copy(df, deep = True)
     dfM = dfM[dfM['montant'].notnull()]
     dfM['Region'] = dfM['Region'].astype(str)
@@ -542,23 +542,86 @@ for i in range(100):
     dfM6['diffMontant'] = np.where(dfM6['diffMontant'] == 0, np.NaN, dfM6['diffMontant'])
     listeM6 = listeM6 + [dfM6['diffMontant'].mean()]
 
+    # Methode 7 : Random Forest
+    def binateur(data, to_bin):
+        data = data.copy()
+        X = data[to_bin]
+        X = pd.get_dummies(X)
+        data = data.drop(columns=to_bin)
+        X = X.fillna(0)
+        return pd.concat([data, X], axis=1)
+    
+    colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'dateSignature', 'dateDebutExecution',  
+                         'valeurGlobale', 'montantSubventionPublique', 'donneesExecution', 
+                         'concessionnaires', 'modifications', 'autoriteConcedante.id', 'acheteur.id', 
+                         'codeRegion', 'autoriteConcedante.nom', 'lieuExecution.code', 'titulaires', 
+                         'acheteur.nom', 'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 
+                         'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'dateNotification', 'montant']
+    
+    dfM7 = pd.DataFrame.copy(dfM, deep = True)
+    dfM7 = dfM7.drop(columns=['reg_FP', 'level_0'])
+    dfmontant = pd.DataFrame(dfM7['montantTest'])
+    dfNoMontant = dfM7.drop(columns='montantTest')
+    dfNoMontant = dfNoMontant.drop(columns=colonnes_inutiles)
+    
+    dfNoMontant = binateur(dfNoMontant, dfNoMontant.columns)
+    
+    dfRF = dfmontant.join(dfNoMontant)
+    #dfRF.head(5)
+    
+    df_Train = dfRF[dfRF.montantTest.notnull()]
+    df_Predict = dfRF[dfRF.montantTest.isnull()]
+    
+    X = df_Train.drop(columns=['montantTest'])
+    y = df_Train['montantTest']
+    regressor = RandomForestRegressor()
+    regressor.fit(X, y)
+    
+    X_test = df_Predict.drop(columns=['montantTest'])
+    y_predict = df_Predict['montantTest']
+    y_test = regressor.predict(X_test)
+    
+    dfM7.reset_index(level=0, inplace=True)
+    dfM7.reset_index(level=0, inplace=True)
+    dfIM = dfM7.loc[dfM7['montantTest'].isnull()]
+    dfIM = dfIM['level_0']
+    y_test = pd.DataFrame(y_test)
+    dfIM = pd.DataFrame(dfIM)
+    
+    dfIM.reset_index(inplace=True)
+    del dfIM['index']
+    dfIM.reset_index(inplace=True)
+    y_test.reset_index(inplace=True)
+    
+    predict = pd.merge(y_test, dfIM, on='index')
+    del predict['index']
+    predict.columns = ['montantEstime', 'level_0']
+    dfM7 = pd.merge(dfM7, predict, how='outer' ,on=["level_0"])
+    dfM7['montantTest'] = np.where(dfM7['montantTest'].isnull(), dfM7.montantEstime, dfM7['montantTest'])
+
+    dfM7['diffMontant'] = dfM7['montant'] - dfM7['montantTest']
+    dfM7['diffMontant'] = dfM7['diffMontant'].abs()
+    dfM7['diffMontant'] = np.where(dfM7['diffMontant'] == 0, np.NaN, dfM7['diffMontant'])
+    listeM7 = listeM7 + [dfM7['diffMontant'].mean()]
+
 Minimum = []; Moyenne = []; Mediane = []; Ecart_type = []; Maximum = [];
-for dfM in [listeM2, listeM3, listeM4, listeM5, listeM6]:
+for dfM in [listeM2, listeM3, listeM4, listeM5, listeM6, listeM7]:
     Minimum += [pd.DataFrame(dfM).abs().min()] 
     Moyenne += [pd.DataFrame(dfM).abs().mean()]
     Mediane += [pd.DataFrame(dfM).abs().median()]
     Ecart_type += [pd.DataFrame(dfM).abs().std()]
     Maximum += [pd.DataFrame(dfM).abs().max()]
     
-Minimum = pd.DataFrame(Minimum, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Minimum.columns = ['Minimum']   
-Moyenne = pd.DataFrame(Moyenne, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Moyenne.columns = ['Moyenne']
-Mediane = pd.DataFrame(Mediane, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Mediane.columns = ['Mediane']
-Ecart_type = pd.DataFrame(Ecart_type, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Ecart_type.columns = ['Ecart_type']
-Maximum = pd.DataFrame(Maximum, index = ['M2', 'M3', 'M4', 'M5', 'M6']); Maximum.columns = ['Maximum']
+Minimum = pd.DataFrame(Minimum, index = ['M2', 'M3', 'M4', 'M5', 'M6', 'M7']); Minimum.columns = ['Minimum']   
+Moyenne = pd.DataFrame(Moyenne, index = ['M2', 'M3', 'M4', 'M5', 'M6', 'M7']); Moyenne.columns = ['Moyenne']
+Mediane = pd.DataFrame(Mediane, index = ['M2', 'M3', 'M4', 'M5', 'M6', 'M7']); Mediane.columns = ['Mediane']
+Ecart_type = pd.DataFrame(Ecart_type, index = ['M2', 'M3', 'M4', 'M5', 'M6', 'M7']); Ecart_type.columns = ['Ecart_type']
+Maximum = pd.DataFrame(Maximum, index = ['M2', 'M3', 'M4', 'M5', 'M6', 'M7']); Maximum.columns = ['Maximum']
 dfResultats = Minimum.join(Moyenne).join(Mediane).join(Ecart_type).join(Maximum)    
 
-del [Minimum, Moyenne, Mediane, Ecart_type, dfM, dfM1, dfM2, dfM3, dfM4, dfM5, dfM6,
-     listeM2, listeM3, listeM4, listeM5, medianeRegFP, moyenneRegFP, i, nb, listeM6]
+del [Minimum, Moyenne, Mediane, Ecart_type, dfM, dfM1, dfM2, dfM3, dfM4, dfM5, dfM6, dfM7,
+     listeM2, listeM3, listeM4, listeM5, medianeRegFP, moyenneRegFP, i, nb, listeM6, listeM7]
+
 
 ##############################################################################
 ### Autre méthode à tester
