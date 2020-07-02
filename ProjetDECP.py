@@ -6,13 +6,9 @@ Created on Mon Jun 08
 ######################################################################
 import pandas as pd
 import numpy as np
-#import math
 import json
-from pandas.io.json import json_normalize #Pour corriger les données Json imbriquées
-#%matplotlib inline
+from pandas.io.json import json_normalize
 import matplotlib.pyplot as plt
-#plt.style.use('seaborn-whitegrid')
-import seaborn as sns
 import scipy.stats as st
 from lxml import html
 import requests
@@ -28,12 +24,11 @@ from sklearn.ensemble import RandomForestRegressor
 chemin = "H:/Desktop/Data/Json/fichierPrincipal/decp.json"
 with open(chemin, encoding='utf-8') as json_data:
     data = json.load(json_data)
-#Aplatir les données Json imbriquées
-df = json_normalize(data['marches'])
+df = json_normalize(data['marches']) #Aplatir les données Json imbriquées
 #test = json_normalize(data, record_path = ['marches', 'modifications'])
 
-#Autre solution
 """
+#Autre solution
 lien = "H:/Desktop/Data/Json/fichierPrincipal/decp.json"
 test = pd.read_json(path_or_buf=lien, orient='index', typ='series', dtype=True,
                  convert_axes=False, convert_dates=True, keep_default_dates=True, 
@@ -42,7 +37,84 @@ test = pd.read_json(path_or_buf=lien, orient='index', typ='series', dtype=True,
 test = json_normalize(test['marches'])
 """
 ######################################################################
+############## Arranger le format des données titulaires #############
+######################################################################
+#Gestion différences concessionnaires / titulaires
+df.titulaires = np.where(df.titulaires.isnull(), df.concessionnaires, df.titulaires)
+df.montant = np.where(df.montant.isnull(), df.valeurGlobale, df.montant)
+df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
+df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
 
+donneesInutiles = ['dateSignature', 'dateDebutExecution',  'valeurGlobale', 'donneesExecution', 'concessionnaires', 
+                   'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom']
+df = df.drop(columns=donneesInutiles)
+    
+#Récupération des données titulaires    
+df.titulaires.fillna('0', inplace=True)
+dfO = df[df['titulaires'] == '0']
+df = df[df['titulaires'] != '0']
+
+def reorga(x):
+    return pd.DataFrame.from_dict(x,orient='index').T
+
+liste_col = []
+for index, liste in enumerate(df.titulaires) :
+    for i in liste :
+        col = reorga(i)
+        col["index"] = index
+        liste_col.append(col)
+
+#del df['level_0']
+df.reset_index(level=0, inplace=True) # drop = true
+del df['index']
+df.reset_index(level=0, inplace=True) 
+myList = list(df.columns); myList[0] = 'index'; df.columns = myList
+
+dfTitulaires = pd.concat(liste_col, sort = False)
+dfTitulaires.reset_index(level=0, inplace=True) 
+myList = list(dfTitulaires.columns); myList[2] = 'idTitulaires'; dfTitulaires.columns = myList
+
+df = pd.merge(df, dfTitulaires, on=['index'])
+df = df.drop(columns=['titulaires','level_0'])
+del i, index, liste, liste_col, col, dfTitulaires, myList, donneesInutiles
+######################################################################
+'''
+Gérer avec les redondances de la colonne index :
+    montants / nb titulaires
+'''
+df = df.drop(columns=['index'])
+######################################################################
+
+##################### Nettoyage de ces nouvelles colonnes #####################
+df.idTitulaires = np.where(df.typeIdentifiant != 'SIRET','00000000000000',df.idTitulaires)
+#df.idTitulaires.astype(str)
+df.reset_index(inplace=True) 
+for i in range(len(df)):
+    df.idTitulaires[i] = df.idTitulaires[i].replace("\\t", "")
+    df.idTitulaires[i] = df.idTitulaires[i].replace("-", "")
+    df.idTitulaires[i] = df.idTitulaires[i].replace(" ", "")
+    df.idTitulaires[i] = df.idTitulaires[i].replace(".", "")
+    df.idTitulaires[i] = df.idTitulaires[i].replace("?", "")
+    df.idTitulaires[i] = df.idTitulaires[i].replace("    ", "")
+del df['index']
+
+######## Récupération code NIC
+df["nic"] = np.nan
+df.nic = df.nic.astype(str)
+df.idTitulaires = df.idTitulaires.astype(str)
+for i in range(len(df)):
+    df['nic'][i] = df.idTitulaires[i][-5:]
+df.nic = np.where(df.typeIdentifiant != 'SIRET',np.NaN, df.nic)    
+# Supprimer le code NIC plus tard si aucune correspondance bdd INSEE/scraping 
+df.nic = df.nic.astype(str)
+for i in range (len(df)):
+    if (df.nic[i].isdigit() == False):
+        df.nic[i] = np.NaN
+
+'''
+import seaborn as sns
+######################################################################
+#............... Quelques stats descriptives AVANT nettoyages des données
 #Vision rapide df
 df.head(5)
 #Quelques informations sur les variables quanti
@@ -50,8 +122,6 @@ df.describe()
 #Nombre de données par variable
 df.info()
 
-######################################################################
-#............... Quelques stats descriptives AVANT nettoyages des données
 dfStat = pd.DataFrame.copy(df, deep = True)
 #Différentes sources des datas
 dfStat["source"].value_counts(normalize=True).plot(kind='pie') #data.gouv.fr_aife - Marches-public.info
@@ -109,42 +179,28 @@ sum(df['montant'])/len(df['montant']) #Moyenne par achat : 3 143 354
 df['montant'].describe() #Médiane : 71 560 !!!
 df['dureeMois'].describe() #Durée des contrats
 del [dfStat, dfNature, GraphDate]
-
+'''
 ######################################################################
 ######################################################################
 #...............    Nettoyage/formatage des données
 
 ################### Identifier et supprimer les doublons -> environ 6000
-df = df.drop_duplicates(subset=['source', '_type', 'nature', 'dureeMois',
-                           'dateSignature', 'datePublicationDonnees',
-                           'dateDebutExecution', 'valeurGlobale',
-                           'lieuExecution.code', 'lieuExecution.typeCode',
-                           'lieuExecution.nom', 'objet','dateNotification',
-                           'montant', 'acheteur.id'], keep='first')
-# Impossible de tester avec ces colonnes (car listes) :
-# 'titulaires', 'concessionnaires', 'donneesExecution',
-    
-#Il faudrait peut-être réduire le nombre de variable pour définir les doublons
-#ce qui permettrait d'en supprimer d'avantage (mais risque de perte de données)
+df = df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
+                           'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
+                           'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant', 
+                           'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
+                           'denominationSociale', 'nic'], keep='first')
+# Intégrer ou non l'ID 
+# Avec id  : 117 données en moins
+# Sans id : 7238 données en moins
 
+# Reset l'index car on supprime quelques données avec les doublons 
+df.reset_index(inplace=True, drop = True)
+    
 # Correction afin que ces variables soient représentées pareil    
 df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
 df['formePrix'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
-    
-################### Identifier les outliers - travail sur les montants
-### Valeur aberrantes ou valeurs atypiques ?
-#Suppression des variables qui n'auraient pas du être présentes
-df['montant'] = np.where(df['montant'] <= 200, np.NaN, df['montant']) # Règle à discuter
-#df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
-#Après avoir analysé cas par cas les données extrêmes, la barre des données
-#que l'on peut considérées comme aberrantes est placée au milliard d'€
-df['montant'] = np.where(df['montant'] >= 9.99e8, np.NaN, df['montant']) #Suppression des valeurs aberrantes
-#Il reste toujours des valeurs extrêmes mais elles sont vraisemblables
-#(surtout lorsque l'on sait que le budget annuel d'une ville comme Paris atteint les 10 milliards)
-GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
-plt.boxplot(GraphDate['montant'])
-#Vision des montants après néttoyage
-df.montant.describe()
+
 
 ################### Régions / Départements ##################
 # Création de la colonne pour distinguer les départements
@@ -277,6 +333,7 @@ df['Region'] = df['Region'].apply(nom_region)
 #del [liste11, liste24, liste27, liste28, liste32, liste44, liste52, liste53, liste75, liste76, liste84, liste93, liste94]
 
 ################### Date / Temps ##################
+'''
 #..............Les différents types 
 #Duree
 df['dureeMois'].describe() # Duree également en jours...
@@ -316,7 +373,7 @@ plt.plot([36, 36], [0, 2500000], 'g-', lw=1) # 3 ans
 plt.title("Montant moyen par mois\n", fontsize=18, color='#000000')
 plt.xlabel('\Durée en mois', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
-
+'''
            
 #..............Travail sur les variables de type date
 df.datePublicationDonnees.describe() 
@@ -333,6 +390,7 @@ df['anneeNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['a
 #On récupère le mois de notification
 df['moisNotification'] = df.dateNotification.str[5:7] 
 
+'''
 #Graphique pour voir les résultats
 #... Médiane par année
 GraphDate = pd.DataFrame(df.groupby('anneeNotification')['montant'].median())
@@ -352,27 +410,92 @@ GraphDate.plot()
 plt.xlabel('\nMois', fontsize=15, color='#000000')
 plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
+'''
+
 
 ######################################################################
-######################################################################          
+######################################################################
+# Mise en forme de la colonne montant
+df["montant"] = pd.to_numeric(df["montant"])
 
-# Vérification du nombre de nan dans les colonnes annee, mois, région, departement
-df['moisNotification'].isnull().sum() #1601
-df['anneeNotification'].isnull().sum() #1601
-df['codePostal'].isnull().sum() #2876
-(df['Region']=='nan').sum() #2495
+# Mise en forme des données vides
+df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
+df.idTitulaires = np.where(df.idTitulaires == '', np.NaN, df.idTitulaires)
+df.denominationSociale = np.where((df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'), np.NaN, df.denominationSociale)
+
+# Exportation des données / gain de temps pour prochaines utilisations
+df.to_csv(r'H:/Desktop/Data/decp_export.csv', sep=';',index = False, header=True, encoding='utf-8')
+
+# Réimportation des données
+df_copy = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
+                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float})
+ 
+# Vérification que les données sont identiques
+#### Comparaison colonne denominationSociale
+df.columns[21]
+df1 = pd.DataFrame(df.iloc[:, 21]); df1.columns = ['Avant']
+df2 = pd.DataFrame(df_copy.iloc[:, 21]); df2.columns = ['Apres']
+dfdenominationSociale = df1.join(df2)
+dfdenominationSociale.Avant = dfdenominationSociale.Avant.astype(str)
+dfdenominationSociale.Apres = dfdenominationSociale.Apres.astype(str)
+dfdenominationSociale["Identique"] = (dfdenominationSociale.Avant == dfdenominationSociale.Apres) 
+(dfdenominationSociale["Identique"] == False).sum() # 0 -> Parfait
+
+#### Vérification des catégories des colonnes
+a = pd.DataFrame(df.dtypes, columns = ['Avant'])
+b = pd.DataFrame(df_copy.dtypes, columns = ['Après'])
+ab = a.join(b)
+
+#### Comparaison de toutes les autres colonnes
+dftest = df.drop(columns=['denominationSociale']) # On drop cette colonne dans les 2 df car   
+dftest_copy = df.drop(columns=['denominationSociale']) # elle fait crash assert_frame_equal
+from pandas.util.testing import assert_frame_equal
+try:
+    assert_frame_equal(dftest, dftest_copy)
+    print(True)
+except:
+    print(False)
+
+del a, b, ab, chemin, data, df1, df2, dfdenominationSociale, dftest, dftest_copy, i
+######################################################################
+######################################################################
+
+'''
+Comme le fichier df_copy est similaire à 100% à df :
+    On peut directement importer le csv en le nommant df
+    Ainsi on gagne du temps pour travailler la suite du programme
+
+# Importation des données déjà travaillé avec le code ci-dessus
+df = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
+                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float})
+'''
 
 ######################################################################
 #On décide de supprimer les lignes ou la variable région est manquante
 #car ceux sont des données au niveau du pays ou internationales
+(df['Region']=='nan').sum() #2495
 df = df[df.Region != 'nan']
 
+
 ######################################################################
+################### Identifier les outliers - travail sur les montants
+### Valeur aberrantes ou valeurs atypiques ?
+#Suppression des variables qui n'auraient pas du être présentes
+df['montant'] = np.where(df['montant'] <= 200, np.NaN, df['montant']) # Règle à discuter
+#df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
+#Après avoir analysé cas par cas les données extrêmes, la barre des données
+#que l'on peut considérées comme aberrantes est placée au milliard d'€
+df['montant'] = np.where(df['montant'] >= 9.99e8, np.NaN, df['montant']) #Suppression des valeurs aberrantes
+#Il reste toujours des valeurs extrêmes mais elles sont vraisemblables
+#(surtout lorsque l'on sait que le budget annuel d'une ville comme Paris atteint les 10 milliards)
+GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
+plt.boxplot(GraphDate['montant'])
+#Vision des montants après néttoyage
+df.montant.describe()
 
-# Check du nombre de nan dans les montants          
-df['montant'].isnull().sum() #1188
-(df['montant']=='nan').sum() #0
-
+######################################################################
 ########## Analysons les liens entre les variables et le montant
 dfM = pd.DataFrame.copy(df, deep = True)
 dfM = dfM[dfM['montant'].notnull()]
@@ -739,49 +862,12 @@ df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
 
 
 #del [GraphDate, Quantiles, Rq, chemin, data, dfDuree, l, listeCP, listeReg, medianeRegFP, q]
+
+
 ######################################################################
-############## Arranger le format des données titulaires #############
-######################################################################
-
-df.titulaires.fillna('0', inplace=True)
-dfO = df[df['titulaires'] == '0']
-df = df[df['titulaires'] != '0']
-
-def reorga(x):
-    return pd.DataFrame.from_dict(x,orient='index').T
-
-liste_col = []
-for index, liste in enumerate(df.titulaires) :
-    for i in liste :
-        col = reorga(i)
-        col["index"] = index
-        liste_col.append(col)
-
-del df['level_0']
-df.reset_index(level=0, inplace=True) # drop = true
-del df['index']
-df.reset_index(level=0, inplace=True) 
-myList = list(df.columns); myList[0] = 'index'; df.columns = myList
-
-dfTitulaires = pd.concat(liste_col, sort = False)
-dfTitulaires.reset_index(level=0, inplace=True) 
-
-df = pd.merge(df, dfTitulaires, on=['index'])
-myList = list(df.columns); myList[41] = 'idTitulaires'; df.columns = myList
-#del i, index, liste, liste_col, col, dfTitulaires, myList
-
-##################### Nettoyage de ces nouvelles colonnes #####################
+######## Enrichissement des données via les codes siret/siren ########
+### Utilisation d'un autre data frame pour traiter les Siret unique
 dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
-dfSIRET = dfSIRET[dfSIRET['typeIdentifiant'] == 'SIRET']
-dfSIRET.idTitulaires.astype(str)
-dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
-dfSIRET.reset_index(inplace=True) 
-for i in range(len(dfSIRET)):
-    dfSIRET.idTitulaires[i] = dfSIRET.idTitulaires[i].replace("\\t", "")
-    dfSIRET.idTitulaires[i] = dfSIRET.idTitulaires[i].replace("-", "")
-    dfSIRET.idTitulaires[i] = dfSIRET.idTitulaires[i].replace(" ", "")
-del dfSIRET['index']
-
 dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
 dfSIRET.reset_index(inplace=True) 
 for i in range (len(dfSIRET)):
@@ -792,14 +878,6 @@ for i in range (len(dfSIRET)):
 dfSIRET = dfSIRET[dfSIRET['typeIdentifiant'] == 'Oui']
 del dfSIRET['typeIdentifiant'], dfSIRET['index']
 
-######## Récupération code NIC
-df.idTitulaires = df.idTitulaires.astype(str)
-for i in range(len(df)):
-    df['nic'][i] = df.idTitulaires[i][-5:]
-# Supprimer le code NIC plus tard si aucune correspondance INSEE/scraping 
-
-######################################################################
-######## Enrichissement des données via les codes siret/siren ########
 #StockEtablissement_utf8
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
