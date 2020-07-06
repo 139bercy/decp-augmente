@@ -16,6 +16,9 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import time
 from sklearn.ensemble import RandomForestRegressor
+from pandas.util.testing import assert_frame_equal
+#pip install pandasql
+#import pandasql as ps
 ######################################################################
 #import warnings
 #warnings.filterwarnings("ignore")
@@ -77,28 +80,120 @@ myList = list(dfTitulaires.columns); myList[2] = 'idTitulaires'; dfTitulaires.co
 df = pd.merge(df, dfTitulaires, on=['index'])
 df = df.drop(columns=['titulaires','level_0'])
 del i, index, liste, liste_col, col, dfTitulaires, myList, donneesInutiles
-######################################################################
-'''
-Gérer avec les redondances de la colonne index :
-    montants / nb titulaires
-'''
-df = df.drop(columns=['index'])
-######################################################################
 
+######################################################################
+######################################################################
+#...............    Nettoyage/formatage des données
+
+################### Identifier et supprimer les doublons -> environ 6000
+df = df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
+                           'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
+                           'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant', 
+                           'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
+                           'denominationSociale'], keep='first')
+# Intégrer ou non l'ID 
+# Avec id  : 117 données en moins
+# Sans id : 7238 données en moins
+# Exemple = df.iloc[65:67,]
+    
+# Reset l'index car on supprime quelques données avec les doublons 
+df.reset_index(inplace=True, drop = True)
+    
+# Correction afin que ces variables soient représentées pareil    
+df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
+df['formePrix'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
+
+
+######################################################################
+################### Identifier les outliers - travail sur les montants
+df["montant"] = pd.to_numeric(df["montant"])
+### Valeur aberrantes ou valeurs atypiques ?
+#Suppression des variables qui n'auraient pas du être présentes
+df['montant'] = np.where(df['montant'] <= 200, 0, df['montant']) 
+#df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
+#Après avoir analysé cas par cas les données extrêmes, la barre des données
+#que l'on peut considérées comme aberrantes est placée au milliard d'€
+df['montant'] = np.where(df['montant'] >= 9.99e8, 0, df['montant']) #Suppression des valeurs aberrantes
+#Il reste toujours des valeurs extrêmes mais elles sont vraisemblables
+#(surtout lorsque l'on sait que le budget annuel d'une ville comme Paris atteint les 10 milliards)
+GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
+plt.boxplot(GraphDate['montant'])
+#Vision des montants après néttoyage
+df.montant.describe()
+df.montant.isnull().sum()
+
+
+######################################################################
+#################### Gestion des montants répétés
+(df.montant==0).sum()
+# Remplace les valeurs manquantes
+df.id = np.where(df.id.isnull(), '0000000000000000', df.id)
+df.codeCPV = np.where(df.codeCPV.isnull(), '00000000', df.codeCPV)
+
+## Gestion du montant en fonction du nombre de titulaires
+dfCount = df.groupby(['source', '_type', 'id', 'montant', 'acheteur.id',
+                    'dureeMois', 'datePublicationDonnees', 'lieuExecution.code', 'codeCPV']).id.count().to_frame('Count?').reset_index()
+    
+df = pd.merge(df, dfCount, on=['source', '_type', 'id', 'montant', 'acheteur.id',
+                    'dureeMois', 'datePublicationDonnees', 'lieuExecution.code', 'codeCPV'])
+
+# On applique au df la division
+df["montant"] = pd.to_numeric(df["montant"])
+df["Count?"] = pd.to_numeric(df["Count?"])
+df["montant"] = df["montant"]/df["Count?"]
+
+# Nettoyage colonnes
+df = df.drop(columns=['index', 'Count?'])
+del dfCount
+df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
+#Vérification
+df.montant.isnull().sum()
+
+
+## Autre solution, moins général
+#dfRI = pd.DataFrame(df['index'])
+#dfRI["Occurences"] = 1
+#dfRI.columns = ['ind', 'occ']
+#q1 = """SELECT ind, sum(occ) from dfRI group by ind"""
+#dfRI = ps.sqldf(q1, locals())
+#dfRI.columns = ['index', 'occurences']
+#
+#df = pd.merge(df, dfRI, on='index')
+#
+#df["montant"] = pd.to_numeric(df["montant"])
+#df["occurences"] = pd.to_numeric(df["occurences"])
+#df.montant = df.montant/df.occurences
+#del dfRI, q1
+
+###############################################################################
 ##################### Nettoyage de ces nouvelles colonnes #####################
 df.idTitulaires = np.where(df.typeIdentifiant != 'SIRET','00000000000000',df.idTitulaires)
-#df.idTitulaires.astype(str)
+
 df.reset_index(inplace=True) 
-for i in range(len(df)):
-    df.idTitulaires[i] = df.idTitulaires[i].replace("\\t", "")
-    df.idTitulaires[i] = df.idTitulaires[i].replace("-", "")
-    df.idTitulaires[i] = df.idTitulaires[i].replace(" ", "")
-    df.idTitulaires[i] = df.idTitulaires[i].replace(".", "")
-    df.idTitulaires[i] = df.idTitulaires[i].replace("?", "")
-    df.idTitulaires[i] = df.idTitulaires[i].replace("    ", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace("\\t", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace("-", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace(" ", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace(".", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace("?", "")
+df['idTitulaires'] = df['idTitulaires'].str.replace("    ", "")
 del df['index']
 
-######## Récupération code NIC
+
+######## Gestion code CPV
+df["CPV_min"] = np.nan
+df.CPV_min = df.CPV_min.astype(str)
+df.codeCPV = df.codeCPV.astype(str)
+for i in range(len(df)):
+    df['CPV_min'][i] = df.codeCPV[i][-2:]
+df.CPV_min = df.CPV_min.astype(str)
+for i in range (len(df)):
+    if (df.CPV_min[i].isdigit() == False):
+        df.CPV_min[i] = np.NaN
+
+df.codeCPV.nunique() #6360
+df.CPV_min.nunique() #69
+
+########  Récupération code NIC 
 df["nic"] = np.nan
 df.nic = df.nic.astype(str)
 df.idTitulaires = df.idTitulaires.astype(str)
@@ -110,6 +205,8 @@ df.nic = df.nic.astype(str)
 for i in range (len(df)):
     if (df.nic[i].isdigit() == False):
         df.nic[i] = np.NaN
+
+df.nic.nunique() #2203
 
 '''
 import seaborn as sns
@@ -180,27 +277,6 @@ df['montant'].describe() #Médiane : 71 560 !!!
 df['dureeMois'].describe() #Durée des contrats
 del [dfStat, dfNature, GraphDate]
 '''
-######################################################################
-######################################################################
-#...............    Nettoyage/formatage des données
-
-################### Identifier et supprimer les doublons -> environ 6000
-df = df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
-                           'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
-                           'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant', 
-                           'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
-                           'denominationSociale', 'nic'], keep='first')
-# Intégrer ou non l'ID 
-# Avec id  : 117 données en moins
-# Sans id : 7238 données en moins
-
-# Reset l'index car on supprime quelques données avec les doublons 
-df.reset_index(inplace=True, drop = True)
-    
-# Correction afin que ces variables soient représentées pareil    
-df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
-df['formePrix'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
-
 
 ################### Régions / Départements ##################
 # Création de la colonne pour distinguer les départements
@@ -330,7 +406,7 @@ def nom_region(Region):
     return Region;
 df['Region'] = df['Region'].apply(nom_region)
 #df['Region'].describe()
-#del [liste11, liste24, liste27, liste28, liste32, liste44, liste52, liste53, liste75, liste76, liste84, liste93, liste94]
+#del [liste11, liste24, liste27, liste28, liste32, liste44, liste52, liste53, liste75, liste76, liste84, liste93, liste94, listeCP, listeReg]
 
 ################### Date / Temps ##################
 '''
@@ -429,8 +505,8 @@ df.to_csv(r'H:/Desktop/Data/decp_export.csv', sep=';',index = False, header=True
 # Réimportation des données
 df_copy = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
                       dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
-                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float})
- 
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'CPV_min' : str})
+
 # Vérification que les données sont identiques
 #### Comparaison colonne denominationSociale
 df.columns[21]
@@ -450,7 +526,7 @@ ab = a.join(b)
 #### Comparaison de toutes les autres colonnes
 dftest = df.drop(columns=['denominationSociale']) # On drop cette colonne dans les 2 df car   
 dftest_copy = df.drop(columns=['denominationSociale']) # elle fait crash assert_frame_equal
-from pandas.util.testing import assert_frame_equal
+
 try:
     assert_frame_equal(dftest, dftest_copy)
     print(True)
@@ -473,34 +549,16 @@ df = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
 '''
 
 ######################################################################
-#On décide de supprimer les lignes ou la variable région est manquante
-#car ceux sont des données au niveau du pays ou internationales
-(df['Region']=='nan').sum() #2495
-df = df[df.Region != 'nan']
-
-
-######################################################################
-################### Identifier les outliers - travail sur les montants
-### Valeur aberrantes ou valeurs atypiques ?
-#Suppression des variables qui n'auraient pas du être présentes
-df['montant'] = np.where(df['montant'] <= 200, np.NaN, df['montant']) # Règle à discuter
-#df = df[(df['montant'] >= 40000) | (df['montant'].isnull())] #Suppression des montants < 40 000
-#Après avoir analysé cas par cas les données extrêmes, la barre des données
-#que l'on peut considérées comme aberrantes est placée au milliard d'€
-df['montant'] = np.where(df['montant'] >= 9.99e8, np.NaN, df['montant']) #Suppression des valeurs aberrantes
-#Il reste toujours des valeurs extrêmes mais elles sont vraisemblables
-#(surtout lorsque l'on sait que le budget annuel d'une ville comme Paris atteint les 10 milliards)
-GraphDate = pd.DataFrame(df.groupby('datePublicationDonnees')['montant'].sum())
-plt.boxplot(GraphDate['montant'])
-#Vision des montants après néttoyage
-df.montant.describe()
-
+(df['Region']=='nan').sum() #4421
+dfNoReg = df[df.Region == 'nan']
+#df = df[df.Region != 'nan']
+df.isnull().sum()
 ######################################################################
 ########## Analysons les liens entre les variables et le montant
 dfM = pd.DataFrame.copy(df, deep = True)
 dfM = dfM[dfM['montant'].notnull()]
-dfM = dfM[dfM['Region'].notnull()]
-X = "Region"
+dfM = dfM[dfM['nic'].notnull()]
+X = "nic"
 Y = "montant"
 sous_echantillon = dfM
 def eta_squared(x, y):
@@ -522,20 +580,25 @@ df['montant'] = df['montant'].astype(float)
 df['moisNotification'] = df['moisNotification'].astype(float)
 st.pearsonr(dfM['moisNotification'], dfM['montant'])[0]
 
-del [X, Y, sous_echantillon, dfM]
+del X, Y, sous_echantillon, dfM
 
 '''
 Résultats : 
-source : 0.0026 (Rapport de corrélation - SCE/SCT)
-_type : 0 (Rapport de corrélation - SCE/SCT)
-nature : 0.0032 (Rapport de corrélation - SCE/SCT)
-procedure : 0.0076 (Rapport de corrélation - SCE/SCT)
-formePrix : 0.0017 (Rapport de corrélation - SCE/SCT)
-codePostal : 0.0267 (Rapport de corrélation - SCE/SCT)
-codeRegion : 0.0046 (Rapport de corrélation - SCE/SCT)
-Region : 0.0046 (Rapport de corrélation - SCE/SCT)
-anneeNotification : -0.0056 (Coefficient de corrélation - Pearson)
-moisNotification : 0.0080 (Coefficient de corrélation - Pearson)
+source : 0.0021 
+_type : 0.0055
+nature : 0.0128 
+procedure : 0.0121 
+formePrix : 0.0120 
+codePostal : 0.0143 
+codeRegion : 0.0035 
+Region : 0.0035 
+anneeNotification : 0 
+moisNotification : 0.0006 
+codeCPV : 0.1782
+CPV_min : 0.0127
+nic : 0.0411
+
+
 
 Conclusion : 
     A première vue aucune variable n'influe sur le montant
@@ -569,13 +632,13 @@ dfM['reg_FP'] = dfM['Region'] + dfM['formePrix']
 plt.scatter(dfM['reg_FP'], dfM['montant'])
 medianeRegFP = dfM.groupby('reg_FP')['montant'].median()
 
-# On retient : les variables Region et formePrix
+# On retient : les variables Region et formePrix et codeCPV
 
 ##############################################################################
 ##############################################################################
 #......... Méthode 1 : Suppression des valeurs manquantes
 dfM1 = pd.DataFrame.copy(df, deep = True)
-dfM1 = dfM1[dfM1['montant'].notnull()]
+dfM1 = dfM1[(dfM1['montant'].notnull()) | (dfM1['montant'] != "nan")]
 (1 - len(dfM1) / len(df)) * 100
 # On perd 1.5% de données, donc cette méthode est à éviter
 
@@ -586,7 +649,8 @@ for i in range(25):
     dfM = dfM[dfM['montant'].notnull()]
     dfM['Region'] = dfM['Region'].astype(str)
     dfM['formePrix'] = dfM['formePrix'].astype(str)
-    dfM['reg_FP'] = dfM['Region'] + dfM['formePrix']
+    dfM['codeCPV'] = dfM['codeCPV'].astype(str)
+    dfM['reg_FP'] = dfM['Region'] + dfM['formePrix'] + df['codeCPV']
     dfM['montantTest'] = dfM['montant']
     nb = (dfM['montantTest'].notnull()).sum()
     dfM.reset_index(level=0, inplace=True)
@@ -674,23 +738,19 @@ for i in range(25):
         X = X.fillna(0)
         return pd.concat([data, X], axis=1)
     
-    colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'dateSignature', 'dateDebutExecution',  
-                         'valeurGlobale', 'montantSubventionPublique', 'donneesExecution', 
-                         'concessionnaires', 'modifications', 'autoriteConcedante.id', 'acheteur.id', 
-                         'codeRegion', 'autoriteConcedante.nom', 'lieuExecution.code', 'titulaires', 
-                         'acheteur.nom', 'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 
-                         'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'dateNotification', 'montant']
+    colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'acheteur.id', 'dateNotification',
+                     'codeRegion', 'lieuExecution.code','acheteur.nom', 'nic',  'idTitulaires',
+                     'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 'denominationSociale',
+                     'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'montant', 'CPV_min']
     
     dfM7 = pd.DataFrame.copy(dfM, deep = True)
-    dfM7 = dfM7.drop(columns=['reg_FP', 'level_0'])
+    dfM7 = dfM7.drop(columns=['reg_FP', 'level_0']) # 95 : 261 150
     dfmontant = pd.DataFrame(dfM7['montantTest'])
     dfNoMontant = dfM7.drop(columns='montantTest')
     dfNoMontant = dfNoMontant.drop(columns=colonnes_inutiles)
     
-    dfNoMontant = binateur(dfNoMontant, dfNoMontant.columns)
-    
+    dfNoMontant = binateur(dfNoMontant, dfNoMontant.columns)    
     dfRF = dfmontant.join(dfNoMontant)
-    #dfRF.head(5)
     
     df_Train = dfRF[dfRF.montantTest.notnull()]
     df_Predict = dfRF[dfRF.montantTest.isnull()]
@@ -745,70 +805,14 @@ dfResultats = Minimum.join(Moyenne).join(Mediane).join(Ecart_type).join(Maximum)
 del [Minimum, Moyenne, Mediane, Ecart_type, dfM, dfM1, dfM2, dfM3, dfM4, dfM5, dfM6, dfM7,
      listeM2, listeM3, listeM4, listeM5, medianeRegFP, moyenneRegFP, i, nb, listeM6, listeM7]
 
-
-##############################################################################
-### Autre méthode à tester
-############ Random Forest
-def binateur(data, to_bin):
-    data = data.copy()
-    X = data[to_bin]
-    X = pd.get_dummies(X)
-    data = data.drop(columns=to_bin)
-    X = X.fillna(0)
-    return pd.concat([data, X], axis=1)
-
-colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'dateSignature', 'dateDebutExecution',  
-                     'valeurGlobale', 'montantSubventionPublique', 'donneesExecution', 
-                     'concessionnaires', 'modifications', 'autoriteConcedante.id', 'acheteur.id', 
-                     'codeRegion', 'autoriteConcedante.nom', 'lieuExecution.code', 'titulaires', 
-                     'acheteur.nom', 'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 
-                     'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'dateNotification']
-
-dfmontant = pd.DataFrame(df['montant'])
-dfNoMontant = df.drop(columns='montant')
-dfNoMontant = dfNoMontant.drop(columns=colonnes_inutiles)
-
-dfNoMontant = binateur(dfNoMontant, dfNoMontant.columns)
-
-dfRF = dfmontant.join(dfNoMontant)
-dfRF.head(5)
-
-df_Train = dfRF[dfRF.montant.notnull()]
-df_Predict = dfRF[dfRF.montant.isnull()]
-
-X = df_Train.drop(columns=['montant'])
-y = df_Train['montant']
-regressor = RandomForestRegressor()
-regressor.fit(X, y)
-
-X_test = df_Predict.drop(columns=['montant'])
-y_predict = df_Predict['montant']
-y_test = regressor.predict(X_test)
-
-df.reset_index(level=0, inplace=True)
-df.reset_index(level=0, inplace=True)
-dfIM = df.loc[df['montant'].isnull()]
-dfIM = dfIM['level_0']
-y_test = pd.DataFrame(y_test)
-dfIM = pd.DataFrame(dfIM)
-
-dfIM.reset_index(inplace=True)
-del dfIM['index']
-dfIM.reset_index(inplace=True)
-y_test.reset_index(inplace=True)
-
-predict = pd.merge(y_test, dfIM, on='index')
-del predict['index']
-predict.columns = ['montantEstime', 'level_0']
-df = pd.merge(df, predict, how='outer' ,on=["level_0"])
-df.montant = np.where(df.montant.isnull(), df.montantEstime, df.montant)
-df.montant.isnull().sum()
-
-##############################################################################
-##############################################################################
+''' Exportation des résultats
+dfResultats.to_csv(r'H:/Desktop/Data/decp_methodes_resultats.csv', sep=';',index = True, header=True, encoding='utf-8')
+'''
+# Ré-importation
+dfResultats = pd.read_csv('H:/Desktop/Data/decp_methodes_resultats.csv', sep=';', encoding='utf-8')
 
 ##### Conclusion - Quelle méthode on sélectionne :
-dfResultats.idxmin()  
+#dfResultats.idxmin() # On va choisir le modèle 5
 
 # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
 df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
@@ -816,18 +820,40 @@ df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
 # Utilisation de la méthode 5 pour estimer les valeurs manquantes
 df['Region'] = df['Region'].astype(str)
 df['formePrix'] = df['formePrix'].astype(str)
-df['reg_FP'] = df['Region'] + df['formePrix']
+df['codeCPV'] = df['codeCPV'].astype(str)
+
+df['moisNotification'] = df['moisNotification'].astype(str)
+df['anneeNotification'] = df['anneeNotification'].astype(str)
+df['conca'] = df['formePrix'] + df['Region'] + df['codeCPV']
+    
 df.reset_index(level=0, inplace=True)
 df.reset_index(level=0, inplace=True)
 del df['index']
-# Calcul de la médiane par classe
-medianeRegFP = pd.DataFrame(df.groupby('reg_FP')['montant'].median())
+# Calcul de la médiane par stratification
+medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
 medianeRegFP.reset_index(level=0, inplace=True)
-medianeRegFP.columns = ['reg_FP','montantEstimation']
-df = pd.merge(df, medianeRegFP, on='reg_FP')
+medianeRegFP.columns = ['conca','montantEstimation']
+df = pd.merge(df, medianeRegFP, on='conca')
 # Remplacement des valeurs manquantes par la médiane du groupe
 df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
+del df['conca'], df['montantEstimation'], df['level_0']
+df['montant'].isnull().sum()
 
+# On recommence avec une plus petite stratification
+df['conca'] = df['formePrix'] + df['Region']
+df.reset_index(level=0, inplace=True)
+# Calcul de la médiane par stratification
+medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
+medianeRegFP.reset_index(level=0, inplace=True)
+medianeRegFP.columns = ['conca','montantEstimation']
+df = pd.merge(df, medianeRegFP, on='conca')
+# Remplacement des valeurs manquantes par la médiane du groupe
+df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
+# S'il reste encore des valeurs nulles...
+df['montant'] = np.where(df['montant'].isnull(), df['montant'].median(), df['montant'])
+df['montant'].isnull().sum() # Vérification
+del df['conca'], df['montantEstimation'], df['index']
+del medianeRegFP
 
 ######################################################################
 #..............Travail sur la variable de la durée des marchés
@@ -843,13 +869,16 @@ Quantiles = Rq.join(q)
 plt.plot(Quantiles['Resultats'])
 
 ### Application sur le jeu de données principal df
-df['dureeMoisEstime'] = np.where((df['montant']/df['dureeMois'] < 1000)
-  | ((df['dureeMois'] > 12) & (df['montant']/df['dureeMois'] < 5000))
-  | (df['dureeMois'] > 120), "Oui", "Non")
-df['dureeMois'] = np.where(df['montant']/df['dureeMois'] < 1000, round(df['dureeMois']/30,0), df['dureeMois'])
-df['dureeMois'] = np.where((df['dureeMois'] > 12) & (df['montant']/df['dureeMois'] < 5000), round(df['dureeMois']/30,0), df['dureeMois'])
-df['dureeMois'] = np.where(df['dureeMois'] > 120, round(df['dureeMois']/30,0), df['dureeMois'])
-df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
+df.dureeMois.describe()
+
+df['dureeMoisEstime'] = np.where((df['montant']/df['dureeMois'] < 200)
+    | ((df['dureeMois'] == 30) & (df['montant'] < 1000000))
+    | ((df['dureeMois'] == 31) & (df['montant'] < 1000000))
+    | ((df['dureeMois'] > 31) & (df['montant']/df['dureeMois'] < 300000))
+    | ((df['dureeMois'] > 120) & (df['montant'] < 100000000)), "Oui", "Non")
+
+df['dureeMoisCalculee'] = np.where(df['dureeMoisEstime'] == "Oui", round(df['dureeMois']/30,0), df['dureeMois'])
+df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
 #df = df(math.ceil(df['dureeMois']))
 
 ##### Check du nombre de données estimées
@@ -860,8 +889,16 @@ df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
 # Nombre de données estimées pour le montant &/OU la durée 
 ((df['dureeMoisEstime'] == "Oui") | (df['montantEstime'] == "Oui")).sum()
 
-
-#del [GraphDate, Quantiles, Rq, chemin, data, dfDuree, l, listeCP, listeReg, medianeRegFP, q]
+dfDuree = pd.DataFrame.copy(df, deep = True)
+dfDuree['rationMoisMontant'] = dfDuree['montant'] / dfDuree['dureeMoisCalculee']
+dfDuree['rationMoisMontant'].describe()
+dfDuree = dfDuree[dfDuree['rationMoisMontant'].notnull()]
+l = [i for i in np.arange(0,0.3,0.01)]
+Rq = pd.DataFrame(np.quantile(dfDuree['rationMoisMontant'], l )); Rq.columns = ['Resultats']  
+q = pd.DataFrame(l); q.columns = ['Quantiles']  
+Quantiles = Rq.join(q)
+plt.plot(Quantiles['Resultats'])
+del [Quantiles, Rq, dfDuree, l, q]
 
 
 ######################################################################
@@ -870,18 +907,22 @@ df['dureeMois'] = np.where(df['dureeMois'] == 0, 1, df['dureeMois'])
 dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
 dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
 dfSIRET.reset_index(inplace=True) 
+dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
 for i in range (len(dfSIRET)):
     if (dfSIRET.idTitulaires[i].isdigit() == True):
         dfSIRET.typeIdentifiant[i] = 'Oui'
     else:
         dfSIRET.typeIdentifiant[i] = 'Non'
-dfSIRET = dfSIRET[dfSIRET['typeIdentifiant'] == 'Oui']
-del dfSIRET['typeIdentifiant'], dfSIRET['index']
+dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
+del dfSIRET['index']
+dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
+for i in range(len(dfSIRET)):
+    dfSIRET.siren[i] = dfSIRET.siret[i][0:9]
+
 
 #StockEtablissement_utf8
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
-dfSIRET.columns = ['siret', 'denominationSociale']
 dfSIRET['siret'] = dfSIRET['siret'].astype(str)
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
                                                                'siret', 'typeVoieEtablissement', 
@@ -897,14 +938,13 @@ for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8'
 result = result.drop_duplicates(subset=['siret'], keep='first')
 del [resultTemp, gm_chunk, chemin]
 
-nanSiret = dfSIRET.merge(result, indicator=True, how='outer')
-nanSiret = nanSiret[nanSiret['_merge'] == 'left_only']
-nanSiret = pd.DataFrame(nanSiret[['siret', 'denominationSociale']])
-nanSiret.reset_index(inplace=True)
-nanSiret.columns = ['siren', 'siret', 'denominationSociale'] 
-nanSiret['siren'] = nanSiret['siren'].astype(str)
-for i in range(len(nanSiret)):
-    nanSiret.siren[i] = nanSiret.siret[i][0:9]
+
+del result['siren_x'], result['siren_y'], result['siren']
+dfSIRET = pd.merge(dfSIRET, result, how='outer', on=['siret'])
+nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
+dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
+nanSiret = nanSiret.iloc[:,:3]
+
 
 chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
@@ -920,14 +960,37 @@ for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8'
     resultTemp = pd.merge(nanSiret, gm_chunk, on=['siren'])
     result2 = pd.concat([result2, resultTemp], axis=0)
 result2 = result2.drop_duplicates(subset=['siren'], keep='first')
+del result2['siret_x'], result2['siret_y'], result2['siret'], result2['denominationSociale_x']
 del [resultTemp, gm_chunk, chemin]
-   
-nanSiren = nanSiret.merge(result2, indicator=True, how='outer', on='siren')
-nanSiren = nanSiren[nanSiren['_merge'] == 'left_only']
-nanSiren = pd.DataFrame(nanSiren[['siren', 'siret_x', 'denominationSociale_x']])
-nanSiren.columns = ["siren", "siret", "a" ,"denominationSociale"]
-nanSiren.reset_index(inplace=True)
-del nanSiren['index']; del nanSiren['a']
+
+result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
+myList = list(result2.columns); myList[2] = 'denominationSociale'; result2.columns = myList
+del dfSIRET['denominationSociale_y']
+dfSIRET.columns = myList
+#dfSIRET.columns == result2.columns
+
+######## Merge des deux resultats
+enrichissementInsee = pd.concat([dfSIRET, result2])
+
+####### Récupération des données tjrs pas enrichies
+nanSiren = pd.merge(nanSiret, result2, indicator=True, how='outer', on='siren')
+nanSiren = nanSiren[nanSiren['activitePrincipaleEtablissement'].isnull()]
+nanSiren = nanSiren.iloc[:,:3]
+nanSiren.columns = ['siret', 'siren', 'denominationSociale'] 
+nanSiren.reset_index(inplace=True, drop=True)
+
+del dfSIRET, i, nanSiret, result, result2, myList
+###############################################################################
+###############################################################################
+######################## Structuration des données récupérées...
+
+
+#### Merge avec df
+dfTest = pd.merge(df, enrichissementInsee, how='outer', left_on="idTitulaires", right_on="siret")
+###############################################################################
+###############################################################################
+
+
 
 ######################################################################
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
@@ -980,13 +1043,20 @@ for i in range(len(nanSiren)):
         df_scrap = pd.concat([df_scrap, scrap], axis=0)
         pass
 
-del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, verification, ville 
-######################################################################
-######################################################################
+# Récupération des résultats
+nanSiren.reset_index(inplace=True)
+resultat = pd.merge(nanSiren, df_scrap, on='index')
+resultatScrap1 = resultat[resultat.rue != ' ']
 
-dfDS = nanSiren.merge(df_scrap, indicator=True, how='outer', on='siret')
-dfDS = dfDS[dfDS['_merge'] == 'left_only']
-dfDS = dfDS.iloc[:,:3]  
+# Données encore manquantes
+dfDS = resultat[resultat.rue == ' ']
+dfDS = dfDS.iloc[:,1:4]
+dfDS.columns = ['siret', 'siren', 'denominationSociale'] 
+dfDS.reset_index(inplace=True, drop=True)
+
+del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, verification, ville, df_scrap, nanSiren, resultat
+######################################################################
+######################################################################
 
 def requete(nom):
     pager.get('https://www.infogreffe.fr/recherche-siret-entreprise/chercher-siret-entreprise.html')
@@ -1031,43 +1101,95 @@ for i in range(len(dfDS)):
         df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
         pass
 
-dfDS2 = df_scrap2.merge(df_scrap, indicator=True, how='outer', on='siret')
-dfDS2 = dfDS2[dfDS2['_merge'] == 'left_only']
+# Récupération des résultats
+dfDS.reset_index(inplace=True)
+resultat = pd.merge(dfDS, df_scrap2, on='index')
+resultatScrap2 = resultat[resultat.rue != ' ']
+
+# On réuni les résultats du scraping
+enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
+del enrichissementScrap['index'], enrichissementScrap['siret_y'], enrichissementScrap['verification']
+
+############ Arrangement des colonnes 
+# Gestion bdd insee
+enrichissementInsee.reset_index(inplace=True, drop=True)
+enrichissementInsee['rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
+enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee['activitePrincipaleEtablissement'].str.replace(".", "")
+del enrichissementInsee['typeVoieEtablissement'], enrichissementInsee['libelleVoieEtablissement'], enrichissementInsee['nic'], enrichissementInsee['nomenclatureActivitePrincipaleEtablissement']
+
+# Gestion bdd scrap
+enrichissementScrap.reset_index(inplace=True, drop=True)
+enrichissementScrap["codePostal"] = np.nan
+enrichissementScrap["commune"] = np.nan
+enrichissementScrap.codePostal = enrichissementScrap.codePostal.astype(str)
+enrichissementScrap.commune = enrichissementScrap.ville.astype(str)
+enrichissementScrap.rue = enrichissementScrap.rue.astype(str)
+for i in range(len(enrichissementScrap)):
+    enrichissementScrap["codePostal"][i] = enrichissementScrap.ville[i][0:7]
+enrichissementScrap["codePostal"] = enrichissementScrap["codePostal"].str.replace(" ", "")
+for i in range(len(enrichissementScrap)):
+    enrichissementScrap["commune"][i] = enrichissementScrap.ville[i][7:]
+del enrichissementScrap['ville'], enrichissementScrap['typeEntreprise'], enrichissementScrap['detailsType']
+
+# Renomme les colonnes
+enrichissementScrap.columns = ['siret', 'siren', 'denominationSociale', 'adresseEtablissement', 'codeTypeEtablissement', 'codePostalEtablissement', 'communeEtablissement']
+enrichissementInsee.columns = ['siret', 'siren', 'denominationSociale', 'codeTypeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement', 'communeEtablissement', 'adresseEtablissement']
+
+# df final pour enrichir les données des entreprises
+dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap])
+dfenrichissement = dfenrichissement.astype(str)
+# On s'assure qu'il n'y ai pas de doublons
+#dfenrichissement.groupby('siret')['siret'].nunique()
+dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
 
 
-# Résultat : 99% des données sont enrichies
-df_codeEntreprise = df_scrap[['codeType', 'detailsType']]
-df_codeEntreprise = df_codeEntreprise.drop_duplicates(subset=['detailsType'], keep='first')
+########### Ajout au df principal !
+# Supp cette colonne pour éviter de la dedoubler
+del df['denominationSociale']
+# Concaténation
+df =  pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
 
+del df['CPV_min'], df['uid'], df['uuid']
+
+######################################################################
+###################### Sauvegarde des données ########################
+######################################################################
+# Ajustement de certaines colonnes
+df.codePostalEtablissement = df.codePostalEtablissement.astype(str)
+df.anneeNotification = df.anneeNotification.astype(str)
+df.codePostal = df.codePostal.astype(str)
+
+# Exportation des données / gain de temps pour prochaines utilisations
+df.to_csv(r'H:/Desktop/Data/decp.csv', sep=';',index = False, header=True, encoding='utf-8')
+ 
+# Réimportation des données
+df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
+                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'codePostal' : str,
+                             'anneeNotification' : str, 'moisNotification' : str, 'codeCommuneEtablissement' : str,
+                             'codePostalEtablissement' : str, 'codeTypeEtablissement' : str, 'siren' : str, 'siret' : str})
+
+#### Comparaison de toutes les autres colonnes
+dftest = df.drop(columns=['formePrix', 'denominationSociale'])
+dftest_copy = df.drop(columns=['formePrix' , 'denominationSociale'])
+try:
+    assert_frame_equal(dftest, dftest_copy)
+    print(True)
+except:
+    print(False)
+######################################################################
+######################################################################
+######################################################################
+# ...
+# ......
+# .........
 ######################################################################
 # Analyse géographique - carte 
 
+### code CPV data :
+# CODE - FR
 
-
-
-
-
-
-
-
-
-######################################################################
 # régression - random forest pour les modèles du montant
 # REGEX pour les communes
 # Revenir sur region avec les dict
-(df['lieuExecution.typeCode']=='CODE COMMUNE').sum()
-(df['lieuExecution.typeCode']=='Code commune').sum()
-df['lieuExecution.typeCode'].unique()
-df["lieuExecution.typeCode"].value_counts(normalize=True).plot(kind='pie')
-
-# Gérer les concessionnaires à part
-d = df.iloc[0]['concessionnaires']
-d[0].describe()
-# Division du dataframe en 2 
-#dfMT = df[(df['montant'].notnull()) & (df['valeurGlobale'].isnull())] # données titulaires
-#dfMC = df[df['valeurGlobale'].notnull()] # données concessionnaires
-
-# conférence API Insee 7 juillet web insee
-
-#apprendre à utiliser git sur pc
 ######################################################################
