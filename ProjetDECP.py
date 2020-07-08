@@ -488,7 +488,6 @@ plt.ylabel("Montant\n", fontsize=15, color='#000000')
 plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
 '''
 
-
 ######################################################################
 ######################################################################
 # Mise en forme de la colonne montant
@@ -598,8 +597,6 @@ codeCPV : 0.1782
 CPV_min : 0.0127
 nic : 0.0411
 
-
-
 Conclusion : 
     A première vue aucune variable n'influe sur le montant
     Néanmoins, ces tests ne sont pas robustes face aux outliers
@@ -631,7 +628,6 @@ dfM['reg_FP'] = dfM['Region'] + dfM['formePrix']
 (dfM['reg_FP']=='nannan').sum() # 0 = tout est bon !
 plt.scatter(dfM['reg_FP'], dfM['montant'])
 medianeRegFP = dfM.groupby('reg_FP')['montant'].median()
-
 # On retient : les variables Region et formePrix et codeCPV
 
 ##############################################################################
@@ -980,18 +976,6 @@ nanSiren.columns = ['siret', 'siren', 'denominationSociale']
 nanSiren.reset_index(inplace=True, drop=True)
 
 del dfSIRET, i, nanSiret, result, result2, myList
-###############################################################################
-###############################################################################
-######################## Structuration des données récupérées...
-
-
-#### Merge avec df
-dfTest = pd.merge(df, enrichissementInsee, how='outer', left_on="idTitulaires", right_on="siret")
-###############################################################################
-###############################################################################
-
-
-
 ######################################################################
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
@@ -1177,19 +1161,105 @@ try:
     print(True)
 except:
     print(False)
+    
+######################################################################
+################### Enrichissement avec le code CPV ##################
+######################################################################
+# Importation et mise en forme des codes/ref CPV
+refCPV = pd.read_excel("H:/Desktop/Data/Json/fichierPrincipal/cpv_2008_ver_2013.xlsx", usecols=['CODE', 'FR'])
+refCPV.columns = ['CODE', 'refCodeCPV']
+refCPV_min = pd.DataFrame.copy(refCPV, deep = True)
+for i in range(len(refCPV_min)):
+    refCPV_min["CODE"][i] = refCPV_min.CODE[i][0:8]
+refCPV_min = refCPV_min.drop_duplicates(subset=['CODE'], keep='first')
+refCPV_min.columns = ['CODEmin', 'FR2']
+# Merge avec le df principal
+df_decp = pd.merge(df_decp, refCPV, how='left', left_on="codeCPV", right_on="CODE")
+df_decp = pd.merge(df_decp, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
+# Garde uniquement la colonne utile / qui regroupe les nouvelles infos
+df_decp.refCodeCPV = np.where(df_decp.refCodeCPV.isnull(), df_decp.FR2, df_decp.refCodeCPV)
+del df_decp['CODE'], df_decp['CODEmin'], df_decp['FR2'], refCPV, refCPV_min, i
+#df_decp.refCodeCPV.isnull().sum()
+
+######################################################################
+############## Enrichissement des données des acheteurs ##############
+######################################################################
+######## Enrichissement des données via les codes siret/siren ########
+### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
+dfAcheteurId = df_decp[['acheteur.id']]; dfAcheteurId.columns = ['siret']
+dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
+dfAcheteurId.reset_index(inplace=True, drop=True) 
+dfAcheteurId.siret = dfAcheteurId.siret.astype(str)
+
+#StockEtablissement_utf8
+chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+result = pd.DataFrame(columns = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
+for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siret', 'codePostalEtablissement', 
+                                                                                           'libelleCommuneEtablissement', 
+                                                                                           'codeCommuneEtablissement']):
+    gm_chunk['siret'] = gm_chunk['siret'].astype(str)
+    resultTemp = pd.merge(dfAcheteurId, gm_chunk, on=['siret'])
+    result = pd.concat([result, resultTemp], axis=0)
+result = result.drop_duplicates(subset=['siret'], keep='first')
+
+
+dfAcheteurId["siren"] = np.nan
+for i in range(len(dfAcheteurId)):
+    dfAcheteurId.siren[i] = dfAcheteurId.siret[i][0:9]
+dfAcheteurId.siren = dfAcheteurId.siren.astype(int)
+dfAcheteurId.siren = dfAcheteurId.siren.astype(str)
+chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+result2 = pd.DataFrame(columns = ['siren', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
+for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'codePostalEtablissement', 
+                                                                                           'libelleCommuneEtablissement', 
+                                                                                           'codeCommuneEtablissement']):
+    gm_chunk['siren'] = gm_chunk['siren'].astype(str)
+    resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siren")
+    result2 = pd.concat([result2, resultTemp], axis=0)
+result2 = result2.drop_duplicates(subset=['siren'], keep='first')
+siret = pd.DataFrame(result['siret']); siret.columns=['s']
+result2 = pd.merge(result2, siret, how='outer',  left_on='siret', right_on='s')
+result2 = result2[result2.s.isnull()]; del result2['s']
+
+dfManquant = pd.merge(dfAcheteurId, result, how='outer', on='siret')
+dfManquant = dfManquant[dfManquant['codePostalEtablissement'].isnull()]
+dfManquant  = dfManquant .iloc[:,:2]
+result2 = pd.merge(dfManquant, result2, how='inner', on='siren')
+del result2['siret_y'], result2['siren']
+result2.columns = ['siret', 'codeCommuneEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement']
+
+enrichissementAcheteur = pd.concat([result, result2])
+enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
+
+df_decp = pd.merge(df_decp, enrichissementAcheteur, how='outer', on='acheteur.id')
+df_decp.codeCommuneAcheteur.isnull().sum()/len(df_decp)*100 # 3.4% de données non-enrichies
+
+del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, i, result, result2, resultTemp, siret
 ######################################################################
 ######################################################################
 ######################################################################
-# ...
-# ......
-# .........
+######################################################################
+######################################################################
+test = pd.DataFrame(df_decp['lieuExecution.nom'].iloc[320:370])
+test.reset_index(inplace=True, drop=True)
+bdd_test = pd.DataFrame(['Ardèche', 'Rhône', 'Isère'], columns=['communeNom'])
+bdd_test.reset_index(inplace=True, drop=True)
+
+
+import re
+re.sub((bdd_test['communeNom'][0] + '*'), bdd_test['communeNom'][0], test['lieuExecution.nom'][4])
+re.sub('Ardèche', 'Ardèche', 'Ard�che')
+
+chaine = ""
+expression = r"^0[0-9]([ .-]?[0-9]{2}){4}$"
+while re.search(expression, chaine) is None:
+    chaine = input("Saisissez un numéro de téléphone (valide) :")
+######################################################################
+######################################################################
+######################################################################
+######################################################################
 ######################################################################
 # Analyse géographique - carte 
-
-### code CPV data :
-# CODE - FR
-
-# régression - random forest pour les modèles du montant
 # REGEX pour les communes
 # Revenir sur region avec les dict
 ######################################################################
