@@ -143,12 +143,14 @@ df["Count?"] = pd.to_numeric(df["Count?"])
 df["montant"] = df["montant"]/df["Count?"]
 
 # Nettoyage colonnes
-df = df.drop(columns=['index', 'Count?'])
+df = df.drop(columns=['index'])
 del dfCount
 df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
 #Vérification
 df.montant.isnull().sum()
 
+# Colonne par marché
+df['montantTotalMarché'] = df["montant"] * df["Count?"]
 
 ## Autre solution, moins général
 #dfRI = pd.DataFrame(df['index'])
@@ -490,8 +492,15 @@ plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
 
 ######################################################################
 ######################################################################
+#df.dtypes
 # Mise en forme de la colonne montant
 df["montant"] = pd.to_numeric(df["montant"])
+df['codePostal'] = df['codePostal'].astype(str)
+df['codeRegion'] = df['codeRegion'].astype(str)
+df['nic'] = df['nic'].astype(str)
+df['anneeNotification'] = df['anneeNotification'].astype(str)
+for i in range(len(df)):
+    df.anneeNotification[i] = df.anneeNotification[i][:4]
 
 # Mise en forme des données vides
 df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
@@ -737,7 +746,7 @@ for i in range(25):
     colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'acheteur.id', 'dateNotification',
                      'codeRegion', 'lieuExecution.code','acheteur.nom', 'nic',  'idTitulaires',
                      'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 'denominationSociale',
-                     'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'montant', 'CPV_min']
+                     'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'montant', 'CPV_min', 'Count?', 'montantTotalMarché']
     
     dfM7 = pd.DataFrame.copy(dfM, deep = True)
     dfM7 = dfM7.drop(columns=['reg_FP', 'level_0']) # 95 : 261 150
@@ -876,6 +885,13 @@ df['dureeMoisEstime'] = np.where((df['montant']/df['dureeMois'] < 200)
 df['dureeMoisCalculee'] = np.where(df['dureeMoisEstime'] == "Oui", round(df['dureeMois']/30,0), df['dureeMois'])
 df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
 #df = df(math.ceil(df['dureeMois']))
+
+# Au cas ils restent encore des données aberrantes
+df['dureeMoisCalculee'] = np.where((df['montant']/df['dureeMois'] < 200)
+    | ((df['dureeMois'] == 30) & (df['montant'] < 1000000))
+    | ((df['dureeMois'] == 31) & (df['montant'] < 1000000))
+    | ((df['dureeMois'] > 31) & (df['montant']/df['dureeMois'] < 300000))
+    | ((df['dureeMois'] > 120) & (df['montant'] < 100000000)), 1, df.dureeMoisCalculee)
 
 ##### Check du nombre de données estimées
 # Nombre de données estimées pour la durée 
@@ -1097,6 +1113,20 @@ del enrichissementScrap['index'], enrichissementScrap['siret_y'], enrichissement
 ############ Arrangement des colonnes 
 # Gestion bdd insee
 enrichissementInsee.reset_index(inplace=True, drop=True)
+enrichissementInsee['typeVoieEtablissement'].unique()
+listCorrespondance = {'ALL': 'Allée', 'AV': 'Avenue', 'BD': 'Boulevard', 'CAR': 'Carrefour',
+                      'CHE': 'Chemin', 'CHS': 'Chaussée', 'CITE': 'Cité', 'COR': 'Corniche',
+                      'CRS': 'Cours', 'DOM': 'Domaine', 'DSC': 'Descente', 'ECA': 'Ecart',
+                      'ESP': 'Esplanade', 'FG': 'Faubourg', 'GR': 'Grande Rue', 'HAM': 'Hameau',
+                      'HLE': 'Halle', 'IMP': 'Impasse', 'LD': 'Lieu dit', 'LOT': 'Lotissement',
+                      'MAR': 'Marché', 'MTE': 'Montée', 'PAS': 'Passage', 'PL': 'Place', 
+                      'PLN': 'Plaine', 'PLT': 'Plateau', 'PRO': 'Promenade', 'PRV': 'Parvis',
+                      'QUA': 'Quartier', 'QUAI': 'Quai', 'RES': 'Résidence', 'RLE': 'Ruelle',
+                      'ROC': 'Rocade', 'RPT': 'Rond Point', 'RTE': 'Route', 'RUE': 'Rue', 
+                      'SEN': 'Sentier', 'SQ': 'Square', 'TPL': 'Terre-plein', 'TRA': 'Traverse',
+                      'VLA': 'Villa', 'VLGE': 'Village'}
+for word, initial in listCorrespondance.items():
+    enrichissementInsee['typeVoieEtablissement'] = enrichissementInsee['typeVoieEtablissement'].replace(word, initial)
 enrichissementInsee['rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
 enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee['activitePrincipaleEtablissement'].str.replace(".", "")
 del enrichissementInsee['typeVoieEtablissement'], enrichissementInsee['libelleVoieEtablissement'], enrichissementInsee['nic'], enrichissementInsee['nomenclatureActivitePrincipaleEtablissement']
@@ -1126,42 +1156,13 @@ dfenrichissement = dfenrichissement.astype(str)
 #dfenrichissement.groupby('siret')['siret'].nunique()
 dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
 
-
 ########### Ajout au df principal !
 # Supp cette colonne pour éviter de la dedoubler
 del df['denominationSociale']
 # Concaténation
 df =  pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
-
 del df['CPV_min'], df['uid'], df['uuid']
 
-######################################################################
-###################### Sauvegarde des données ########################
-######################################################################
-# Ajustement de certaines colonnes
-df.codePostalEtablissement = df.codePostalEtablissement.astype(str)
-df.anneeNotification = df.anneeNotification.astype(str)
-df.codePostal = df.codePostal.astype(str)
-
-# Exportation des données / gain de temps pour prochaines utilisations
-df.to_csv(r'H:/Desktop/Data/decp.csv', sep=';',index = False, header=True, encoding='utf-8')
- 
-# Réimportation des données
-df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
-                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
-                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'codePostal' : str,
-                             'anneeNotification' : str, 'moisNotification' : str, 'codeCommuneEtablissement' : str,
-                             'codePostalEtablissement' : str, 'codeTypeEtablissement' : str, 'siren' : str, 'siret' : str})
-
-#### Comparaison de toutes les autres colonnes
-dftest = df.drop(columns=['formePrix', 'denominationSociale'])
-dftest_copy = df.drop(columns=['formePrix' , 'denominationSociale'])
-try:
-    assert_frame_equal(dftest, dftest_copy)
-    print(True)
-except:
-    print(False)
-    
 ######################################################################
 ################### Enrichissement avec le code CPV ##################
 ######################################################################
@@ -1174,19 +1175,19 @@ for i in range(len(refCPV_min)):
 refCPV_min = refCPV_min.drop_duplicates(subset=['CODE'], keep='first')
 refCPV_min.columns = ['CODEmin', 'FR2']
 # Merge avec le df principal
-df_decp = pd.merge(df_decp, refCPV, how='left', left_on="codeCPV", right_on="CODE")
-df_decp = pd.merge(df_decp, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
+df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE")
+df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
 # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
-df_decp.refCodeCPV = np.where(df_decp.refCodeCPV.isnull(), df_decp.FR2, df_decp.refCodeCPV)
-del df_decp['CODE'], df_decp['CODEmin'], df_decp['FR2'], refCPV, refCPV_min, i
-#df_decp.refCodeCPV.isnull().sum()
+df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
+del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
+#df.refCodeCPV.isnull().sum()
 
 ######################################################################
 ############## Enrichissement des données des acheteurs ##############
 ######################################################################
 ######## Enrichissement des données via les codes siret/siren ########
 ### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
-dfAcheteurId = df_decp[['acheteur.id']]; dfAcheteurId.columns = ['siret']
+dfAcheteurId = df[['acheteur.id']]; dfAcheteurId.columns = ['siret']
 dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
 dfAcheteurId.reset_index(inplace=True, drop=True) 
 dfAcheteurId.siret = dfAcheteurId.siret.astype(str)
@@ -1231,10 +1232,185 @@ result2.columns = ['siret', 'codeCommuneEtablissement', 'codePostalEtablissement
 enrichissementAcheteur = pd.concat([result, result2])
 enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
 
-df_decp = pd.merge(df_decp, enrichissementAcheteur, how='outer', on='acheteur.id')
-df_decp.codeCommuneAcheteur.isnull().sum()/len(df_decp)*100 # 3.4% de données non-enrichies
+df = pd.merge(df, enrichissementAcheteur, how='outer', on='acheteur.id')
+df.codeCommuneAcheteur.isnull().sum()/len(df)*100 # 3.4% de données non-enrichies
 
 del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, i, result, result2, resultTemp, siret
+
+######################################################################
+###################### Sauvegarde des données ########################
+######################################################################
+# Ajustement de certaines colonnes
+df.codePostalEtablissement = df.codePostalEtablissement.astype(str)
+for i in range(len(df)):
+    df.codePostalEtablissement[i] = df.codePostalEtablissement[i][:5]
+df.anneeNotification = df.anneeNotification.astype(str)
+df.codePostal = df.codePostal.astype(str)
+
+# Réorganisation des colonnes et de leur nom
+df.columns = ['source', 'type', 'nature', 'procedure', 'dureeMois',
+       'datePublicationDonnees', 'lieuExecutionCode',
+       'lieuExecutionTypeCode', 'lieuExecutionNom', 'identifiantMarche', 'objetMarche', 'codeCPV',
+       'dateNotification', 'montant', 'formePrix', 'acheteurId',
+       'acheteur.nom', 'typeIdentifiantEtablissement', 'idEtablissement', 'nbTitulairesSurCeMarche',
+       'montantTotalMarche', 'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
+       'anneeNotification', 'moisNotification', 'montantEstEstime',
+       'dureeMoisEstEstime', 'dureeMoisCalculee', 'adresseEtablissement',
+       'codeCommuneEtablissement', 'codePostalEtablissement',
+       'codeTypeEtablissement', 'communeEtablissement', 'denominationSocialeEtablissement',
+       'sirenEtablissement', 'siretEtablissement', 'referenceCPV', 'codeCommuneAcheteur',
+       'codePostalAcheteur', 'libelleCommuneAcheteur']
+
+df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dateNotification',  
+         'anneeNotification', 'moisNotification', 'formePrix', 'identifiantMarche', 'objetMarche' , 'codeCPV',
+         'referenceCPV', 'montant', 'montantEstEstime', 'montantTotalMarche', 'nbTitulairesSurCeMarche',
+         'dureeMois', 'dureeMoisEstEstime', 'dureeMoisCalculee', 'acheteurId', 'acheteur.nom',
+         'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', 'codeCommuneAcheteur',
+         'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
+         'typeIdentifiantEtablissement', 'idEtablissement', 'nicEtablissement', 'adresseEtablissement',
+         'codeCommuneEtablissement', 'codePostalEtablissement', 'codeTypeEtablissement', 'communeEtablissement',
+         'denominationSocialeEtablissement','sirenEtablissement', 'siretEtablissement']]
+
+# Rectification codePostalAcheteur
+df.codePostalAcheteur = df.codePostalAcheteur.astype(str)
+for i in range(len(df)):
+    df.codePostalAcheteur[i] = df.codePostalAcheteur[i][:5]
+
+# Exportation des données / gain de temps pour prochaines utilisations
+#df.dtypes
+df.to_csv(r'H:/Desktop/Data/decp.csv', sep=';',index = False, header=True, encoding='utf-8')
+ 
+# Réimportation des données
+df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
+                      dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
+                             'moisNotification' : str,  'idEtablissement' : str, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
+                             'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
+                             'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
+                             'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
+
+#### Comparaison de toutes les autres colonnes
+dftest = df.drop(columns=['formePrix', 'denominationSocialeEtablissement'])
+dftest_copy = df.drop(columns=['formePrix' , 'denominationSocialeEtablissement'])
+try:
+    assert_frame_equal(dftest, dftest_copy)
+    print(True)
+except:
+    print(False)
+    
+######################################################################
+######################################################################
+############### Stats descriptives ###############
+###..... Jeu de données
+dfStat = pd.DataFrame.copy(df_decp, deep = True)
+dfStat.columns
+dfStat.info()
+dfStat.isnull().sum()
+dfStat.nunique()
+
+###..... Variables quantitatives
+# Montant des marchés
+dfStat.montant.describe()
+dfStat.montant[dfStat.montant < 1000000].plot(kind='box')
+dfStat.montant[dfStat.montant < 173000].plot(kind='box')
+
+# Duree des marchés
+dfStat.dureeMois.describe()
+dfStat.dureeMoisCalculee.describe()
+dfStat.dureeMois[dfStat.dureeMois < 120].plot(kind='box')
+dfStat.dureeMoisCalculee[dfStat.dureeMois < 120].plot(kind='box')
+
+
+###..... Variables qualitatives
+# Source
+dfStat.source.value_counts(normalize=True).plot(kind='bar')
+# Forme des prix / PROCEDURE
+dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True)
+dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True, logy =True)
+# Nature
+dfStat.nature[(dfStat.nature=='Marché')|(dfStat.nature=='Accord-cadre')|(dfStat.nature=='Marché subséquent')].value_counts(normalize=True).plot(kind='pie')
+# _Type
+dfStat._type.value_counts(normalize=True).plot(kind='pie')
+
+# Region
+dfStat.Region.value_counts(normalize=True).plot(kind='bar')
+# Code Postal
+dfStat.codePostal.describe()
+
+# AnneeNotification
+dfStat.anneeNotification.value_counts(normalize=True).sort_index().plot(kind='line')
+# MoisNotification 
+plt.plot(dfStat.moisNotification.value_counts(normalize=True).sort_index())
+# Date de publication
+dfStat.datePublicationDonnees.value_counts(normalize=True).sort_index().plot(kind='line', rot=45)
+# Date de notification
+dfStat.dateNotification.value_counts(normalize=True).sort_index().plot(kind='line', rot=45)
+
+# Lieu d'exécution
+dfStat['lieuExecution.nom'].describe()
+# Nom acheteur
+dfStat['acheteur.nom'].describe()
+# codeCPV
+dfStat.codeCPV.describe()
+# pie chart top 6
+
+# nic
+dfStat.nic.describe()
+# codeTypeEtablissement
+dfStat.codeTypeEtablissement.describe()
+# siren
+dfStat.siren.describe()
+# siret
+dfStat.siret.describe()
+
+# Acheteur - Etablissement 
+(dfStat.codeCommuneEtablissement == dfStat.codeCommuneAcheteur).sum()
+(dfStat.codePostalEtablissement == dfStat.codePostalAcheteur).sum()
+
+######## Statistiques bivariées
+# Duree | Montant
+dfStat[(dfStat.dureeMoisCalculee < 120) & (dfStat.montant < 50000000)].plot.scatter("dureeMoisCalculee", "montant")
+dfStat[(dfStat.dureeMois < 120) & (dfStat.montant < 50000000)].plot.scatter("dureeMoisCalculee", "montant")
+dfStat[(dfStat.dureeMois < 40) & (dfStat.montant < 10000000)].plot.scatter("dureeMoisCalculee", "montant")
+
+# Type -> Marché/Contrat de concession
+dfStat[dfStat.montant < 1000000].boxplot(column = "montant", by = "_type") 
+dfStat[dfStat.dureeMoisCalculee < 100].boxplot(column = "dureeMoisCalculee", by = "_type") 
+
+# Montant / Region
+dfStat[dfStat.montant < 400000].boxplot(column = "montant", by = "Region", rot=90) 
+
+# Montant / nature
+dfStat[dfStat.montant < 400000].boxplot(column = "montant", by = "nature", rot=90)
+dfStat[(dfStat.montant < 400000) & ((dfStat.nature=='Marché')|(dfStat.nature=='Accord-cadre')|(dfStat.nature=='Marché subséquent'))].boxplot(column = "montant", by = "nature", rot=90)
+
+# distance entre entreprise et commune 
+
+#################################### Villes ###################################
+# Levallois-Perret
+dfLP = dfStat[dfStat.codeCommuneAcheteur == '92044']
+#dfLP = dfStat[dfStat['acheteur.id'] == '21920044100018']
+dfLP.formePrix.value_counts()
+dfLP.siret.value_counts()
+dfLP.montant.plot(kind='box')
+dfLP.plot.scatter("dureeMoisCalculee", "montant")
+test = dfLP[dfLP.siret == '81031603400018']
+
+# Puteaux
+dfPT = dfStat[dfStat.codeCommuneAcheteur == '92062']
+#dfPT = dfStat[dfStat['acheteur.id'] == '21920062300011']
+dfPT.formePrix.value_counts()
+dfPT.nature.value_counts()
+dfPT.siret.value_counts()
+dfPT.montant[dfPT.montant<4000000].plot(kind='box')
+dfPT.plot.scatter("dureeMoisCalculee", "montant")
+test = dfPT[dfPT.siret == '30666424400036']
+
+# Issy-les-Moulineaux
+dfIM = dfStat[dfStat.codeCommuneAcheteur == '92040']
+dfIM.siret.value_counts()
+test = dfIM[dfIM.siret == '39882733700021']
+
+
 ######################################################################
 ######################################################################
 ######################################################################
