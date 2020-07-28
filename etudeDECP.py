@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jul 15 08:14:51 2020
-
-@author: Administrator
+Created on Wed Jul 15
+@author: Lucas GEFFARD
 """
 # Librairies
 import pandas as pd
@@ -262,7 +261,8 @@ dfMT = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().
 dfMM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame('montantMoyen').reset_index()
 dfIN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame('nbMarches').reset_index()
 dfSN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame('nbEntreprises').reset_index()
-dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.mean().to_frame('distanceMoyenne').reset_index()
+#dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.mean().to_frame('distanceMoyenne').reset_index()
+dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame('distanceMoyenne').reset_index()
 
 df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
 df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
@@ -278,7 +278,7 @@ df_carte.nbMarches = round(df_carte.nbMarches, 0)
 df_carte.nbEntreprises = round(df_carte.nbEntreprises, 0)
 df_carte.distanceMoyenne = round(df_carte.distanceMoyenne, 0)
 
-### Mise en forme
+'''
 from folium.plugins import MarkerCluster
 c= folium.Map(location=[47, 2.0],zoom_start=6, tiles='OpenStreetMap')
 marker_cluster = MarkerCluster().add_to(c)
@@ -292,6 +292,22 @@ for i in range (len(df_carte)):
                   + "Distance moyennes des entreprises : " + df_carte.distanceMoyenne[i].astype(str) + ' Km'
                   , max_width = 400, min_width = 300), clustered_marker = True).add_to(marker_cluster)
 c.save('carteDECP.html')
+'''
+### Mise en forme
+from folium.plugins import MarkerCluster
+c= folium.Map(location=[47, 2.0],zoom_start=6, tiles='OpenStreetMap')
+marker_cluster = MarkerCluster().add_to(c)
+for i in range (len(df_carte)):
+    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]],
+                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
+                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
+                  #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
+                  + 'pour un montant moyen de <b>' + df_carte.montantMoyen[i].astype(str) + ' €</b> '
+                  + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
+                  + "à une distance médiane de <b>" + df_carte.distanceMoyenne[i].astype(str) + ' km</b> '
+                  , max_width = 320, min_width = 200), clustered_marker = True).add_to(marker_cluster)
+c.save('carteDECP.html')
+
 '''
 ###############################################################################
 ###############################################################################
@@ -333,3 +349,127 @@ del df_carte, df_carte2, i
 ###############################################################################
 ###############################################################################
 del df_decp['superficieEtablissement'], df_decp['populationEtablissement'], df_decp['latitudeAcheteur'], df_decp['longitudeAcheteur'], df_decp['latitudeEtablissement'], df_decp['longitudeEtablissement']
+del df_carte, i
+
+###############################################################################
+############################ Segmentation de marché ###########################
+###############################################################################
+#... Créer une bdd par villes (acheteur/client)
+# Selection des variables qualitatives
+dfBIN = df_decp[['type', 'nature', 'procedure', 'lieuExecutionTypeCode', 'regionAcheteur']]
+#... Vérification des caractéristiques
+# Arrangement du code du lieu d'exécution
+dfBIN['lieuExecutionTypeCode'] = dfBIN['lieuExecutionTypeCode'].str.upper()
+dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT', dfBIN['lieuExecutionTypeCode'])
+dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION', dfBIN['lieuExecutionTypeCode'])
+dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE ARRONDISSEMENT', 'CODE DEPARTEMENT', dfBIN['lieuExecutionTypeCode'])
+dfBIN['lieuExecutionTypeCode'] = np.where((dfBIN['lieuExecutionTypeCode'] == 'CODE COMMUNE') | (dfBIN['lieuExecutionTypeCode'] == 'CODE POSTAL'), 'CODE COMMUNE/POSTAL', dfBIN['lieuExecutionTypeCode'])
+# Vérification des types
+dfBIN.dtypes
+#... On binarise les variables qualitatives
+def binateur(data, to_bin):
+    data = data.copy()
+    X = data[to_bin]
+    X = pd.get_dummies(X)
+    data = data.drop(columns=to_bin)
+    X = X.fillna(0)
+    return pd.concat([data, X], axis=1)
+
+dfBIN = binateur(dfBIN, dfBIN.columns) 
+
+#... Selection des variables quantitatives + nom de la commune
+dfNoBin = df_decp[['libelleCommuneAcheteur', 'montant', 'dureeMois', 
+                   'dureeMoisCalculee', 'distanceAcheteurEtablissement']]
+# Création d'une seule colonne pour la durée du marché
+dfNoBin['duree'] = round(dfNoBin.dureeMois*0.2 + dfNoBin.dureeMoisCalculee*0.8, 0)
+del dfNoBin['dureeMois'], dfNoBin['dureeMoisCalculee']
+# On modifie les valeurs manquantes pour la distance en appliquant la médiane
+dfNoBin.distanceAcheteurEtablissement = np.where(dfNoBin['distanceAcheteurEtablissement'].isnull(), dfNoBin['distanceAcheteurEtablissement'].median(), dfNoBin['distanceAcheteurEtablissement'])
+# Vérification des types
+dfNoBin.dtypes
+
+
+# On obtient alors notre df prêt sans variables qualitatives (sauf libellé)
+df = dfNoBin.join(dfBIN)
+del dfNoBin, dfBIN
+df = df[df['libelleCommuneAcheteur'].notnull()]
+df['nbContrats'] = 1 # Trouver autre solution
+
+#... Gestion des régions
+df = df.groupby(['libelleCommuneAcheteur']).sum().reset_index()
+ensemble = ['regionAcheteur_Auvergne-Rhône-Alpes',
+       'regionAcheteur_Bourgogne-Franche-Comté', 'regionAcheteur_Bretagne',
+       'regionAcheteur_Centre-Val de Loire',
+       "regionAcheteur_Collectivité d'outre mer", 'regionAcheteur_Corse',
+       'regionAcheteur_Grand Est', 'regionAcheteur_Guadeloupe',
+       'regionAcheteur_Guyane', 'regionAcheteur_Hauts-de-France',
+       'regionAcheteur_La Réunion', 'regionAcheteur_Martinique',
+       'regionAcheteur_Mayotte', 'regionAcheteur_Normandie',
+       'regionAcheteur_Nouvelle-Aquitaine', 'regionAcheteur_Occitanie',
+       'regionAcheteur_Pays de la Loire',
+       "regionAcheteur_Provence-Alpes-Côte d'Azur",
+       'regionAcheteur_Île-de-France']
+df['HighScore'] = df[ensemble].max(axis=1)
+for x in ensemble:
+    df[x] = np.where(df[x] == df['HighScore'], 1, 0)
+
+#... Fréquence 
+ensemble = ['nature_Accord-cadre', 'nature_CONCESSION DE SERVICE',
+       'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX',
+       'nature_Concession de service', 'nature_Concession de service public',
+       'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC',
+       'nature_Délégation de service public', 'nature_Marché',
+       'nature_Marché de partenariat', 'nature_Marché hors accord cadre',
+       'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
+       "procedure_Appel d'offres restreint",
+       'procedure_Appel d’offres restreint', 'procedure_Dialogue compétitif',
+       'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
+       'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
+       'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
+       'procedure_Procédure non négociée ouverte',
+       'procedure_Procédure non négociée restreinte',
+       'procedure_Procédure négociée ouverte',
+       'procedure_Procédure négociée restreinte',
+       'lieuExecutionTypeCode_CODE CANTON',
+       'lieuExecutionTypeCode_CODE COMMUNE/POSTAL',
+       'lieuExecutionTypeCode_CODE DEPARTEMENT',
+       'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION']
+for x in ensemble:
+    df[x] = df[x]/df['nbContrats']
+del df['HighScore'], ensemble, x
+
+#... Duree, montant et distance moyenne par ville (par rapport au nb de contrats)
+df.distanceAcheteurEtablissement = round(df.distanceAcheteurEtablissement/df['nbContrats'],0)
+df.duree = round(df.duree/df['nbContrats'],0)
+df['montantMoyen'] = round(df.montant/df['nbContrats'],0)
+
+df.columns = ['libelleCommuneAcheteur', 'montantTotal', 'distanceMoyenne', 'dureeMoyenne', 'nbContratDeConcession', 'nbMarché',
+       'nature_Accord-cadre', 'nature_CONCESSION DE SERVICE', 'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX', 'nature_Concession de service', 'nature_Concession de service public',
+       'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public', 'nature_Marché',
+       'nature_Marché de partenariat', 'nature_Marché hors accord cadre', 'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
+       "procedure_Appel d'offres restreint",'procedure_Appel d’offres restreint', 'procedure_Dialogue compétitif',
+       'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
+       'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
+       'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
+       'procedure_Procédure non négociée ouverte', 'procedure_Procédure non négociée restreinte',
+       'procedure_Procédure négociée ouverte', 'procedure_Procédure négociée restreinte',
+       'lieuExecutionTypeCode_CODE CANTON', 'lieuExecutionTypeCode_CODE COMMUNE/POSTAL',
+       'lieuExecutionTypeCode_CODE DEPARTEMENT', 'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION',
+       'regionAcheteur_Auvergne-Rhône-Alpes', 'regionAcheteur_Bourgogne-Franche-Comté', 'regionAcheteur_Bretagne',
+       'regionAcheteur_Centre-Val de Loire', "regionAcheteur_Collectivité d'outre mer", "regionAcheteur_Corse",
+       'regionAcheteur_Grand Est', 'regionAcheteur_Guadeloupe', 'regionAcheteur_Guyane', 'regionAcheteur_Hauts-de-France',
+       'regionAcheteur_La Réunion', 'regionAcheteur_Martinique', 'regionAcheteur_Mayotte', 'regionAcheteur_Normandie',
+       'regionAcheteur_Nouvelle-Aquitaine', 'regionAcheteur_Occitanie', 'regionAcheteur_Pays de la Loire',
+       "regionAcheteur_Provence-Alpes-Côte d'Azur", 'regionAcheteur_Île-de-France', 'nbContrats', 'montantMoyen']
+
+#... Mettre les valeurs sur une même unité de mesure
+from sklearn.preprocessing import StandardScaler
+df_nom = pd.DataFrame(df.libelleCommuneAcheteur)
+del df['libelleCommuneAcheteur']
+scaler = StandardScaler()
+scaled_df = scaler.fit_transform(df)
+# Vérification
+np.around(scaled_df.mean(axis = 0),15) # Doit être égal à 0
+scaled_df.std(axis = 0) # Doit être égal à 1
+### On obtient le df nécessaire pour réaliser la segmentation de marché !
+scaled_df[0] # Aperçu de la première ligne
