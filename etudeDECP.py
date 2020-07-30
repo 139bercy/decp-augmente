@@ -443,6 +443,10 @@ df.distanceAcheteurEtablissement = round(df.distanceAcheteurEtablissement/df['nb
 df.duree = round(df.duree/df['nbContrats'],0)
 df['montantMoyen'] = round(df.montant/df['nbContrats'],0)
 
+#... Finalement les données spatiales ne sont pas gardés pour réaliser la segmentation
+df.drop(columns = df.columns[36:55], axis = 1, inplace = True)
+
+# Renomme des colonnes
 df.columns = ['libelleCommuneAcheteur', 'montantTotal', 'distanceMoyenne', 'dureeMoyenne', 'nbContratDeConcession', 'nbMarché',
        'nature_Accord-cadre', 'nature_CONCESSION DE SERVICE', 'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX', 'nature_Concession de service', 'nature_Concession de service public',
        'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public', 'nature_Marché',
@@ -453,14 +457,8 @@ df.columns = ['libelleCommuneAcheteur', 'montantTotal', 'distanceMoyenne', 'dure
        'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
        'procedure_Procédure non négociée ouverte', 'procedure_Procédure non négociée restreinte',
        'procedure_Procédure négociée ouverte', 'procedure_Procédure négociée restreinte',
-       'lieuExecutionTypeCode_CODE CANTON', 'lieuExecutionTypeCode_CODE COMMUNE/POSTAL',
-       'lieuExecutionTypeCode_CODE DEPARTEMENT', 'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION',
-       'regionAcheteur_Auvergne-Rhône-Alpes', 'regionAcheteur_Bourgogne-Franche-Comté', 'regionAcheteur_Bretagne',
-       'regionAcheteur_Centre-Val de Loire', "regionAcheteur_Collectivité d'outre mer", "regionAcheteur_Corse",
-       'regionAcheteur_Grand Est', 'regionAcheteur_Guadeloupe', 'regionAcheteur_Guyane', 'regionAcheteur_Hauts-de-France',
-       'regionAcheteur_La Réunion', 'regionAcheteur_Martinique', 'regionAcheteur_Mayotte', 'regionAcheteur_Normandie',
-       'regionAcheteur_Nouvelle-Aquitaine', 'regionAcheteur_Occitanie', 'regionAcheteur_Pays de la Loire',
-       "regionAcheteur_Provence-Alpes-Côte d'Azur", 'regionAcheteur_Île-de-France', 'nbContrats', 'montantMoyen']
+       'lieuExecutionTypeCode_CODE CANTON', 'lieuExecutionTypeCode_CODE COMMUNE/POSTAL', 'lieuExecutionTypeCode_CODE DEPARTEMENT', 
+       'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION', 'nbContrats', 'montantMoyen']
 
 #... Mettre les valeurs sur une même unité de mesure
 from sklearn.preprocessing import StandardScaler
@@ -469,7 +467,134 @@ del df['libelleCommuneAcheteur']
 scaler = StandardScaler()
 scaled_df = scaler.fit_transform(df)
 # Vérification
-np.around(scaled_df.mean(axis = 0),15) # Doit être égal à 0
-scaled_df.std(axis = 0) # Doit être égal à 1
+np.around(scaled_df.mean(axis = 0),10) # Doit être égal à 0
+np.around(scaled_df.std(axis = 0),10) # Doit être égal à 1
 ### On obtient le df nécessaire pour réaliser la segmentation de marché !
 scaled_df[0] # Aperçu de la première ligne
+
+#... On réassemble le df
+df = df_nom.join(df)
+del df_nom
+
+###############################################################################
+### Réalisation de l'ACP
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+#print(scaled_df.shape) # n=2340 et p=37
+acp = PCA(svd_solver='full')
+coord = acp.fit_transform(scaled_df)
+#proportion de variance expliquée
+print(acp.explained_variance_ratio_)
+#scree plot
+eigval = (2340-1)/2340*acp.explained_variance_
+plt.plot(np.arange(1,37+1), eigval)
+#cumul de variance expliquée
+plt.plot(np.arange(1,37+1),np.cumsum(acp.explained_variance_ratio_))
+
+# Test des bâtons brisés
+bs = np.cumsum(1/np.arange(37,0,-1))[::-1]
+# D'après les résultats aucun facteur n'est valide...
+print(pd.DataFrame({'Val.Propre':eigval,'Seuils':bs}))
+
+###############################################################################
+### Application de l'algorithme des k-means
+from sklearn.cluster import KMeans
+
+'''
+# TESTS
+for n in range(19):
+    n=n+1
+    print('\nTest avec ', n)
+    model=KMeans(n_clusters=n)
+    model.fit(scaled_df)
+    for i in range(n):
+        print((model.labels_==i).sum())
+'''
+# K-means - on prend 7 grappes
+model=KMeans(n_clusters=7)
+model.fit(scaled_df)
+print(model.cluster_centers_)
+print(model.labels_)
+res = model.labels_
+    
+# Graphique du résultat
+for point in scaled_df:
+    if model.predict(point.reshape(1,-1)) == [0]:
+        plt.scatter(point[0], point[1], c='b')
+    elif model.predict(point.reshape(1,-1)) == [1]:
+        plt.scatter(point[0], point[1], c='g')
+    elif model.predict(point.reshape(1,-1)) == [2]:
+        plt.scatter(point[0], point[1], c='r')
+for center in model.cluster_centers_:
+    plt.scatter(center[0],center[1])
+plt.show()
+# Nombre de communes par grappe
+for i in range(7):
+    print((model.labels_==i).sum())
+
+# Ajout des résultats
+res = pd.DataFrame(res, columns=['segmentation_KMEANS'])
+df = df.join(res)
+del bs, center, coord, eigval, i, point, res
+# La méthode K-means n'est pour le moment pas très concluante
+'''
+from pandas.plotting import scatter_matrix
+dftest = pd.DataFrame(scaled_df)
+dftest = dftest[dftest.columns[0:9]]
+dftest = dftest[dftest<10]
+dftest = dftest.dropna()
+scatter_matrix(dftest,figsize=(9,9))
+del dftest[3], dftest[6], dftest[7], dftest[8]
+scatter_matrix(dftest,figsize=(5,5))
+
+df['montantTotal'].decribe()
+df.montantTotal[(df.montantTotal<10000000)].plot.hist()
+dftest[0][dftest[0]<-0.1].hist()
+'''
+
+###############################################################################
+### Application de l'algorithme de classification ascendante hiérarchique - CAH
+#graphique - croisement deux à deux des variables
+
+#librairies pour la CAH
+from matplotlib import pyplot as plt
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+'''
+# Générer la matrice des liens
+Z = linkage(df.iloc[:,1:38] ,method='ward',metric='euclidean')
+# Dendrogramme
+plt.title('CAH avec matérialisation des X classes')
+dendrogram(Z,labels=df.index,orientation='left',color_threshold=0.08e10)
+plt.show()
+# Récupération des classes
+groupes_cah = pd.DataFrame(fcluster(Z,t=0.08e10,criterion='distance'), columns = ['segmentation_CAH'])
+'''
+############ Avec les données normalisée
+# Générer la matrice des liens
+Z = linkage(scaled_df ,method='ward',metric='euclidean')
+# Dendrogramme
+plt.title('CAH avec matérialisation des X classes')
+dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
+plt.show()
+# Récupération des classes
+groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
+
+### Ajout au df 
+df = df.join(groupes_cah)
+del Z, groupes_cah, scaled_df
+
+###############################################################################
+### Comparons les résultats des deux méthodes
+df.segmentation_KMEANS.value_counts()
+df.segmentation_CAH.value_counts()
+
+pd.crosstab(df.segmentation_CAH, df.segmentation_KMEANS)
+'''
+### Conclusion
+Les résultats ne sont pour le moment pas entièrement satisfaisant.
+Il faudrait sans doute essayer d'optimiser plus l'utilisation des algortihmes. 
+Et surtout, il faudrait envisager de réaliser un travail sur les données en 
+entrée afin de les rendre plus homogène. (On ne prend pas en compte les données 
+extrêmes au profit de meilleurs résultats pour notre jeu de données.)
+'''
