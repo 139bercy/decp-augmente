@@ -481,6 +481,8 @@ del df_nom
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
+### Essayer sur 3 axes
+
 #print(scaled_df.shape) # n=2340 et p=37
 acp = PCA(svd_solver='full')
 coord = acp.fit_transform(scaled_df)
@@ -518,6 +520,7 @@ print(model.cluster_centers_)
 print(model.labels_)
 res = model.labels_
     
+'''
 # Graphique du résultat
 for point in scaled_df:
     if model.predict(point.reshape(1,-1)) == [0]:
@@ -529,6 +532,18 @@ for point in scaled_df:
 for center in model.cluster_centers_:
     plt.scatter(center[0],center[1])
 plt.show()
+'''
+
+# Graphique du résultat
+for point in scaled_df:
+    clusterID = model.predict(point.reshape(1,-1))
+    if clusterID == [0]:
+        plt.scatter(point[0], point[1], c='b')
+    elif clusterID == [1]:
+        plt.scatter(point[0], point[1], c='g')
+    elif clusterID == [2]:
+        plt.scatter(point[0], point[1], c='r')
+plt.show()
 # Nombre de communes par grappe
 for i in range(7):
     print((model.labels_==i).sum())
@@ -536,8 +551,8 @@ for i in range(7):
 # Ajout des résultats
 res = pd.DataFrame(res, columns=['segmentation_KMEANS'])
 df = df.join(res)
-del bs, center, coord, eigval, i, point, res
-# La méthode K-means n'est pour le moment pas très concluante
+del coord, eigval, i, point, res #center, bs
+
 '''
 from pandas.plotting import scatter_matrix
 dftest = pd.DataFrame(scaled_df)
@@ -558,7 +573,6 @@ dftest[0][dftest[0]<-0.1].hist()
 #graphique - croisement deux à deux des variables
 
 #librairies pour la CAH
-from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 '''
 # Générer la matrice des liens
@@ -587,14 +601,19 @@ del Z, groupes_cah, scaled_df
 ###############################################################################
 ### Comparons les résultats des deux méthodes
 df.segmentation_KMEANS.value_counts()
-df.segmentation_CAH.value_counts()
+df.segmentation_CAH.value_counts() # Regarder les données autres clusters principaux
 
 pd.crosstab(df.segmentation_CAH, df.segmentation_KMEANS)
-'''
-### Conclusion
-Les résultats ne sont pour le moment pas entièrement satisfaisant.
-Il faudrait sans doute essayer d'optimiser plus l'utilisation des algortihmes. 
-Et surtout, il faudrait envisager de réaliser un travail sur les données en 
-entrée afin de les rendre plus homogène. (On ne prend pas en compte les données 
-extrêmes au profit de meilleurs résultats pour notre jeu de données.)
-'''
+
+df.describe()
+resTest = df[(df['segmentation_CAH']==1) | (df['segmentation_CAH']==6) | (df['segmentation_CAH']==5)].groupby(['segmentation_CAH']).mean()
+resTest2 = df[(df['segmentation_KMEANS']==0) | (df['segmentation_KMEANS']==1) | (df['segmentation_KMEANS']==4)].groupby(['segmentation_KMEANS']).mean()
+del resTest, resTest2
+
+# Conclusion
+# Séelctionner le clustering avec le CAH car :
+    # Résultat reproductible (pas d'aléatiore)
+    # Forme des amas non hyper-sphérique
+    # Gère mieux les outliers / plus précis
+    # On ne connait pas à l'avance le nombre k de cluster
+
