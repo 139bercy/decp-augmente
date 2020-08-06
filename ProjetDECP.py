@@ -192,8 +192,8 @@ for i in range (len(df)):
     if (df.CPV_min[i].isdigit() == False):
         df.CPV_min[i] = np.NaN
 
-df.codeCPV.nunique() #6360
-df.CPV_min.nunique() #69
+df.codeCPV.nunique() #6534
+df.CPV_min.nunique() #71
 
 ########  Récupération code NIC 
 df["nic"] = np.nan
@@ -462,9 +462,12 @@ df.dateNotification = df.dateNotification.str[0:10]
 #On récupère l'année de notification
 df['anneeNotification'] = df.dateNotification.str[0:4] 
 df['anneeNotification'] = df['anneeNotification'].astype(float)
-#On supprime les erreurs (0021 par exemple)
+#On supprime les erreurs (0021 ou 2100 par exemple)
 df['dateNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['dateNotification'])
+df['dateNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['dateNotification'])
 df['anneeNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['anneeNotification'])
+df['anneeNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['anneeNotification'])
+
 #On récupère le mois de notification
 df['moisNotification'] = df.dateNotification.str[5:7] 
 
@@ -512,7 +515,7 @@ df.to_csv(r'H:/Desktop/Data/decp_export.csv', sep=';',index = False, header=True
 
 # Réimportation des données
 df_copy = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
-                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
+                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str, 'anneeNotification' : str,
                              'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'CPV_min' : str})
 
 # Vérification que les données sont identiques
@@ -873,25 +876,43 @@ q = pd.DataFrame(l); q.columns = ['Quantiles']
 Quantiles = Rq.join(q)
 plt.plot(Quantiles['Resultats'])
 
+
+
+
+##############################################################################
+##############################################################################
 ### Application sur le jeu de données principal df
 df.dureeMois.describe()
+df.montant.describe()
+(df.montant/df.dureeMois).describe()
 
-df['dureeMoisEstime'] = np.where((df['montant']/df['dureeMois'] < 200)
-    | ((df['dureeMois'] == 30) & (df['montant'] < 1000000))
-    | ((df['dureeMois'] == 31) & (df['montant'] < 1000000))
-    | ((df['dureeMois'] > 31) & (df['montant']/df['dureeMois'] < 300000))
-    | ((df['dureeMois'] > 120) & (df['montant'] < 100000000)), "Oui", "Non")
+df['dureeMoisEstime'] = np.where((df['montant']==df['dureeMois'])
+    | (df['montant']/df['dureeMois'] < 100)
+    | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
+    | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
+    | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
+    | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), "Oui", "Non")
+df.dureeMoisEstime[df.dureeMoisEstime=='Oui'].count()
 
 df['dureeMoisCalculee'] = np.where(df['dureeMoisEstime'] == "Oui", round(df['dureeMois']/30,0), df['dureeMois'])
 df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
 #df = df(math.ceil(df['dureeMois']))
 
 # Au cas ils restent encore des données aberrantes
-df['dureeMoisCalculee'] = np.where((df['montant']/df['dureeMois'] < 200)
-    | ((df['dureeMois'] == 30) & (df['montant'] < 1000000))
-    | ((df['dureeMois'] == 31) & (df['montant'] < 1000000))
-    | ((df['dureeMois'] > 31) & (df['montant']/df['dureeMois'] < 300000))
-    | ((df['dureeMois'] > 120) & (df['montant'] < 100000000)), 1, df.dureeMoisCalculee)
+df['dureeMoisCalculee'] = np.where((df['montant']/df['dureeMois'] < 100)
+    | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
+    | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
+    | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
+    | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
+    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), 1, df.dureeMoisCalculee)
+
+df.dureeMoisCalculee.describe()
+(df.montant/df.dureeMoisCalculee).describe()
 
 ##### Check du nombre de données estimées
 # Nombre de données estimées pour la durée 
@@ -997,7 +1018,7 @@ del dfSIRET, i, nanSiret, result, result2, myList
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(nanSiren)):
     try:
-        url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siren[i]
+        url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siret[i]
         
         page = requests.get(url)
         tree = html.fromstring(page.content)
@@ -1034,14 +1055,58 @@ for i in range(len(nanSiren)):
             detailsType = infos[11]
             #detailsType2 = infos[29]
             verification = (siret == nanSiren.siret[i])
-    
+            
         scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
         df_scrap = pd.concat([df_scrap, scrap], axis=0)
+        
     except:
-        index = i
-        scrap = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
-        df_scrap = pd.concat([df_scrap, scrap], axis=0)
-        pass
+        try :
+            url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siren[i]
+        
+            page = requests.get(url)
+            tree = html.fromstring(page.content)
+            
+            rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
+            infos = tree.xpath('//p/text()')
+            details = tree.xpath('//a/text()')
+            
+            print(i)
+            index = i
+            rue = rueSiret[1]
+            siret = rueSiret[5].replace(" ","")
+            ville = infos[7]
+            typeEntreprise = infos[15]
+            codeType = infos[16].replace(" : ","")
+            detailsType1 = details[28]
+            detailsType2 = details[29]
+            verification = (siret == nanSiren.siret[i])
+            if (detailsType1 ==' '):
+                detailType = detailsType2
+            else:
+                detailsType = detailsType1
+                
+            if (verification == False):
+                codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
+                infos = tree.xpath('//span[@class="data"]/text()')
+                
+                index = i
+                rue = infos[8]
+                siret = codeSiret[0].replace(" ", "")
+                ville = infos[9].replace(",\xa0","")
+                typeEntreprise = infos[4]
+                #codeType = infos[12].replace(" : ","")
+                detailsType = infos[11]
+                #detailsType2 = infos[29]
+                verification = (siret == nanSiren.siret[i])
+                
+                scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+                df_scrap = pd.concat([df_scrap, scrap], axis=0)
+        
+        except:
+            index = i
+            scrap = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+            df_scrap = pd.concat([df_scrap, scrap], axis=0)
+            pass
 
 # Récupération des résultats
 nanSiren.reset_index(inplace=True)
@@ -1244,6 +1309,7 @@ del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, i, resul
 df.codePostalEtablissement = df.codePostalEtablissement.astype(str)
 for i in range(len(df)):
     df.codePostalEtablissement[i] = df.codePostalEtablissement[i][:5]
+
 df.anneeNotification = df.anneeNotification.astype(str)
 df.codePostal = df.codePostal.astype(str)
 
@@ -1271,10 +1337,14 @@ df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dat
          'codeCommuneEtablissement', 'codePostalEtablissement', 'codeTypeEtablissement', 'communeEtablissement',
          'denominationSocialeEtablissement','sirenEtablissement', 'siretEtablissement']]
 
-# Rectification codePostalAcheteur
+# Rectification codePostalAcheteur et codeCommuneEtablissement
 df.codePostalAcheteur = df.codePostalAcheteur.astype(str)
 for i in range(len(df)):
     df.codePostalAcheteur[i] = df.codePostalAcheteur[i][:5]
+
+df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str)
+for i in range(len(df)):
+    df.codeCommuneEtablissement[i] = df.codeCommuneEtablissement[i][:5]
 
 # Exportation des données / gain de temps pour prochaines utilisations
 #df.dtypes
@@ -1299,143 +1369,26 @@ except:
     
 ######################################################################
 ######################################################################
-############### Stats descriptives ###############
-###..... Jeu de données
-dfStat = pd.DataFrame.copy(df_decp, deep = True)
-dfStat.columns
-dfStat.info()
-dfStat.isnull().sum()
-dfStat.nunique()
-
-###..... Variables quantitatives
-# Montant des marchés
-dfStat.montant.describe()
-dfStat.montant[dfStat.montant < 1000000].plot(kind='box')
-dfStat.montant[dfStat.montant < 173000].plot(kind='box')
-
-# Duree des marchés
-dfStat.dureeMois.describe()
-dfStat.dureeMoisCalculee.describe()
-dfStat.dureeMois[dfStat.dureeMois < 120].plot(kind='box')
-dfStat.dureeMoisCalculee[dfStat.dureeMois < 120].plot(kind='box')
-
-
-###..... Variables qualitatives
-# Source
-dfStat.source.value_counts(normalize=True).plot(kind='bar')
-# Forme des prix / PROCEDURE
-dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True)
-dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True, logy =True)
-# Nature
-dfStat.nature[(dfStat.nature=='Marché')|(dfStat.nature=='Accord-cadre')|(dfStat.nature=='Marché subséquent')].value_counts(normalize=True).plot(kind='pie')
-# _Type
-dfStat._type.value_counts(normalize=True).plot(kind='pie')
-
-# Region
-dfStat.Region.value_counts(normalize=True).plot(kind='bar')
-# Code Postal
-dfStat.codePostal.describe()
-
-# AnneeNotification
-dfStat.anneeNotification.value_counts(normalize=True).sort_index().plot(kind='line')
-# MoisNotification 
-plt.plot(dfStat.moisNotification.value_counts(normalize=True).sort_index())
-# Date de publication
-dfStat.datePublicationDonnees.value_counts(normalize=True).sort_index().plot(kind='line', rot=45)
-# Date de notification
-dfStat.dateNotification.value_counts(normalize=True).sort_index().plot(kind='line', rot=45)
-
-# Lieu d'exécution
-dfStat['lieuExecution.nom'].describe()
-# Nom acheteur
-dfStat['acheteur.nom'].describe()
-# codeCPV
-dfStat.codeCPV.describe()
-# pie chart top 6
-
-# nic
-dfStat.nic.describe()
-# codeTypeEtablissement
-dfStat.codeTypeEtablissement.describe()
-# siren
-dfStat.siren.describe()
-# siret
-dfStat.siret.describe()
-
-# Acheteur - Etablissement 
-(dfStat.codeCommuneEtablissement == dfStat.codeCommuneAcheteur).sum()
-(dfStat.codePostalEtablissement == dfStat.codePostalAcheteur).sum()
-
-######## Statistiques bivariées
-# Duree | Montant
-dfStat[(dfStat.dureeMoisCalculee < 120) & (dfStat.montant < 50000000)].plot.scatter("dureeMoisCalculee", "montant")
-dfStat[(dfStat.dureeMois < 120) & (dfStat.montant < 50000000)].plot.scatter("dureeMoisCalculee", "montant")
-dfStat[(dfStat.dureeMois < 40) & (dfStat.montant < 10000000)].plot.scatter("dureeMoisCalculee", "montant")
-
-# Type -> Marché/Contrat de concession
-dfStat[dfStat.montant < 1000000].boxplot(column = "montant", by = "_type") 
-dfStat[dfStat.dureeMoisCalculee < 100].boxplot(column = "dureeMoisCalculee", by = "_type") 
-
-# Montant / Region
-dfStat[dfStat.montant < 400000].boxplot(column = "montant", by = "Region", rot=90) 
-
-# Montant / nature
-dfStat[dfStat.montant < 400000].boxplot(column = "montant", by = "nature", rot=90)
-dfStat[(dfStat.montant < 400000) & ((dfStat.nature=='Marché')|(dfStat.nature=='Accord-cadre')|(dfStat.nature=='Marché subséquent'))].boxplot(column = "montant", by = "nature", rot=90)
-
-# distance entre entreprise et commune 
-
-#################################### Villes ###################################
-# Levallois-Perret
-dfLP = dfStat[dfStat.codeCommuneAcheteur == '92044']
-#dfLP = dfStat[dfStat['acheteur.id'] == '21920044100018']
-dfLP.formePrix.value_counts()
-dfLP.siret.value_counts()
-dfLP.montant.plot(kind='box')
-dfLP.plot.scatter("dureeMoisCalculee", "montant")
-test = dfLP[dfLP.siret == '81031603400018']
-
-# Puteaux
-dfPT = dfStat[dfStat.codeCommuneAcheteur == '92062']
-#dfPT = dfStat[dfStat['acheteur.id'] == '21920062300011']
-dfPT.formePrix.value_counts()
-dfPT.nature.value_counts()
-dfPT.siret.value_counts()
-dfPT.montant[dfPT.montant<4000000].plot(kind='box')
-dfPT.plot.scatter("dureeMoisCalculee", "montant")
-test = dfPT[dfPT.siret == '30666424400036']
-
-# Issy-les-Moulineaux
-dfIM = dfStat[dfStat.codeCommuneAcheteur == '92040']
-dfIM.siret.value_counts()
-test = dfIM[dfIM.siret == '39882733700021']
-
-
+######################################################################
+######################################################################
+######################################################################
+#test = pd.DataFrame(df_decp['lieuExecution.nom'].iloc[320:370])
+#test.reset_index(inplace=True, drop=True)
+#bdd_test = pd.DataFrame(['Ardèche', 'Rhône', 'Isère'], columns=['communeNom'])
+#bdd_test.reset_index(inplace=True, drop=True)
+#
+#
+#import re
+#re.sub((bdd_test['communeNom'][0] + '*'), bdd_test['communeNom'][0], test['lieuExecution.nom'][4])
+#re.sub('Ardèche', 'Ardèche', 'Ard�che')
+#
+#chaine = ""
+#expression = r"^0[0-9]([ .-]?[0-9]{2}){4}$"
+#while re.search(expression, chaine) is None:
+#    chaine = input("Saisissez un numéro de téléphone (valide) :")
 ######################################################################
 ######################################################################
 ######################################################################
 ######################################################################
 ######################################################################
-test = pd.DataFrame(df_decp['lieuExecution.nom'].iloc[320:370])
-test.reset_index(inplace=True, drop=True)
-bdd_test = pd.DataFrame(['Ardèche', 'Rhône', 'Isère'], columns=['communeNom'])
-bdd_test.reset_index(inplace=True, drop=True)
-
-
-import re
-re.sub((bdd_test['communeNom'][0] + '*'), bdd_test['communeNom'][0], test['lieuExecution.nom'][4])
-re.sub('Ardèche', 'Ardèche', 'Ard�che')
-
-chaine = ""
-expression = r"^0[0-9]([ .-]?[0-9]{2}){4}$"
-while re.search(expression, chaine) is None:
-    chaine = input("Saisissez un numéro de téléphone (valide) :")
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-# Analyse géographique - carte 
-# REGEX pour les communes
-# Revenir sur region avec les dict
 ######################################################################
