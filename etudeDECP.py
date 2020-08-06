@@ -45,7 +45,7 @@ dfStat.dureeMoisCalculee[dfStat.dureeMois < 120].plot(kind='box')
 # Source
 dfStat.source.value_counts(normalize=True).plot(kind='bar')
 # Forme des prix / PROCEDURE
-dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True)
+dfStat.formePrix.value_counts(normalize=True).plot(kind='barh', legend=True)
 dfStat.formePrix.value_counts(normalize=True).plot(kind='bar', legend=True, logy =True)
 # Nature
 dfStat.nature[(dfStat.nature=='Marché')|(dfStat.nature=='Accord-cadre')|(dfStat.nature=='Marché subséquent')].value_counts(normalize=True).plot(kind='pie')
@@ -202,11 +202,11 @@ df_villes.longitude = df_villes.longitude.astype(float)
 
 ################################# Ajout au dataframe principal
 # Ajout pour les acheteurs
-df_villes.columns = ['codeCommuneAcheteur', 'superficieAcheteur', 'populationAcheteur', 'latitudeAcheteur','longitudeAcheteur']
+df_villes.columns = ['codeCommuneAcheteur', 'populationAcheteur', 'superficieAcheteur', 'latitudeAcheteur','longitudeAcheteur']
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneAcheteur')
 
 # Ajout pour les etablissement
-df_villes.columns = ['codeCommuneEtablissement', 'superficieEtablissement', 'populationEtablissement', 'latitudeEtablissement','longitudeEtablissement']
+df_villes.columns = ['codeCommuneEtablissement', 'populationEtablissement', 'superficieEtablissement', 'latitudeEtablissement','longitudeEtablissement']
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
 
 del df_villes
@@ -277,6 +277,7 @@ df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
 df_carte.nbMarches = round(df_carte.nbMarches, 0)
 df_carte.nbEntreprises = round(df_carte.nbEntreprises, 0)
 df_carte.distanceMoyenne = round(df_carte.distanceMoyenne, 0)
+df_carte.distanceMoyenne = np.where(df_carte.distanceMoyenne.isnull(), 0, df_carte.distanceMoyenne)
 
 '''
 from folium.plugins import MarkerCluster
@@ -295,20 +296,37 @@ c.save('carteDECP.html')
 '''
 ### Mise en forme
 from folium.plugins import MarkerCluster
+
 c= folium.Map(location=[47, 2.0],zoom_start=6, tiles='OpenStreetMap')
 marker_cluster = MarkerCluster().add_to(c)
 for i in range (len(df_carte)):
-    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]],
+    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
+                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMoyenne[i]/2)), max(20, min(40,df_carte.distanceMoyenne[i]/2)))),
                   popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
                   + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
                   #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
-                  + 'pour un montant moyen de <b>' + df_carte.montantMoyen[i].astype(str) + ' €</b> '
+                  + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i]/1000,0).astype(int).astype(str) + ' mille euros</b> '
                   + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
-                  + "à une distance médiane de <b>" + df_carte.distanceMoyenne[i].astype(str) + ' km</b> '
-                  , max_width = 320, min_width = 200), clustered_marker = True).add_to(marker_cluster)
+                  + "à une distance médiane de <b>" + df_carte.distanceMoyenne[i].astype(str) + ' km</b> ',
+                  max_width = 320, min_width = 200)  
+                  , clustered_marker = True).add_to(marker_cluster)
 c.save('carteDECP.html')
 
+
 '''
+folium.CircleMarker
+..
+, radius=df_carte.distanceMoyenne[i],
+                  color='crimson',
+                  fill=True,
+                  fill_color='crimson'
+                  
+                  
+                   + '<div style="width: 50px; height: 50px; border-radius: 50%; border : solid 2px; background: orange; position: absolute; margin-top: 35px; margin-left: 130px; opacity:0.5"></div>', 
+
+#, radius = 10 # CircleMarker icon = folium.Icon(color='green')
+
+...
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -349,8 +367,8 @@ del df_carte, df_carte2, i
 ###############################################################################
 ###############################################################################
 del df_decp['superficieEtablissement'], df_decp['populationEtablissement'], df_decp['latitudeAcheteur'], df_decp['longitudeAcheteur'], df_decp['latitudeEtablissement'], df_decp['longitudeEtablissement']
-del df_carte, i
-
+del i
+#df_carte,
 ###############################################################################
 ############################ Segmentation de marché ###########################
 ###############################################################################
@@ -381,7 +399,7 @@ dfBIN = binateur(dfBIN, dfBIN.columns)
 dfNoBin = df_decp[['libelleCommuneAcheteur', 'montant', 'dureeMois', 
                    'dureeMoisCalculee', 'distanceAcheteurEtablissement']]
 # Création d'une seule colonne pour la durée du marché
-dfNoBin['duree'] = round(dfNoBin.dureeMois*0.2 + dfNoBin.dureeMoisCalculee*0.8, 0)
+dfNoBin['duree'] = round(dfNoBin.dureeMoisCalculee, 0)
 del dfNoBin['dureeMois'], dfNoBin['dureeMoisCalculee']
 # On modifie les valeurs manquantes pour la distance en appliquant la médiane
 dfNoBin.distanceAcheteurEtablissement = np.where(dfNoBin['distanceAcheteurEtablissement'].isnull(), dfNoBin['distanceAcheteurEtablissement'].median(), dfNoBin['distanceAcheteurEtablissement'])
@@ -551,7 +569,7 @@ for i in range(7):
 # Ajout des résultats
 res = pd.DataFrame(res, columns=['segmentation_KMEANS'])
 df = df.join(res)
-del coord, eigval, i, point, res #center, bs
+del coord, eigval, i, point, res, bs, clusterID #center
 
 '''
 from pandas.plotting import scatter_matrix
@@ -616,4 +634,186 @@ del resTest, resTest2
     # Forme des amas non hyper-sphérique
     # Gère mieux les outliers / plus précis
     # On ne connait pas à l'avance le nombre k de cluster
+
+# Règle avec le montant total
+df['segmentation_RULES']=3
+df['segmentation_RULES'] = np.where(df['montantTotal']<=2500000, 2, df['segmentation_RULES'])
+df['segmentation_RULES'] = np.where(df['montantTotal']<=1800000, 1, df['segmentation_RULES'])
+pd.crosstab(df.segmentation_CAH, df.segmentation_RULES) # Ne fonctionne pas
+# Règle avec le montant moyen
+df['segmentation_RULES']=3
+df['segmentation_RULES'] = np.where(df['montantMoyen']<=300000, 2, df['segmentation_RULES'])
+df['segmentation_RULES'] = np.where(df['montantMoyen']<=100000, 1, df['segmentation_RULES'])
+pd.crosstab(df.segmentation_CAH, df.segmentation_RULES) # Ne fonctionne pas non plus
+# Règle avec la distance moyenne
+df['segmentation_RULES']=3
+df['segmentation_RULES'] = np.where(df['distanceMoyenne']<=110, 2, df['segmentation_RULES'])
+df['segmentation_RULES'] = np.where(df['distanceMoyenne']<=60, 1, df['segmentation_RULES'])
+pd.crosstab(df.segmentation_CAH, df.segmentation_RULES) # Ne fonctionne tjrs pas !
+# Règle avec le nombre de marché
+df['segmentation_RULES']=3
+df['segmentation_RULES'] = np.where(df['nbMarché']<60, 2, df['segmentation_RULES'])
+df['segmentation_RULES'] = np.where(df['nbMarché']<12, 1, df['segmentation_RULES'])
+pd.crosstab(df.segmentation_CAH, df.segmentation_RULES) # NON
+
+### CONCLUSION :
+# La CAH est la bonne solution pour réaliser nos clusters
+#Test = df[['libelleCommuneAcheteur', 'montantTotal', 'montantMoyen', 'distanceMoyenne',
+#           'dureeMoyenne', 'nbContrats', 'segmentation_CAH']]
+###############################################################################
+###############################################################################
+###############################################################################
+
+### Ratio nb entreprises / nb marchés
+df_carte['ratioEntreprisesMarchés']=df_carte['nbEntreprises']/df_carte['nbMarches']
+df_bar = df_carte[['libelleCommuneAcheteur', 'nbMarches', 'ratioEntreprisesMarchés']]
+df_bar = df_bar[(df_bar.nbMarches>0) & (df_bar.ratioEntreprisesMarchés>0)]
+df_bar = df_bar.sort_values(by = 'ratioEntreprisesMarchés').head(10).sort_values(by = 'ratioEntreprisesMarchés', ascending = False)
+# Graphique des résultats : top 10
+df_bar.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des communes avec le plus petit ratio NBentreprise/NBmarchés')
+plt.yticks(range(0,len(df_bar.libelleCommuneAcheteur)), df_bar.libelleCommuneAcheteur)
+'''
+### HeatMap du ratio calculé
+#from folium.plugins import HeatMap
+df_carte2 = df_carte[['latitudeAcheteur','longitudeAcheteur','ratioEntreprisesMarchés']]
+df_carte2.ratioEntreprisesMarchés = np.where(df_carte2.ratioEntreprisesMarchés>=2, 2, df_carte2.ratioEntreprisesMarchés)
+df_carte2.ratioEntreprisesMarchés = round(df_carte2.ratioEntreprisesMarchés*100,0).astype(int)
+'''
+'''
+df_HeatMap = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
+for i in range(len(df_carte2)):
+    print(i)
+    for j in range(df_carte2.ratioEntreprisesMarchés[i]):
+        ar = np.array([[df_carte2.latitudeAcheteur[i],df_carte2.longitudeAcheteur[i]]])
+        df_temp = pd.DataFrame(ar, columns = ['latitudeAcheteur', 'longitudeAcheteur'])
+        df_HeatMap = pd.concat([df_HeatMap, df_temp])
+df_HeatMap['Count']=1        
+
+################################ GAIN DE TEMPS ################################
+df_HeatMap = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
+l=0
+for k in [250,500,750,1000,1250,1500,1750,2000,len(df_carte2)]:
+    df_temp2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
+    for i in range(l, k):
+        #print(i)
+        for j in range(df_carte2.ratioEntreprisesMarchés[i]):
+            ar = np.array([[df_carte2.latitudeAcheteur[i],df_carte2.longitudeAcheteur[i]]])
+            df_temp = pd.DataFrame(ar, columns = ['latitudeAcheteur', 'longitudeAcheteur'])
+            df_temp2 = pd.concat([df_temp2, df_temp])
+    df_HeatMap = pd.concat([df_HeatMap, df_temp2])
+    l=k
+del l, i, j, k, ar, df_temp, df_temp2   
+###############################################################################
+import random
+pd.set_option('display.precision',12)
+df_HeatMap.reset_index(inplace=True, drop=True)
+df_HeatMap.latitudeAcheteur = df_HeatMap.latitudeAcheteur.astype(float)
+df_HeatMap.longitudeAcheteur = df_HeatMap.longitudeAcheteur.astype(float)
+for i in range(len(df_HeatMap)):
+    df_HeatMap.latitudeAcheteur[i] = df_HeatMap.latitudeAcheteur[i] + round(random.random()*0.000000001,12)
+    df_HeatMap.longitudeAcheteur[i] = df_HeatMap.longitudeAcheteur[i] + round(random.random()*0.000000001,12)
+df_HeatMap.latitudeAcheteur = df_HeatMap.latitudeAcheteur.astype(str)
+df_HeatMap.longitudeAcheteur = df_HeatMap.longitudeAcheteur.astype(str)
+
+### Code pour la carte HeatMap
+from folium.plugins import HeatMap
+base_map = folium.Map(location=[47, 2.0],zoom_start=6, tiles='OpenStreetMap')
+marker_cluster = MarkerCluster().add_to(base_map)
+HeatMap(data=df_HeatMap, radius=20, max_zoom=13).add_to(base_map)
+for i in range (len(df_carte)):
+    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
+                  icon=folium.features.CustomIcon('https://images.emojiterra.com/google/android-nougat/512px/2753.png', icon_size=(10,10)),
+                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
+                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
+                  #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
+                  +  " pour <b>" + df_carte.nbEntreprises[i].astype(str) + '</b> entreprises ',
+                  max_width = 320, min_width = 200)  
+                  , clustered_marker = True).add_to(marker_cluster)
+base_map.save('carte2DECP.html')
+'''
+
+### HeatMap montantTotal / Population
+df_HeatMap = pd.merge(df_carte, df_decp[['populationAcheteur','libelleCommuneAcheteur']], how='inner', on=['libelleCommuneAcheteur'])
+df_HeatMap = df_HeatMap.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
+df_HeatMap = df_HeatMap[df_HeatMap.populationAcheteur.notnull()]
+df_HeatMap.reset_index(inplace=True, drop=True)
+df_HeatMap['ratioMontantTTPopulation'] = df_HeatMap.montantTotal / df_HeatMap.populationAcheteur
+df_HeatMap['ratioMontantTTPopulation'] = np.where(df_HeatMap['populationAcheteur']==0, 0, df_HeatMap['ratioMontantTTPopulation'])
+#df_HeatMap.ratioMontantTTPopulation.describe()
+df_HeatMap.ratioMontantTTPopulation = round(df_HeatMap.ratioMontantTTPopulation/10,0).astype(int)
+df_HeatMap['ratioMontantTTPopulation'] = np.where(df_HeatMap['ratioMontantTTPopulation']>300, 300, df_HeatMap['ratioMontantTTPopulation'])
+#df_HeatMap['ratioMontantTTPopulation'].sum()
+
+
+df_HeatMap2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
+l=0
+for k in [250,500,750,1000,1250,1500,1750,2000,len(df_HeatMap)]:
+    df_temp2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
+    for i in range(l, k):
+        print(i)
+        for j in range(df_HeatMap.ratioMontantTTPopulation[i]):
+            ar = np.array([[df_HeatMap.latitudeAcheteur[i],df_HeatMap.longitudeAcheteur[i]]])
+            df_temp = pd.DataFrame(ar, columns = ['latitudeAcheteur', 'longitudeAcheteur'])
+            df_temp2 = pd.concat([df_temp2, df_temp])
+    df_HeatMap2 = pd.concat([df_HeatMap2, df_temp2])
+    l=k
+del l, i, j, k, ar, df_temp, df_temp2  
+
+from folium.plugins import HeatMap
+base_map = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=12, min_zoom=5, tiles='OpenStreetMap')
+HeatMap(data=df_HeatMap2[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(base_map)
+marker_cluster = MarkerCluster().add_to(base_map)
+for i in range (len(df_carte)):
+    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
+                  icon=folium.features.CustomIcon('https://images.emojiterra.com/google/android-nougat/512px/2753.png', icon_size=(10,10)),
+                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
+                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
+                  #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
+                  +  " pour <b>" + df_carte.nbEntreprises[i].astype(str) + '</b> entreprises ',
+                  max_width = 320, min_width = 200)  
+                  , clustered_marker = True).add_to(marker_cluster)
+base_map.save('carte2DECP.html')
+
+# Répartition des marchés
+a = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=8, min_zoom=5, tiles='OpenStreetMap')
+HeatMap(data=df_carte[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(a)
+a.save('carteRépartitionDECP.html')
+
+del df_HeatMap, df_HeatMap2, df_bar, i
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+### Récap des erreurs
+df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEstime=='Oui') 
+                    | (df_decp.geomAcheteur.isnull()) | (df_decp.geomEtablissement.isnull())]
+
+
+df_ERROR = df_ERROR[['identifiantMarche','objetMarche', 'acheteurId','acheteur.nom', 'idEtablissement',
+                     'montant', 'montantEstEstime', 'dureeMois','dureeMoisEstEstime','dureeMoisCalculee',
+                     'geomAcheteur', 'geomEtablissement']]
+df_ERROR.columns = ['identifiantMarche','objetMarche', 'acheteurId','acheteur.nom', 'EtablissementID',
+                     'montant', 'montantEstEstime', 'dureeMois','dureeMoisEstEstime','dureeMoisCalculee',
+                     'siretAcheteur', 'siretEtablissement']
+df_ERROR.siretAcheteur = np.where(df_ERROR.siretAcheteur.isnull(), 'MAUVAIS', 'BON')
+df_ERROR.siretEtablissement = np.where(df_ERROR.siretEtablissement.isnull(), 'MAUVAIS', 'BON')
+
+#siretEtablissement
+df_decp.idEtablissement[df_decp.siretEtablissement.isnull()]
+
+### BILAN
+(df_ERROR.montantEstEstime=='Oui').sum() # 2953
+(df_ERROR.dureeMoisEstEstime=='Oui').sum() # 24800
+(df_ERROR.siretAcheteur=='MAUVAIS').sum() # 14298
+(df_ERROR.siretEtablissement=='MAUVAIS').sum() # 6234
+
+# Les pires lignes (4 erreurs): 
+F = df_ERROR[(df_ERROR.montantEstEstime=='Oui') & (df_ERROR.dureeMoisEstEstime=='Oui') & (df_ERROR.siretAcheteur=='MAUVAIS') & (df_ERROR.siretEtablissement=='MAUVAIS')]
+
+# Liste de tous les acheteurs ayant fait au moins une erreur :
+ListeMauvaixAcheteurs = pd.DataFrame(np.array([df_ERROR['acheteur.nom'].unique()]).T, columns=['Acheteur'])
+
+
+
 
