@@ -101,12 +101,14 @@ df.reset_index(inplace=True, drop = True)
     
 # Correction afin que ces variables soient représentées pareil    
 df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
-df['formePrix'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
+df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
 
 
 ######################################################################
 ################### Identifier les outliers - travail sur les montants
 df["montant"] = pd.to_numeric(df["montant"])
+# Garde une trace des données d'origine
+df['montantOriginal'] = df["montant"]
 ### Valeur aberrantes ou valeurs atypiques ?
 #Suppression des variables qui n'auraient pas du être présentes
 df['montant'] = np.where(df['montant'] <= 200, 0, df['montant']) 
@@ -498,6 +500,8 @@ plt.title("Médiane des montants par mois\n", fontsize=18, color='#3742fa')
 #df.dtypes
 # Mise en forme de la colonne montant
 df["montant"] = pd.to_numeric(df["montant"])
+df["montantOriginal"] = pd.to_numeric(df["montantOriginal"])
+
 df['codePostal'] = df['codePostal'].astype(str)
 df['codeRegion'] = df['codeRegion'].astype(str)
 df['nic'] = df['nic'].astype(str)
@@ -516,7 +520,7 @@ df.to_csv(r'H:/Desktop/Data/decp_export.csv', sep=';',index = False, header=True
 # Réimportation des données
 df_copy = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
                       dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str, 'anneeNotification' : str,
-                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'CPV_min' : str})
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'montantOriginal' : float, 'CPV_min' : str})
 
 # Vérification que les données sont identiques
 #### Comparaison colonne denominationSociale
@@ -555,8 +559,8 @@ Comme le fichier df_copy est similaire à 100% à df :
 
 # Importation des données déjà travaillé avec le code ci-dessus
 df = pd.read_csv('H:/Desktop/Data/decp_export.csv', sep=';', encoding='utf-8',
-                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str,
-                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float})
+                      dtype={'acheteur.id' : str, 'nic' : str, 'codeRegion' : str, 'denominationSociale' : str, 'anneeNotification' : str,
+                             'moisNotification' : str,  'idTitulaires' : str, 'montant' : float, 'montantOriginal' : float, 'CPV_min' : str})  
 '''
 
 ######################################################################
@@ -748,7 +752,7 @@ for i in range(25):
     
     colonnes_inutiles = ['source', 'uid' , 'dureeMois', 'acheteur.id', 'dateNotification',
                      'codeRegion', 'lieuExecution.code','acheteur.nom', 'nic',  'idTitulaires',
-                     'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 'denominationSociale',
+                     'lieuExecution.typeCode', 'lieuExecution.nom', 'id', 'denominationSociale', 'montantOriginal',
                      'objet', 'codeCPV','uuid', 'datePublicationDonnees', 'montant', 'CPV_min', 'Count?', 'montantTotalMarché']
     
     dfM7 = pd.DataFrame.copy(dfM, deep = True)
@@ -1313,24 +1317,25 @@ for i in range(len(df)):
 df.anneeNotification = df.anneeNotification.astype(str)
 df.codePostal = df.codePostal.astype(str)
 
+
 # Réorganisation des colonnes et de leur nom
 df.columns = ['source', 'type', 'nature', 'procedure', 'dureeMois',
        'datePublicationDonnees', 'lieuExecutionCode',
        'lieuExecutionTypeCode', 'lieuExecutionNom', 'identifiantMarche', 'objetMarche', 'codeCPV',
        'dateNotification', 'montant', 'formePrix', 'acheteurId',
-       'acheteur.nom', 'typeIdentifiantEtablissement', 'idEtablissement', 'nbTitulairesSurCeMarche',
+       'acheteurNom', 'typeIdentifiantEtablissement', 'idEtablissement', 'montantOriginal', 'nbTitulairesSurCeMarche',
        'montantTotalMarche', 'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
        'anneeNotification', 'moisNotification', 'montantEstEstime',
        'dureeMoisEstEstime', 'dureeMoisCalculee', 'adresseEtablissement',
        'codeCommuneEtablissement', 'codePostalEtablissement',
        'codeTypeEtablissement', 'communeEtablissement', 'denominationSocialeEtablissement',
        'sirenEtablissement', 'siretEtablissement', 'referenceCPV', 'codeCommuneAcheteur',
-       'codePostalAcheteur', 'libelleCommuneAcheteur']
+       'codePostalAcheteur', 'libelleCommuneAcheteur'] 
 
 df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dateNotification',  
          'anneeNotification', 'moisNotification', 'formePrix', 'identifiantMarche', 'objetMarche' , 'codeCPV',
-         'referenceCPV', 'montant', 'montantEstEstime', 'montantTotalMarche', 'nbTitulairesSurCeMarche',
-         'dureeMois', 'dureeMoisEstEstime', 'dureeMoisCalculee', 'acheteurId', 'acheteur.nom',
+         'referenceCPV', 'montantOriginal', 'montant', 'montantEstEstime', 'montantTotalMarche', 'nbTitulairesSurCeMarche',
+         'dureeMois', 'dureeMoisEstEstime', 'dureeMoisCalculee', 'acheteurId', 'acheteurNom',
          'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', 'codeCommuneAcheteur',
          'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
          'typeIdentifiantEtablissement', 'idEtablissement', 'nicEtablissement', 'adresseEtablissement',
@@ -1353,7 +1358,7 @@ df.to_csv(r'H:/Desktop/Data/decp.csv', sep=';',index = False, header=True, encod
 # Réimportation des données
 df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
                       dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
-                             'moisNotification' : str,  'idEtablissement' : str, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
+                             'moisNotification' : str,  'idEtablissement' : str, 'montantOriginal' : float, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
                              'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
                              'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
                              'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
@@ -1367,28 +1372,4 @@ try:
 except:
     print(False)
     
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-#test = pd.DataFrame(df_decp['lieuExecution.nom'].iloc[320:370])
-#test.reset_index(inplace=True, drop=True)
-#bdd_test = pd.DataFrame(['Ardèche', 'Rhône', 'Isère'], columns=['communeNom'])
-#bdd_test.reset_index(inplace=True, drop=True)
-#
-#
-#import re
-#re.sub((bdd_test['communeNom'][0] + '*'), bdd_test['communeNom'][0], test['lieuExecution.nom'][4])
-#re.sub('Ardèche', 'Ardèche', 'Ard�che')
-#
-#chaine = ""
-#expression = r"^0[0-9]([ .-]?[0-9]{2}){4}$"
-#while re.search(expression, chaine) is None:
-#    chaine = input("Saisissez un numéro de téléphone (valide) :")
-######################################################################
-######################################################################
-######################################################################
-######################################################################
-######################################################################
 ######################################################################
