@@ -439,8 +439,7 @@ ensemble = ['nature_Accord-cadre', 'nature_CONCESSION DE SERVICE',
        'nature_Délégation de service public', 'nature_Marché',
        'nature_Marché de partenariat', 'nature_Marché hors accord cadre',
        'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
-       "procedure_Appel d'offres restreint",
-       'procedure_Appel d’offres restreint', 'procedure_Dialogue compétitif',
+       "procedure_Appel d'offres restreint", 'procedure_Dialogue compétitif',
        'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
        'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
        'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
@@ -469,7 +468,7 @@ df.columns = ['libelleCommuneAcheteur', 'montantTotal', 'distanceMoyenne', 'dure
        'nature_Accord-cadre', 'nature_CONCESSION DE SERVICE', 'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX', 'nature_Concession de service', 'nature_Concession de service public',
        'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public', 'nature_Marché',
        'nature_Marché de partenariat', 'nature_Marché hors accord cadre', 'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
-       "procedure_Appel d'offres restreint",'procedure_Appel d’offres restreint', 'procedure_Dialogue compétitif',
+       "procedure_Appel d'offres restreint", 'procedure_Dialogue compétitif',
        'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
        'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
        'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
@@ -508,12 +507,12 @@ coord = acp.fit_transform(scaled_df)
 print(acp.explained_variance_ratio_)
 #scree plot
 eigval = (2340-1)/2340*acp.explained_variance_
-plt.plot(np.arange(1,37+1), eigval)
+plt.plot(np.arange(1,36+1), eigval)
 #cumul de variance expliquée
-plt.plot(np.arange(1,37+1),np.cumsum(acp.explained_variance_ratio_))
+plt.plot(np.arange(1,36+1),np.cumsum(acp.explained_variance_ratio_))
 
 # Test des bâtons brisés
-bs = np.cumsum(1/np.arange(37,0,-1))[::-1]
+bs = np.cumsum(1/np.arange(36,0,-1))[::-1]
 # D'après les résultats aucun facteur n'est valide...
 print(pd.DataFrame({'Val.Propre':eigval,'Seuils':bs}))
 
@@ -538,20 +537,6 @@ print(model.cluster_centers_)
 print(model.labels_)
 res = model.labels_
     
-'''
-# Graphique du résultat
-for point in scaled_df:
-    if model.predict(point.reshape(1,-1)) == [0]:
-        plt.scatter(point[0], point[1], c='b')
-    elif model.predict(point.reshape(1,-1)) == [1]:
-        plt.scatter(point[0], point[1], c='g')
-    elif model.predict(point.reshape(1,-1)) == [2]:
-        plt.scatter(point[0], point[1], c='r')
-for center in model.cluster_centers_:
-    plt.scatter(center[0],center[1])
-plt.show()
-'''
-
 # Graphique du résultat
 for point in scaled_df:
     clusterID = model.predict(point.reshape(1,-1))
@@ -561,7 +546,18 @@ for point in scaled_df:
         plt.scatter(point[0], point[1], c='g')
     elif clusterID == [2]:
         plt.scatter(point[0], point[1], c='r')
+    elif clusterID == [3]:
+        plt.scatter(point[0], point[1], c='c')
+    elif clusterID == [4]:
+        plt.scatter(point[0], point[1], c='m')
+    elif clusterID == [5]:
+        plt.scatter(point[0], point[1], c='y')
+    elif clusterID == [6]:
+        plt.scatter(point[0], point[1], c='k')
+#for center in model.cluster_centers_:
+#    plt.scatter(center[0],center[1])
 plt.show()
+
 # Nombre de communes par grappe
 for i in range(7):
     print((model.labels_==i).sum())
@@ -667,11 +663,16 @@ pd.crosstab(df.segmentation_CAH, df.segmentation_RULES) # NON
 ### Ratio nb entreprises / nb marchés
 df_carte['ratioEntreprisesMarchés']=df_carte['nbEntreprises']/df_carte['nbMarches']
 df_bar = df_carte[['libelleCommuneAcheteur', 'nbMarches', 'ratioEntreprisesMarchés']]
-df_bar = df_bar[(df_bar.nbMarches>0) & (df_bar.ratioEntreprisesMarchés>0)]
-df_bar = df_bar.sort_values(by = 'ratioEntreprisesMarchés').head(10).sort_values(by = 'ratioEntreprisesMarchés', ascending = False)
+df_bar = df_bar[(df_bar.nbMarches>100) & (df_bar.ratioEntreprisesMarchés>0)]
+df_bar = df_bar.sort_values(by = 'ratioEntreprisesMarchés').sort_values(by = 'ratioEntreprisesMarchés', ascending = True)
 # Graphique des résultats : top 10
-df_bar.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des communes avec le plus petit ratio NBentreprise/NBmarchés')
-plt.yticks(range(0,len(df_bar.libelleCommuneAcheteur)), df_bar.libelleCommuneAcheteur)
+df_barGraph = df_bar.head(10)
+df_barGraph.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des communes avec le plus petit ratio NBentreprise/NBmarchés')
+plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelleCommuneAcheteur)
+del df_barGraph
+round(df_bar.ratioEntreprisesMarchés.mean(),2)
+df_bar.to_csv(r'H:/Desktop/Data/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
+
 '''
 ### HeatMap du ratio calculé
 #from folium.plugins import HeatMap
@@ -789,30 +790,85 @@ del df_HeatMap, df_HeatMap2, df_bar, i
 df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEstime=='Oui') 
                     | (df_decp.geomAcheteur.isnull()) | (df_decp.geomEtablissement.isnull())]
 
-
-df_ERROR = df_ERROR[['identifiantMarche','objetMarche', 'acheteurId','acheteur.nom', 'idEtablissement',
-                     'montant', 'montantEstEstime', 'dureeMois','dureeMoisEstEstime','dureeMoisCalculee',
-                     'geomAcheteur', 'geomEtablissement']]
-df_ERROR.columns = ['identifiantMarche','objetMarche', 'acheteurId','acheteur.nom', 'EtablissementID',
-                     'montant', 'montantEstEstime', 'dureeMois','dureeMoisEstEstime','dureeMoisCalculee',
+df_ERROR = df_ERROR[['identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
+                     'idEtablissement', 'montantOriginal',  'dureeMois',
+                     'montantEstEstime', 'dureeMoisEstEstime', 'geomAcheteur', 'geomEtablissement']]
+df_ERROR.columns = ['identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 'EtablissementID',
+                     'montantOriginal', 'dureeMoisOriginal', 'montantAberrant', 'dureeMoisAberrant',
                      'siretAcheteur', 'siretEtablissement']
 df_ERROR.siretAcheteur = np.where(df_ERROR.siretAcheteur.isnull(), 'MAUVAIS', 'BON')
 df_ERROR.siretEtablissement = np.where(df_ERROR.siretEtablissement.isnull(), 'MAUVAIS', 'BON')
 
+
+df_Classement = pd.DataFrame.copy(df_ERROR, deep = True)
+df_Classement = df_Classement[['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteur', 'siretEtablissement']]
+df_Classement.columns = ['acheteurNom', 'montantEstEstime', 'dureeMoisEstEstime', 'siretAcheteur', 'siretEtablissement']
+df_Classement.montantEstEstime = np.where(df_Classement.montantEstEstime=='Oui',1,0)
+df_Classement.dureeMoisEstEstime = np.where(df_Classement.dureeMoisEstEstime=='Oui',1,0)
+df_Classement.siretAcheteur = np.where(df_Classement.siretAcheteur=='MAUVAIS',1,0)
+df_Classement.siretEtablissement = np.where(df_Classement.siretEtablissement=='MAUVAIS',1,0)
+
+df_Classement = df_Classement.groupby(['acheteurNom']).sum().reset_index()
+df_50 = pd.DataFrame(df_Classement[(df_Classement.montantEstEstime >= 50) |
+        (df_Classement.dureeMoisEstEstime >= 300) |
+        (df_Classement.siretAcheteur >= 180) |
+        (df_Classement.siretEtablissement >= 50)])
+df_50['Note']=df_50.montantEstEstime*4+df_50.dureeMoisEstEstime*1+df_50.siretAcheteur*1+df_50.siretEtablissement*2
+df_50=df_50.sort_values(by = 'Note', ascending = False)
+del df_50['Note']
+
 #siretEtablissement
 df_decp.idEtablissement[df_decp.siretEtablissement.isnull()]
 
-### BILAN
-(df_ERROR.montantEstEstime=='Oui').sum() # 2953
-(df_ERROR.dureeMoisEstEstime=='Oui').sum() # 24800
-(df_ERROR.siretAcheteur=='MAUVAIS').sum() # 14298
-(df_ERROR.siretEtablissement=='MAUVAIS').sum() # 6234
+#### BILAN
+#(df_ERROR.montantEstEstime=='Oui').sum() # 2952
+#(df_ERROR.dureeMoisEstEstime=='Oui').sum() # 24732
+#(df_ERROR.siretAcheteur=='MAUVAIS').sum() # 14285
+#(df_ERROR.siretEtablissement=='MAUVAIS').sum() # 6691
+    
+Bilan=pd.DataFrame(df_Classement.sum()[1:5]).T; Bilan.columns=['Montant aberrant ','Durée en mois aberrante ','Siret acheteur mauvais ','Siret entreprise mauvais ']
 
 # Les pires lignes (4 erreurs): 
-F = df_ERROR[(df_ERROR.montantEstEstime=='Oui') & (df_ERROR.dureeMoisEstEstime=='Oui') & (df_ERROR.siretAcheteur=='MAUVAIS') & (df_ERROR.siretEtablissement=='MAUVAIS')]
+F = df_ERROR[(df_ERROR.montantAberrant=='Oui') & (df_ERROR.dureeMoisAberrant=='Oui') & (df_ERROR.siretAcheteur=='MAUVAIS') & (df_ERROR.siretEtablissement=='MAUVAIS')]
 
-# Liste de tous les acheteurs ayant fait au moins une erreur :
-ListeMauvaixAcheteurs = pd.DataFrame(np.array([df_ERROR['acheteur.nom'].unique()]).T, columns=['Acheteur'])
+# Liste de tous les acheteurs ayant fait au moins 10 supposées erreurs :
+df_Classement['Total'] = df_Classement.montantEstEstime + df_Classement.dureeMoisEstEstime + df_Classement.siretAcheteur + df_Classement.siretEtablissement
+ListeMauvaixAcheteurs = pd.DataFrame(np.array([df_Classement.acheteurNom[df_Classement['Total']>10].unique()]).T, columns=['Acheteur'])
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+### Rapide aperçu des données principales
+# Aperçu répartition des sources
+round(df_decp.source.value_counts(normalize=True)*100,2) # pourcentage des sources
+df_decp.source.value_counts(normalize=True).plot(kind='pie')
+
+# Recapitulatif quantitatif
+df_RECAP = pd.concat([df_decp.montantOriginal.describe(),
+                      df_decp.montant.describe(),
+                      df_decp.dureeMois.describe(),
+                      df_decp.dureeMoisCalculee.describe(),
+                      df_decp.distanceAcheteurEtablissement.describe()], axis=1)
+df_RECAP.columns=['Montant original', 'Montant calculé', 'Durée en mois originale', 'Durée en mois calculée','Distance acheteur - établissement']
+df_RECAP = df_RECAP[1:8]
+
+# Récupération sous format CSV
+df_ERROR.to_csv(r'H:/Desktop/Data/df_ERROR.csv', sep=';',index = False, header=True, encoding='utf-8')
+ListeMauvaixAcheteurs.to_csv(r'H:/Desktop/Data/ListeMauvaixAcheteurs.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_50.columns = ['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteurFAUX', 'siretEtablissementFAUX']
+df_50.to_csv(r'H:/Desktop/Data/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
+
+del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
+#del df, df_carte
+
+
+
+
+
+# min 20 marchés pour classement/graphe préférence
+
+
 
 
 
