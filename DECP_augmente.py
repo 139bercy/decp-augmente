@@ -3,7 +3,7 @@
 Created on Mon Aug 10 
 @author: Lucas GEFFARD
 """
-######################################################################
+######################### Importation des librairies ##########################
 import pandas as pd
 from pandas.io.json import json_normalize
 import numpy as np
@@ -14,6 +14,7 @@ from lxml import html
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.firefox.options import Options
 import time
 
 from sklearn.decomposition import PCA
@@ -32,7 +33,7 @@ from folium.plugins import HeatMap
 #Chargement des données
 chemin = "H:/Desktop/MEF_dep"
 os.chdir(chemin)
-with open("decp.json", encoding='utf-8') as json_data:
+with open("dataJSON/decp.json", encoding='utf-8') as json_data:
     data = json.load(json_data)
 df = json_normalize(data['marches']) #Aplatir les données Json imbriquées
 
@@ -44,7 +45,7 @@ df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedant
 donneesInutiles = ['dateSignature', 'dateDebutExecution',  'valeurGlobale', 'donneesExecution', 'concessionnaires', 
                    'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom']
 df = df.drop(columns=donneesInutiles)
-    
+
 #Récupération des données titulaires    
 df.titulaires.fillna('0', inplace=True)
 dfO = df[df['titulaires'] == '0']
@@ -95,7 +96,7 @@ df['montant'] = np.where(df['montant'] <= 200, 0, df['montant'])
 df['montant'] = np.where(df['montant'] >= 9.99e8, 0, df['montant'])
 
 ######################################################################
-#################### Gestion des montants répétés
+#################### Gestion des id/code manquants
 df.id = np.where(df.id.isnull(), '0000000000000000', df.id)
 df.codeCPV = np.where(df.codeCPV.isnull(), '00000000', df.codeCPV)
 
@@ -121,10 +122,9 @@ df['montantTotalMarché'] = df["montant"] * df["Count?"]
 
 ###############################################################################
 ##################### Nettoyage de ces nouvelles colonnes #####################
-df.idTitulaires = np.where(df.typeIdentifiant != 'SIRET','00000000000000',df.idTitulaires)
 df.reset_index(inplace=True, drop=True) 
-for i in ["\\t","-"," ",".","?","    "]: 
-    df['idTitulaires'] =  df['idTitulaires'].astype(str).str.replace(i, "")
+for i in ["\\t","-"," ",".","?","    "]: # Nettoyage des codes
+    df.idTitulaires[(df.typeIdentifiant=='SIRET')|(df.typeIdentifiant.isnull())|(df.typeIdentifiant=='nan')] =  df.idTitulaires[(df.typeIdentifiant=='SIRET')|(df.typeIdentifiant.isnull())|(df.typeIdentifiant=='nan')].astype(str).str.replace(i, "")
 
 ######## Gestion code CPV
 df.codeCPV = df.codeCPV.astype(str)
@@ -191,14 +191,14 @@ def check_reg(codeRegion):
 df['codeRegion'] = df['codeRegion'].apply(check_reg)
 
 # Identification du nom des régions
-df['Region2'] = df['codeRegion'].astype(str)
+df['Region'] = df['codeRegion'].astype(str)
 listCorrespondance = {'84' : 'Auvergne-Rhône-Alpes','27' : 'Bourgogne-Franche-Comté','53' : 'Bretagne','24' : 'Centre-Val de Loire',
                       '94' : 'Corse','44' : 'Grand Est','32' : 'Hauts-de-France','11' : 'Île-de-France',
                       '28' : 'Normandie','75' : 'Nouvelle-Aquitaine','76' : 'Occitanie','52' : 'Pays de la Loire',
                       '93' : 'Provence-Alpes-Côte d\'Azur','01' : 'Guadeloupe', '02' : 'Martinique',
                       '03' : 'Guyane','04' : 'La Réunion','06' : 'Mayotte','98' : 'Collectivité d\'outre mer'}
 for word, initial in listCorrespondance.items():
-    df['Region2'] = np.where(df['Region2'] == word, initial, df['Region2'])
+    df['Region'] = np.where(df['Region'] == word, initial, df['Region'])
 
 ###############################################################################
 ###############################################################################
@@ -219,6 +219,7 @@ df['dateNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['da
 df['dateNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['dateNotification'])
 df['anneeNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['anneeNotification'])
 df['anneeNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['anneeNotification'])
+df['anneeNotification'] = df.anneeNotification.astype(str).str[:4]
 
 #On récupère le mois de notification
 df['moisNotification'] = df.dateNotification.str[5:7] 
@@ -231,9 +232,6 @@ df["montantOriginal"] = pd.to_numeric(df["montantOriginal"])
 df['codePostal'] = df['codePostal'].astype(str)
 df['codeRegion'] = df['codeRegion'].astype(str)
 df['nic'] = df['nic'].astype(str)
-df['anneeNotification'] = df['anneeNotification'].astype(str)
-for i in range(len(df)):
-    df.anneeNotification[i] = df.anneeNotification[i][:4]
 
 # Mise en forme des données vides
 df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
@@ -318,14 +316,14 @@ for i in range (len(dfSIRET)):
         dfSIRET.typeIdentifiant[i] = 'Oui'
     else:
         dfSIRET.typeIdentifiant[i] = 'Non'
-dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
+#dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
+dfSIRET = dfSIRET[dfSIRET.typeIdentifiant=='Oui']
 del dfSIRET['index']
 dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
-for i in range(len(dfSIRET)):
-    dfSIRET.siren[i] = dfSIRET.siret[i][0:9]
+dfSIRET.siren = dfSIRET.siret.str[0:9]
 
 #StockEtablissement_utf8
-chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
 dfSIRET['siret'] = dfSIRET['siret'].astype(str)
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
@@ -348,7 +346,7 @@ nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
 dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
 nanSiret = nanSiret.iloc[:,:3]
 
-chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
                                                                'siret', 'typeVoieEtablissement', 
@@ -495,7 +493,10 @@ def requete(nom):
     time.sleep(2)
     url = pager.current_url
     return url
-pager = webdriver.Firefox(executable_path = "H:/Desktop/Data/geckodriver.exe")
+options = Options()
+options.add_argument('--headless')
+pager = webdriver.Firefox(executable_path = "webdriver/geckodriver.exe", options=options)
+#pager = webdriver.PhantomJS('webdriver/phantomjs.exe')
 
 df_scrap2 = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(dfDS)):
@@ -531,11 +532,26 @@ for i in range(len(dfDS)):
         scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
         df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
         pass
+pager.quit()
 
 # Récupération des résultats
 dfDS.reset_index(inplace=True)
 resultat = pd.merge(dfDS, df_scrap2, on='index')
 resultatScrap2 = resultat[resultat.rue != ' ']
+
+###############################################################################
+###############################################################################
+###############################################################################
+dfDS.to_csv(r'dfDS.csv', sep=';',index = False, header=True, encoding='utf-8')
+resultat.to_csv(r'resultat.csv', sep=';',index = False, header=True, encoding='utf-8')
+resultatScrap2.to_csv(r'resultatScrap2.csv', sep=';',index = False, header=True, encoding='utf-8')
+
+errorSIRET = resultat[(resultat.siret_y=='')|(resultat.siret_y=='')|(resultat.siret_y==' ')|(resultat.siret_y.isnull())]
+errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]; errorSIRET.columns = ['siret', 'siren', 'denominationSociale']; errorSIRET.reset_index(inplace=True, drop=True)
+errorSIRET.to_csv(r'errorSIRET.csv', sep=';',index = False, header=True, encoding='utf-8')
+###############################################################################
+###############################################################################
+###############################################################################
 
 # On réuni les résultats du scraping
 enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
@@ -569,11 +585,10 @@ enrichissementScrap["commune"] = np.nan
 enrichissementScrap.codePostal = enrichissementScrap.codePostal.astype(str)
 enrichissementScrap.commune = enrichissementScrap.ville.astype(str)
 enrichissementScrap.rue = enrichissementScrap.rue.astype(str)
-for i in range(len(enrichissementScrap)):
-    enrichissementScrap["codePostal"][i] = enrichissementScrap.ville[i][0:7]
+
+enrichissementScrap["codePostal"] = enrichissementScrap.ville.str[0:7]
 enrichissementScrap["codePostal"] = enrichissementScrap["codePostal"].str.replace(" ", "")
-for i in range(len(enrichissementScrap)):
-    enrichissementScrap["commune"][i] = enrichissementScrap.ville[i][7:]
+enrichissementScrap["commune"] = enrichissementScrap.ville.str[7:]
 del enrichissementScrap['ville'], enrichissementScrap['typeEntreprise'], enrichissementScrap['detailsType']
 
 # Renomme les colonnes
@@ -596,11 +611,10 @@ del df['CPV_min'], df['uid'], df['uuid']
 ################### Enrichissement avec le code CPV ##################
 ######################################################################
 # Importation et mise en forme des codes/ref CPV
-refCPV = pd.read_excel("H:/Desktop/Data/Json/fichierPrincipal/cpv_2008_ver_2013.xlsx", usecols=['CODE', 'FR'])
+refCPV = pd.read_excel("dataEnrichissement/cpv_2008_ver_2013.xlsx", usecols=['CODE', 'FR'])
 refCPV.columns = ['CODE', 'refCodeCPV']
 refCPV_min = pd.DataFrame.copy(refCPV, deep = True)
-for i in range(len(refCPV_min)):
-    refCPV_min["CODE"][i] = refCPV_min.CODE[i][0:8]
+refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
 refCPV_min = refCPV_min.drop_duplicates(subset=['CODE'], keep='first')
 refCPV_min.columns = ['CODEmin', 'FR2']
 # Merge avec le df principal
@@ -621,7 +635,7 @@ dfAcheteurId.reset_index(inplace=True, drop=True)
 dfAcheteurId.siret = dfAcheteurId.siret.astype(str)
 
 #StockEtablissement_utf8
-chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siret', 'codePostalEtablissement', 
                                                                                            'libelleCommuneEtablissement', 
@@ -632,11 +646,10 @@ for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8'
 result = result.drop_duplicates(subset=['siret'], keep='first')
 
 dfAcheteurId["siren"] = np.nan
-for i in range(len(dfAcheteurId)):
-    dfAcheteurId.siren[i] = dfAcheteurId.siret[i][0:9]
+dfAcheteurId.siren = dfAcheteurId.siret.str[0:9]
 dfAcheteurId.siren = dfAcheteurId.siren.astype(int)
 dfAcheteurId.siren = dfAcheteurId.siren.astype(str)
-chemin = 'H:/Desktop/Data/Json/fichierPrincipal/StockEtablissement_utf8.csv'
+chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'codePostalEtablissement', 
                                                                                            'libelleCommuneEtablissement', 
@@ -660,15 +673,12 @@ enrichissementAcheteur = pd.concat([result, result2])
 enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
 
 df = pd.merge(df, enrichissementAcheteur, how='outer', on='acheteur.id')
-del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, i, result, result2, resultTemp, siret
+del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
 
 ######################################################################
 ######################################################################
 # Ajustement de certaines colonnes
-df.codePostalEtablissement = df.codePostalEtablissement.astype(str)
-for i in range(len(df)):
-    df.codePostalEtablissement[i] = df.codePostalEtablissement[i][:5]
-
+df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
 df.anneeNotification = df.anneeNotification.astype(str)
 df.codePostal = df.codePostal.astype(str)
 
@@ -697,24 +707,17 @@ df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dat
          'denominationSocialeEtablissement','sirenEtablissement', 'siretEtablissement']]
 
 # Rectification codePostalAcheteur et codeCommuneEtablissement
-df.codePostalAcheteur = df.codePostalAcheteur.astype(str)
-for i in range(len(df)):
-    df.codePostalAcheteur[i] = df.codePostalAcheteur[i][:5]
-
-df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str)
-for i in range(len(df)):
-    df.codeCommuneEtablissement[i] = df.codeCommuneEtablissement[i][:5]
-    
+df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
+df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True); del df
 ######################################################################
-
 ######## Enrichissement latitude & longitude avec adresse la ville 
-df_villes = pd.read_csv('H:/Desktop/Data/Json/fichierPrincipal/code-insee-postaux-geoflar.csv', 
+df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv', 
                         sep=';', header = 0, error_bad_lines=False,
                         usecols=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'])
 df_villes['ordre']=0
-df_villes2 = pd.read_csv('H:/Desktop/Data/Json/fichierPrincipal/code-insee-postaux-geoflar.csv', 
+df_villes2 = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv', 
                         sep=';', header = 0, error_bad_lines=False,
                         usecols=['Code commune complet', 'geom_x_y', 'Superficie', 'Population'])
 df_villes2['ordre']=1
@@ -828,7 +831,7 @@ for i in range (len(df_carte)):
                   + "à une distance médiane de <b>" + df_carte.distanceMoyenne[i].astype(str) + ' km</b> ',
                   max_width = 320, min_width = 200)  
                   , clustered_marker = True).add_to(marker_cluster)
-c.save('carteDECP.html')
+c.save('carte/carteDECP.html')
 
 ###############################################################################
 ###############################################################################
@@ -919,21 +922,11 @@ df.duree = round(df.duree/df['nbContrats'],0)
 df['montantMoyen'] = round(df.montant/df['nbContrats'],0)
 
 #... Finalement les données spatiales ne sont pas gardés pour réaliser la segmentation
-df.drop(columns = df.columns[36:55], axis = 1, inplace = True)
+df.drop(columns = df.columns[35:55], axis = 1, inplace = True)
 
 # Renomme des colonnes
-df.columns = ['libelleCommuneAcheteur', 'montantTotal', 'distanceMoyenne', 'dureeMoyenne', 'nbContratDeConcession', 'nbMarché',
-       'nature_Accord-cadre', 'nature_CONCESSION DE SERVICE', 'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX', 'nature_Concession de service', 'nature_Concession de service public',
-       'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public', 'nature_Marché',
-       'nature_Marché de partenariat', 'nature_Marché hors accord cadre', 'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
-       "procedure_Appel d'offres restreint", 'procedure_Dialogue compétitif',
-       'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
-       'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
-       'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
-       'procedure_Procédure non négociée ouverte', 'procedure_Procédure non négociée restreinte',
-       'procedure_Procédure négociée ouverte', 'procedure_Procédure négociée restreinte',
-       'lieuExecutionTypeCode_CODE CANTON', 'lieuExecutionTypeCode_CODE COMMUNE/POSTAL', 'lieuExecutionTypeCode_CODE DEPARTEMENT', 
-       'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION', 'nbContrats', 'montantMoyen']
+df=df.rename(columns = {'montant': 'montantTotal', 'distanceAcheteurEtablissement': 'distanceMoyenne', 'duree': 'dureeMoyenne', 
+                     'type_Contrat de concession': 'nbContratDeConcession', 'type_Marché': 'nbMarché'})
 
 #... Mettre les valeurs sur une même unité de mesure
 df_nom = pd.DataFrame(df.libelleCommuneAcheteur)
@@ -947,17 +940,17 @@ del df_nom
 
 ###############################################################################
 ### Réalisation de l'ACP
-
-#print(scaled_df.shape) # n=2340 et p=37
+n=np.shape(scaled_df)[0] #nb lignes
+p=np.shape(scaled_df)[1] #nb col
 acp = PCA(svd_solver='full')
 coord = acp.fit_transform(scaled_df)
 #scree plot
-eigval = (2340-1)/2340*acp.explained_variance_
-plt.plot(np.arange(1,36+1), eigval)
+eigval = (n-1)/n*acp.explained_variance_
+plt.plot(np.arange(1,p+1), eigval)
 #cumul de variance expliquée
-plt.plot(np.arange(1,36+1),np.cumsum(acp.explained_variance_ratio_))
+plt.plot(np.arange(1,p+1),np.cumsum(acp.explained_variance_ratio_))
 # Test des bâtons brisés
-bs = np.cumsum(1/np.arange(36,0,-1))[::-1]
+bs = np.cumsum(1/np.arange(p,0,-1))[::-1]
 # D'après les résultats aucun facteur n'est valide...
 print(pd.DataFrame({'Val.Propre':eigval,'Seuils':bs}))
 
@@ -1028,7 +1021,6 @@ del resTest, resTest2
     # Gère mieux les outliers / plus précis
     # On ne connait pas à l'avance le nombre k de cluster
 ###############################################################################
-
 ### Ratio nb entreprises / nb marchés
 df_carte['ratioEntreprisesMarchés']=df_carte['nbEntreprises']/df_carte['nbMarches']
 df_bar = df_carte[['libelleCommuneAcheteur', 'nbMarches', 'ratioEntreprisesMarchés']]
@@ -1040,7 +1032,7 @@ df_barGraph.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des commune
 plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelleCommuneAcheteur)
 del df_barGraph
 round(df_bar.ratioEntreprisesMarchés.mean(),2)
-df_bar.to_csv(r'H:/Desktop/Data/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_bar.to_csv(r'resultatsCSV/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
 
 ### HeatMap montantTotal / Population
 df_HeatMap = pd.merge(df_carte, df_decp[['populationAcheteur','libelleCommuneAcheteur']], how='inner', on=['libelleCommuneAcheteur'])
@@ -1053,8 +1045,10 @@ df_HeatMap.ratioMontantTTPopulation = round(df_HeatMap.ratioMontantTTPopulation/
 df_HeatMap['ratioMontantTTPopulation'] = np.where(df_HeatMap['ratioMontantTTPopulation']>300, 300, df_HeatMap['ratioMontantTTPopulation'])
 
 df_HeatMap2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
-l=0
-for k in [250,500,750,1000,1250,1500,1750,2000,len(df_HeatMap)]:
+df_HeatMap2.reset_index(inplace=True, drop = True)
+l=0  
+ran = [i for i in range(0,len(df_HeatMap),250)] + [len(df_HeatMap)]
+for k in ran:
     df_temp2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
     for i in range(l, k):
         print(i)
@@ -1064,7 +1058,7 @@ for k in [250,500,750,1000,1250,1500,1750,2000,len(df_HeatMap)]:
             df_temp2 = pd.concat([df_temp2, df_temp])
     df_HeatMap2 = pd.concat([df_HeatMap2, df_temp2])
     l=k
-del l, i, j, k, ar, df_temp, df_temp2  
+del l, i, j, k, ar, df_temp, df_temp2, ran  
 
 base_map = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=12, min_zoom=5, tiles='OpenStreetMap')
 HeatMap(data=df_HeatMap2[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(base_map)
@@ -1078,12 +1072,12 @@ for i in range (len(df_carte)):
                   +  " pour <b>" + df_carte.nbEntreprises[i].astype(str) + '</b> entreprises ',
                   max_width = 320, min_width = 200)  
                   , clustered_marker = True).add_to(marker_cluster)
-base_map.save('carte2DECP.html')
+base_map.save('carte/HeatMapDECP.html')
 
 # Répartition des marchés
 a = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=8, min_zoom=5, tiles='OpenStreetMap')
 HeatMap(data=df_carte[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(a)
-a.save('carteRépartitionDECP.html')
+a.save('carte/carteRépartitionDECP.html')
 del df_HeatMap, df_HeatMap2, df_bar, i
 
 ###############################################################################
@@ -1144,10 +1138,45 @@ df_RECAP.columns=['Montant original (€)', 'Montant calculé (€)', 'Durée en
 df_RECAP = df_RECAP[1:8]
 
 # Récupération sous format CSV
-df_ERROR.to_csv(r'H:/Desktop/Data/df_ERROR.csv', sep=';',index = False, header=True, encoding='utf-8')
-ListeMauvaixAcheteurs.to_csv(r'H:/Desktop/Data/ListeMauvaixAcheteurs.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_ERROR.to_csv(r'resultatsCSV/df_ERROR.csv', sep=';',index = False, header=True, encoding='utf-8')
+ListeMauvaixAcheteurs.to_csv(r'resultatsCSV/ListeMauvaixAcheteurs.csv', sep=';',index = False, header=True, encoding='utf-8')
 df_50.columns = ['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteurFAUX', 'siretEtablissementFAUX']
-df_50.to_csv(r'H:/Desktop/Data/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_50.to_csv(r'resultatsCSV/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
 
 del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
 #del df, df_carte
+
+'''
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+
+# Avant vérifier les formats avec Regex
+
+'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public'
+
+
+# Exportation des données 
+#df.dtypes
+df.to_csv(r'decp.csv', sep=';',index = False, header=True, encoding='utf-8')
+ 
+# Réimportation des données
+df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
+                      dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
+                             'moisNotification' : str,  'idEtablissement' : str, 'montantOriginal' : float, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
+                             'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
+                             'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
+                             'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
+
+#### Comparaison de toutes les autres colonnes
+dftest = df.drop(columns=['formePrix', 'denominationSocialeEtablissement'])
+dftest_copy = df.drop(columns=['formePrix' , 'denominationSocialeEtablissement'])
+try:
+    assert_frame_equal(dftest, dftest_copy)
+    print(True)
+except:
+    print(False)
+'''
+
