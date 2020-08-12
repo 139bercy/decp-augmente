@@ -117,9 +117,6 @@ df = df.drop(columns=['index'])
 del dfCount
 df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
 
-# Colonne par marché
-df['montantTotalMarché'] = df["montant"] * df["Count?"]
-
 ###############################################################################
 ##################### Nettoyage de ces nouvelles colonnes #####################
 df.reset_index(inplace=True, drop=True) 
@@ -200,12 +197,8 @@ listCorrespondance = {'84' : 'Auvergne-Rhône-Alpes','27' : 'Bourgogne-Franche-C
 for word, initial in listCorrespondance.items():
     df['Region'] = np.where(df['Region'] == word, initial, df['Region'])
 
-###############################################################################
-###############################################################################
 del chemin, data, dfO, i, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
-#del listeCP, listeReg
-###############################################################################
-###############################################################################
+
 ###############################################################################
 ################### Date / Temps ##################    
 #..............Travail sur les variables de type date           
@@ -215,10 +208,10 @@ df.dateNotification = df.dateNotification.str[0:10]
 df['anneeNotification'] = df.dateNotification.str[0:4] 
 df['anneeNotification'] = df['anneeNotification'].astype(float)
 #On supprime les erreurs (0021 ou 2100 par exemple)
-df['dateNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['dateNotification'])
-df['dateNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['dateNotification'])
-df['anneeNotification'] = np.where(df['anneeNotification'] < 2000, np.NaN, df['anneeNotification'])
-df['anneeNotification'] = np.where(df['anneeNotification'] > 2050, np.NaN, df['anneeNotification'])
+df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
+df['dateNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['dateNotification'])
+df['anneeNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['anneeNotification'])
+df['anneeNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['anneeNotification'])
 df['anneeNotification'] = df.anneeNotification.astype(str).str[:4]
 
 #On récupère le mois de notification
@@ -278,9 +271,12 @@ df['montant'] = np.where(df['montant'].isnull(), df['montant'].median(), df['mon
 del df['conca'], df['montantEstimation'], df['index']
 del medianeRegFP
 
+# Colonne par marché
+df['montantTotalMarché'] = df["montant"] * df["Count?"]
+
 ##############################################################################
 ##############################################################################
-### Application sur le jeu de données principal df
+### Rectification des durées en mois aberrantes
 df['dureeMoisEstime'] = np.where((df['montant']==df['dureeMois'])
     | (df['montant']/df['dureeMois'] < 100)
     | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
@@ -316,7 +312,6 @@ for i in range (len(dfSIRET)):
         dfSIRET.typeIdentifiant[i] = 'Oui'
     else:
         dfSIRET.typeIdentifiant[i] = 'Non'
-#dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
 dfSIRET = dfSIRET[dfSIRET.typeIdentifiant=='Oui']
 del dfSIRET['index']
 dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
@@ -380,6 +375,19 @@ nanSiren.reset_index(inplace=True, drop=True)
 del dfSIRET, i, nanSiret, result, result2, myList
 
 ######################################################################
+### On supprimer les siret déjà identifié comme faux 
+try :
+    archiveErrorSIRET = pd.read_csv('errorSIRET.csv', sep=';', encoding='utf-8', dtype={'siren' : str, 'siret' : str, 'denominationSociale' : str})
+    nanSiren = pd.merge(nanSiren, archiveErrorSIRET, how='outer', indicator='source')
+    nanSiren = nanSiren[nanSiren.source.eq('left_only')].drop('source', axis=1)
+    nanSiren.reset_index(inplace=True, drop=True)
+    print('Erreurs archivées supprimées')
+except:
+    archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
+    print('Aucune archive d\'erreur')
+    pass
+######################################################################
+
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(nanSiren)):
@@ -540,17 +548,12 @@ resultat = pd.merge(dfDS, df_scrap2, on='index')
 resultatScrap2 = resultat[resultat.rue != ' ']
 
 ###############################################################################
-###############################################################################
-###############################################################################
-dfDS.to_csv(r'dfDS.csv', sep=';',index = False, header=True, encoding='utf-8')
-resultat.to_csv(r'resultat.csv', sep=';',index = False, header=True, encoding='utf-8')
-resultatScrap2.to_csv(r'resultatScrap2.csv', sep=';',index = False, header=True, encoding='utf-8')
-
+### Enregistrement des entreprises n'ayant aucune correspondance
 errorSIRET = resultat[(resultat.siret_y=='')|(resultat.siret_y=='')|(resultat.siret_y==' ')|(resultat.siret_y.isnull())]
 errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]; errorSIRET.columns = ['siret', 'siren', 'denominationSociale']; errorSIRET.reset_index(inplace=True, drop=True)
+errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0)
+errorSIRET = errorSIRET.drop_duplicates(subset=['siret', 'siren', 'denominationSociale'], keep='first')
 errorSIRET.to_csv(r'errorSIRET.csv', sep=';',index = False, header=True, encoding='utf-8')
-###############################################################################
-###############################################################################
 ###############################################################################
 
 # On réuni les résultats du scraping
@@ -688,8 +691,8 @@ df.columns = ['source', 'type', 'nature', 'procedure', 'dureeMois',
        'lieuExecutionTypeCode', 'lieuExecutionNom', 'identifiantMarche', 'objetMarche', 'codeCPV',
        'dateNotification', 'montant', 'formePrix', 'acheteurId',
        'acheteurNom', 'typeIdentifiantEtablissement', 'idEtablissement', 'montantOriginal', 'nbTitulairesSurCeMarche',
-       'montantTotalMarche', 'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
-       'anneeNotification', 'moisNotification', 'montantEstEstime',
+       'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
+       'anneeNotification', 'moisNotification', 'montantEstEstime', 'montantTotalMarche',
        'dureeMoisEstEstime', 'dureeMoisCalculee', 'adresseEtablissement',
        'codeCommuneEtablissement', 'codePostalEtablissement',
        'codeTypeEtablissement', 'communeEtablissement', 'denominationSocialeEtablissement',
@@ -709,9 +712,21 @@ df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dat
 # Rectification codePostalAcheteur et codeCommuneEtablissement
 df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
 df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
+
 ######################################################################
-df_decp = pd.DataFrame.copy(df, deep = True); del df
 ######################################################################
+df_decp = pd.DataFrame.copy(df, deep = True); 
+df_decp.codeCommuneAcheteur = df_decp.codeCommuneAcheteur.astype(str).str[:5]
+
+#del df
+del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
+     detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee, 
+     enrichissementScrap, errorSIRET, index, infos, initial, listCorrespondance, 
+     listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
+     scrap2, typeEntreprise, url, verification, ville, word]
+######################################################################
+######################################################################
+
 ######## Enrichissement latitude & longitude avec adresse la ville 
 df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv', 
                         sep=';', header = 0, error_bad_lines=False,
@@ -1033,7 +1048,7 @@ plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelle
 del df_barGraph
 round(df_bar.ratioEntreprisesMarchés.mean(),2)
 df_bar.to_csv(r'resultatsCSV/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
-
+'''
 ### HeatMap montantTotal / Population
 df_HeatMap = pd.merge(df_carte, df_decp[['populationAcheteur','libelleCommuneAcheteur']], how='inner', on=['libelleCommuneAcheteur'])
 df_HeatMap = df_HeatMap.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
@@ -1079,7 +1094,7 @@ a = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=8, min_zoom=5, tiles='
 HeatMap(data=df_carte[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(a)
 a.save('carte/carteRépartitionDECP.html')
 del df_HeatMap, df_HeatMap2, df_bar, i
-
+'''
 ###############################################################################
 ###############################################################################
 ### Récap des erreurs
@@ -1160,7 +1175,7 @@ del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
 
 # Exportation des données 
 #df.dtypes
-df.to_csv(r'decp.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_decp.to_csv(r'decp.csv', sep=';',index = False, header=True, encoding='utf-8')
  
 # Réimportation des données
 df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
