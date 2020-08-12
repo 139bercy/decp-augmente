@@ -676,6 +676,7 @@ enrichissementAcheteur = pd.concat([result, result2])
 enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
 
 df = pd.merge(df, enrichissementAcheteur, how='outer', on='acheteur.id')
+
 del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
 
 ######################################################################
@@ -716,7 +717,6 @@ df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True); 
-df_decp.codeCommuneAcheteur = df_decp.codeCommuneAcheteur.astype(str).str[:5]
 
 #del df
 del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
