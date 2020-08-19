@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import folium
 from folium.plugins import MarkerCluster
 from folium.plugins import HeatMap
+from folium import plugins
 ######################################################################
 #import warnings
 #warnings.filterwarnings("ignore")
@@ -844,100 +845,6 @@ df_decp['geomEtablissement'] = np.where(df_decp['geomEtablissement'] == 'nan,nan
 df_decp.reset_index(inplace=True, drop=True)
 
 ###############################################################################
-###############################################################################
-###############################################################################
-############........ CARTE DES MARCHES PAR VILLE
-df_carte = df_decp[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
-df_carte=df_carte[df_carte['latitudeAcheteur'] != 'nan']
-df_carte=df_carte[df_carte['longitudeAcheteur'] != 'nan']
-df_carte = df_carte.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
-df_carte.reset_index(inplace=True, drop=True)
-
-dfMT = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().to_frame('montantTotal').reset_index()
-dfMM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame('montantMoyen').reset_index()
-dfIN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame('nbMarches').reset_index()
-dfSN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame('nbEntreprises').reset_index()
-dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame('distanceMediane').reset_index()
-
-df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-df_carte = pd.merge(df_carte, dfIN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-df_carte = pd.merge(df_carte, dfSN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-df_carte = pd.merge(df_carte, dfDM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-del dfMM, dfMT, dfIN, dfSN, dfDM
-
-df_carte.montantTotal = round(df_carte.montantTotal, 0)
-df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
-df_carte.nbMarches = round(df_carte.nbMarches, 0)
-df_carte.nbEntreprises = round(df_carte.nbEntreprises, 0)
-df_carte.distanceMediane = round(df_carte.distanceMediane, 0)
-df_carte.distanceMediane = np.where(df_carte.distanceMediane.isnull(), 0, df_carte.distanceMediane)
-
-###############################################################################
-###############################################################################
-### Carte des DECP
-geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
-df_Reg = df_decp.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
-df_Reg.columns = ['code','montant']; df_Reg = df_Reg[(df_Reg.code!='nan') & (df_Reg.code!='98')]
-df_Reg.montant=round(df_Reg.montant/1000000,0).astype(int)
-df_Reg.montant = np.where(df_Reg.montant>10000, 10000, df_Reg.montant)
-
-depPop = pd.read_csv("dataEnrichissement/departements-francais.csv", sep='\t', encoding='utf-8', usecols=['NUMÉRO', 'POPULATION'])
-depPop.columns= ['code','population']; depPop.code = depPop.code.astype(str); depPop=depPop[depPop.population.notnull()]; depPop.population = depPop.population.astype(int)
-for i in range(len(depPop)):
-    if len(depPop['code'][i])<2:
-        depPop['code'][i] = '0' + depPop['code'][i]
-
-geojson2 = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/departements.geojson').read())
-df_Dep = df_decp.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
-df_Dep.columns = ['code','montant']; df_Dep = df_Dep[(df_Dep.code!='nan')]
-df_Dep = pd.merge(df_Dep, depPop, how='left', on='code'); df_Dep = df_Dep[df_Dep.population.notnull()]
-df_Dep.montant = round(df_Dep.montant/df_Dep.population,0).astype(int)
-del df_Dep['population']
-df_Dep.montant = np.where(df_Dep.montant>2000, 2000, df_Dep.montant)
-
-dfHM = df_decp[['latitudeAcheteur', 'longitudeAcheteur']]
-dfHM = dfHM[(dfHM.latitudeAcheteur!='nan') | (dfHM.longitudeAcheteur!='nan')]
-
-### Mise en forme
-c= folium.Map(location=[47, 2.0],zoom_start=6, control_scale = True)
-
-marker_cluster = MarkerCluster(name="Marker Marchés",overlay=False).add_to(c)
-for i in range(len(df_carte)):
-    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
-                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2)))),
-                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
-                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
-                  #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
-                  + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i]/1000,0).astype(int).astype(str) + ' mille euros</b> '
-                  + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
-                  + "à une distance médiane de <b>" + df_carte.distanceMediane[i].astype(int).astype(str) + ' km</b> ',
-                  max_width = 320, min_width = 200)  
-                  , clustered_marker = True).add_to(marker_cluster)
-
-HeatMap(data=dfHM[['latitudeAcheteur', 'longitudeAcheteur']], radius=10, name="HeatMap Répartition", show=False,overlay=False).add_to(c)
-
-choropleth = folium.Choropleth(geo_data=geojson, name='Montant en million / Region', data=df_Reg, columns=['code', 'montant'],
-    key_on='feature.properties.code', fill_color= 'YlGnBu', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
-    highlight=True, line_color='black', show=False,overlay=False).add_to(c)
-choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
-
-choropleth = folium.Choropleth(geo_data=geojson2, name='Montant/NbHabitants', data=df_Dep, columns=['code', 'montant'],
-    key_on='feature.properties.code', fill_color= 'YlOrRd', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
-    highlight=True, line_color='black', show=False,overlay=False).add_to(c)
-choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
-
-folium.TileLayer('OpenStreetMap', overlay=True, show=True,control =False).add_to(c)
-folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
-folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
-folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
-folium.LayerControl(collapsed=False).add_to(c)
-c.save('carte/carteDECP.html')
-
-###############################################################################
-del df_decp['superficieEtablissement'], df_decp['populationEtablissement'], df_decp['latitudeAcheteur'], df_decp['longitudeAcheteur'], df_decp['latitudeEtablissement'], df_decp['longitudeEtablissement']
-
-###############################################################################
 ############################ Segmentation de marché ###########################
 ###############################################################################
 #... Créer une bdd par villes (acheteur/client)
@@ -1008,17 +915,16 @@ del df_nom
 ############ Avec les données normalisée
 # Générer la matrice des liens
 Z = linkage(scaled_df ,method='ward',metric='euclidean')
-# Dendrogramme
+''' # Dendrogramme
 plt.title('CAH avec matérialisation des X classes')
 dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
-plt.show()
+plt.show() '''
 # Récupération des classes
 groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
 ### Ajout au df 
 df = df.join(groupes_cah)
 del Z, groupes_cah, scaled_df
 
-###############################################################################
 # On créé une 4e catégorie avec toutes les valeurs seules
 df.reset_index(inplace=True)
 a=pd.DataFrame(df.groupby('segmentation_CAH')['index'].nunique())
@@ -1027,12 +933,111 @@ a=a.sort_values(by = 'nb', axis = 0, ascending = False)
 a.reset_index(inplace=True, drop=True)
 a=a.drop([0,1,2]); a = list(a.cluster)
 # On remplace
-df['segmentation_CAH']=df['segmentation_CAH'].replace(a, 0)
+df['segmentation_CAH']=df['segmentation_CAH'].replace(a, 0); del a
+df.segmentation_CAH = df.segmentation_CAH.astype(int)
 df=df[['libelleCommuneAcheteur','segmentation_CAH']]
+# Changement / TRI des clusters
+l = list(df.segmentation_CAH.unique()); l.sort()
+k = [0, 1, 2, 3]; listCorrespondance = {x:y for x,y in zip(k, l)}
+for word, initial in listCorrespondance.items():
+    df['segmentation_CAH'] = np.where(df['segmentation_CAH'] == initial, word, df['segmentation_CAH'])
+del l,k,listCorrespondance
 
 # On ajoute au dataframe principal
 df_decp = pd.merge(df_decp, df, how='left', on='libelleCommuneAcheteur')
 df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
+df_decp.segmentation_CAH = df_decp.segmentation_CAH.astype(int)
+
+###############################################################################
+###############################################################################
+###############################################################################
+############........ CARTE DES MARCHES PAR VILLE
+df_carte = df_decp[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
+df_carte=df_carte[df_carte['latitudeAcheteur'] != 'nan']
+df_carte=df_carte[df_carte['longitudeAcheteur'] != 'nan']
+df_carte = df_carte.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
+df_carte.reset_index(inplace=True, drop=True)
+
+dfMT = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().to_frame('montantTotal').reset_index()
+dfMM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame('montantMoyen').reset_index()
+dfIN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame('nbMarches').reset_index()
+dfSN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame('nbEntreprises').reset_index()
+dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame('distanceMediane').reset_index()
+
+df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
+df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
+df_carte = pd.merge(df_carte, dfIN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
+df_carte = pd.merge(df_carte, dfSN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
+df_carte = pd.merge(df_carte, dfDM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
+df_carte = pd.merge(df_carte, df, how='left', on=['libelleCommuneAcheteur'])
+del dfMM, dfMT, dfIN, dfSN, dfDM
+
+df_carte.montantTotal = round(df_carte.montantTotal, 0)
+df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
+df_carte.nbMarches = round(df_carte.nbMarches, 0)
+df_carte.nbEntreprises = round(df_carte.nbEntreprises, 0)
+df_carte.distanceMediane = round(df_carte.distanceMediane, 0)
+df_carte.distanceMediane = np.where(df_carte.distanceMediane.isnull(), 0, df_carte.distanceMediane)
+
+###############################################################################
+### Carte des DECP
+geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
+df_Reg = df_decp.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+df_Reg.columns = ['code','montant']; df_Reg = df_Reg[(df_Reg.code!='nan') & (df_Reg.code!='98')]
+df_Reg.montant=round(df_Reg.montant/1000000,0).astype(int)
+df_Reg.montant = np.where(df_Reg.montant>10000, 10000, df_Reg.montant)
+
+depPop = pd.read_csv("dataEnrichissement/departements-francais.csv", sep='\t', encoding='utf-8', usecols=['NUMÉRO', 'POPULATION'])
+depPop.columns= ['code','population']; depPop.code = depPop.code.astype(str); depPop=depPop[depPop.population.notnull()]; depPop.population = depPop.population.astype(int)
+for i in range(len(depPop)):
+    if len(depPop['code'][i])<2:
+        depPop['code'][i] = '0' + depPop['code'][i]
+
+geojson2 = json.loads(urllib.request.urlopen('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-avec-outre-mer.geojson').read())
+df_Dep = df_decp.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+df_Dep.columns = ['code','montant']; df_Dep = df_Dep[(df_Dep.code!='nan')]
+df_Dep = pd.merge(df_Dep, depPop, how='left', on='code'); df_Dep = df_Dep[df_Dep.population.notnull()]
+df_Dep.montant = round(df_Dep.montant/df_Dep.population,0).astype(int)
+del df_Dep['population']
+df_Dep.montant = np.where(df_Dep.montant>2000, 2000, df_Dep.montant)
+
+dfHM = df_decp[['latitudeAcheteur', 'longitudeAcheteur']]
+dfHM = dfHM[(dfHM.latitudeAcheteur!='nan') | (dfHM.longitudeAcheteur!='nan')]
+
+### Mise en forme
+c= folium.Map(location=[47, 2.0],zoom_start=6, control_scale = True)
+plugins.MiniMap(toggle_display=True).add_to(c)
+
+marker_cluster = MarkerCluster(name="Marker Marchés", overlay=False).add_to(c)
+for i in range(len(df_carte)):
+    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
+                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2)))),
+                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
+                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
+                  + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i]/1000,0).astype(int).astype(str) + ' mille euros</b> '
+                  + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
+                  + "à une distance médiane de <b>" + df_carte.distanceMediane[i].astype(int).astype(str) + ' km</b> ',
+                  max_width = 320, min_width = 200), 
+                  tooltip=folium.Tooltip(df_carte.libelleCommuneAcheteur[i]), clustered_marker = True).add_to(marker_cluster)
+
+HeatMap(data=dfHM[['latitudeAcheteur', 'longitudeAcheteur']], radius=10, name="HeatMap Répartition", show=False,overlay=False).add_to(c)
+
+choropleth = folium.Choropleth(geo_data=geojson, name='Montant en million / Region', data=df_Reg, columns=['code', 'montant'],
+    key_on='feature.properties.code', fill_color= 'YlGnBu', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
+    highlight=True, line_color='black', show=False,overlay=False, legend_name= 'Mettre légende').add_to(c)
+choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
+
+choropleth = folium.Choropleth(geo_data=geojson2, name='Montant/NbHabitants', data=df_Dep, columns=['code', 'montant'],
+    key_on='feature.properties.code', fill_color= 'YlOrRd', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
+    highlight=True, line_color='black', show=False,overlay=False, legend_name= 'Mettre légende').add_to(c)
+choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
+
+folium.TileLayer('OpenStreetMap', overlay=True, show=True,control =False).add_to(c)
+folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
+folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
+folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
+folium.LayerControl(collapsed=False).add_to(c)
+c.save('carte/carteDECP.html')
 
 ###############################################################################
 ##### Algorithme de Luhn 
@@ -1142,8 +1147,9 @@ ListeMauvaixAcheteurs.to_csv(r'resultatsCSV/ListeMauvaixAcheteurs.csv', sep=';',
 df_50.columns = ['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteurFAUX', 'siretEtablissementFAUX']
 df_50.to_csv(r'resultatsCSV/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
 
+###############################################################################
 del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
-#del df, df_carte
+del depPop, df, dfHM, df_Dep, df_Reg, df_carte, geojson, geojson2, i
 
 '''
 ###############################################################################
