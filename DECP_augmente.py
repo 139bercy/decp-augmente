@@ -757,6 +757,14 @@ del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1
      enrichissementScrap, errorSIRET, index, infos, initial, listCorrespondance, 
      listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
      scrap2, typeEntreprise, url, verification, ville, word]
+
+# Petites corrections
+df_decp['lieuExecutionTypeCode'] = df_decp['lieuExecutionTypeCode'].str.upper()
+df_decp['lieuExecutionTypeCode'] = np.where(df_decp['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT', df_decp['lieuExecutionTypeCode'])
+df_decp['lieuExecutionTypeCode'] = np.where(df_decp['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION', df_decp['lieuExecutionTypeCode'])
+
+df_decp['nature'] = np.where(df_decp['nature'] == 'Délégation de service public', 'DELEGATION DE SERVICE PUBLIC', df_decp['nature'])
+df_decp['nature'] = df_decp['nature'].str.upper()
 ######################################################################
 ######################################################################
 
@@ -933,11 +941,8 @@ del df_decp['superficieEtablissement'], df_decp['populationEtablissement'], df_d
 ############################ Segmentation de marché ###########################
 ###############################################################################
 #... Créer une bdd par villes (acheteur/client)
-dfBIN = df_decp[['type', 'nature', 'procedure', 'lieuExecutionTypeCode', 'regionAcheteur']]
+dfBIN = df_decp[['type', 'nature', 'procedure', 'lieuExecutionTypeCode']]
 # Arrangement du code du lieu d'exécution
-dfBIN['lieuExecutionTypeCode'] = dfBIN['lieuExecutionTypeCode'].str.upper()
-dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT', dfBIN['lieuExecutionTypeCode'])
-dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION', dfBIN['lieuExecutionTypeCode'])
 dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE ARRONDISSEMENT', 'CODE DEPARTEMENT', dfBIN['lieuExecutionTypeCode'])
 dfBIN['lieuExecutionTypeCode'] = np.where((dfBIN['lieuExecutionTypeCode'] == 'CODE COMMUNE') | (dfBIN['lieuExecutionTypeCode'] == 'CODE POSTAL'), 'CODE COMMUNE/POSTAL', dfBIN['lieuExecutionTypeCode'])
 
@@ -949,7 +954,6 @@ def binateur(data, to_bin):
     data = data.drop(columns=to_bin)
     X = X.fillna(0)
     return pd.concat([data, X], axis=1)
-
 dfBIN = binateur(dfBIN, dfBIN.columns) 
 
 #... Selection des variables quantitatives + nom de la commune
@@ -965,56 +969,25 @@ df = dfNoBin.join(dfBIN)
 del dfNoBin, dfBIN
 df = df[df['libelleCommuneAcheteur'].notnull()]
 df['nbContrats'] = 1 # Trouver autre solution
-
-#... Gestion des régions
 df = df.groupby(['libelleCommuneAcheteur']).sum().reset_index()
-ensemble = ['regionAcheteur_Auvergne-Rhône-Alpes',
-       'regionAcheteur_Bourgogne-Franche-Comté', 'regionAcheteur_Bretagne',
-       'regionAcheteur_Centre-Val de Loire',
-       "regionAcheteur_Collectivité d'outre mer", 'regionAcheteur_Corse',
-       'regionAcheteur_Grand Est', 'regionAcheteur_Guadeloupe',
-       'regionAcheteur_Guyane', 'regionAcheteur_Hauts-de-France',
-       'regionAcheteur_La Réunion', 'regionAcheteur_Martinique',
-       'regionAcheteur_Mayotte', 'regionAcheteur_Normandie',
-       'regionAcheteur_Nouvelle-Aquitaine', 'regionAcheteur_Occitanie',
-       'regionAcheteur_Pays de la Loire',
-       "regionAcheteur_Provence-Alpes-Côte d'Azur",
-       'regionAcheteur_Île-de-France']
-df['HighScore'] = df[ensemble].max(axis=1)
-for x in ensemble:
-    df[x] = np.where(df[x] == df['HighScore'], 1, 0)
 
 #... Fréquence 
-ensemble = ['nature_Accord-cadre', 'nature_CONCESSION DE SERVICE',
-       'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX',
-       'nature_Concession de service', 'nature_Concession de service public',
-       'nature_Concession de travaux', 'nature_DELEGATION DE SERVICE PUBLIC',
-       'nature_Délégation de service public', 'nature_Marché',
-       'nature_Marché de partenariat', 'nature_Marché hors accord cadre',
-       'nature_Marché subséquent', "procedure_Appel d'offres ouvert",
-       "procedure_Appel d'offres restreint", 'procedure_Dialogue compétitif',
-       'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
-       'procedure_Marché public négocié sans publicité ni mise en concurrence préalable',
-       'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
-       'procedure_Procédure non négociée ouverte',
-       'procedure_Procédure non négociée restreinte',
-       'procedure_Procédure négociée ouverte',
-       'procedure_Procédure négociée restreinte',
-       'lieuExecutionTypeCode_CODE CANTON',
-       'lieuExecutionTypeCode_CODE COMMUNE/POSTAL',
-       'lieuExecutionTypeCode_CODE DEPARTEMENT',
-       'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION']
+ensemble = ['type_Contrat de concession', 'type_Marché', 'nature_ACCORD-CADRE', 'nature_CONCESSION DE SERVICE',
+       'nature_CONCESSION DE SERVICE PUBLIC', 'nature_CONCESSION DE TRAVAUX', 'nature_DELEGATION DE SERVICE PUBLIC', 'nature_MARCHÉ',
+       'nature_MARCHÉ DE PARTENARIAT', 'nature_MARCHÉ HORS ACCORD CADRE', 'nature_MARCHÉ SUBSÉQUENT', "procedure_Appel d'offres ouvert",
+       "procedure_Appel d'offres restreint", 'procedure_Dialogue compétitif', 'procedure_Marché négocié sans publicité ni mise en concurrence préalable',
+       'procedure_Marché public négocié sans publicité ni mise en concurrence préalable', 'procedure_Procédure adaptée', 'procedure_Procédure avec négociation',
+       'procedure_Procédure non négociée ouverte', 'procedure_Procédure non négociée restreinte', 'procedure_Procédure négociée ouverte',
+       'procedure_Procédure négociée restreinte', 'lieuExecutionTypeCode_CODE CANTON', 'lieuExecutionTypeCode_CODE COMMUNE/POSTAL',
+       'lieuExecutionTypeCode_CODE DEPARTEMENT', 'lieuExecutionTypeCode_CODE PAYS', 'lieuExecutionTypeCode_CODE REGION']
 for x in ensemble:
     df[x] = df[x]/df['nbContrats']
-del df['HighScore'], ensemble, x
+del ensemble, x
 
 #... Duree, montant et distance moyenne par ville (par rapport au nb de contrats)
 df.distanceAcheteurEtablissement = round(df.distanceAcheteurEtablissement/df['nbContrats'],0)
 df.duree = round(df.duree/df['nbContrats'],0)
 df['montantMoyen'] = round(df.montant/df['nbContrats'],0)
-
-#... Finalement les données spatiales ne sont pas gardés pour réaliser la segmentation
-df.drop(columns = df.columns[35:55], axis = 1, inplace = True)
 
 # Renomme des colonnes
 df=df.rename(columns = {'montant': 'montantTotal', 'distanceAcheteurEtablissement': 'distanceMoyenne', 'duree': 'dureeMoyenne', 
@@ -1055,6 +1028,11 @@ a.reset_index(inplace=True, drop=True)
 a=a.drop([0,1,2]); a = list(a.cluster)
 # On remplace
 df['segmentation_CAH']=df['segmentation_CAH'].replace(a, 0)
+df=df[['libelleCommuneAcheteur','segmentation_CAH']]
+
+# On ajoute au dataframe principal
+df_decp = pd.merge(df_decp, df, how='left', on='libelleCommuneAcheteur')
+df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
 
 ###############################################################################
 ##### Algorithme de Luhn 
@@ -1172,11 +1150,6 @@ del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
 ###############################################################################
 ###############################################################################
 ###############################################################################
-###############################################################################
-
-# Avant vérifier les formats avec Regex
-
-'nature_DELEGATION DE SERVICE PUBLIC', 'nature_Délégation de service public'
 
 
 # Exportation des données 
