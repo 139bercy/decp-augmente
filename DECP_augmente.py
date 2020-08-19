@@ -935,15 +935,19 @@ a=a.drop([0,1,2]); a = list(a.cluster)
 # On remplace
 df['segmentation_CAH']=df['segmentation_CAH'].replace(a, 0); del a
 df.segmentation_CAH = df.segmentation_CAH.astype(int)
-df=df[['libelleCommuneAcheteur','segmentation_CAH']]
+
 # Changement / TRI des clusters
-l = list(df.segmentation_CAH.unique()); l.sort()
+cahORDER =pd.DataFrame(df.groupby('segmentation_CAH')[['montantTotal', 'segmentation_CAH']].mean())
+cahORDER = cahORDER.sort_values(by = 'montantTotal')
+cahORDER = cahORDER[cahORDER.segmentation_CAH!=0]
+l = ['0'] + list(cahORDER.segmentation_CAH.unique())
 k = [0, 1, 2, 3]; listCorrespondance = {x:y for x,y in zip(k, l)}
 for word, initial in listCorrespondance.items():
     df['segmentation_CAH'] = np.where(df['segmentation_CAH'] == initial, word, df['segmentation_CAH'])
 del l,k,listCorrespondance
 
 # On ajoute au dataframe principal
+df=df[['libelleCommuneAcheteur','segmentation_CAH']]
 df_decp = pd.merge(df_decp, df, how='left', on='libelleCommuneAcheteur')
 df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
 df_decp.segmentation_CAH = df_decp.segmentation_CAH.astype(int)
@@ -1008,11 +1012,32 @@ dfHM = dfHM[(dfHM.latitudeAcheteur!='nan') | (dfHM.longitudeAcheteur!='nan')]
 c= folium.Map(location=[47, 2.0],zoom_start=6, control_scale = True)
 plugins.MiniMap(toggle_display=True).add_to(c)
 
-marker_cluster = MarkerCluster(name="Marker Marchés", overlay=False).add_to(c)
+mapMarker = folium.Marker([44,-4],icon=folium.features.CustomIcon('https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Information_icon.svg/1000px-Information_icon.svg.png', icon_size=(20,20)),
+              popup = folium.Popup('<b>Indicateur de distance</b></br></br>' +
+                                   '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=8 height=8/>'+ ' ' +
+                                   '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=14 height=14/>'+ ' ' +
+                                   '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Distance moyenne</br>entre acheteurs et entreprises' + '</br></br>' + 
+
+                                   '<b>Ségmentation des acheteurs </b></br></br>'+
+                                   '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Petit' + '</br>' + 
+                                   '<img src="https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png"  width=20 height=20/> : Moyen' + '</br>' + 
+                                   '<img src="https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced"  width=20 height=20/> : Grand' + '</br>' + 
+                                   '<img src="https://svgsilh.com/svg/157354.svg"  width=20 height=20/> : Hors-segmentation',
+                                   max_width=320, show=True), overlay=False).add_to(c)
+
+marker_cluster = MarkerCluster(name='DECP par communes').add_to(c)
 for i in range(len(df_carte)):
+    if (df_carte.segmentation_CAH[i]==1):
+        icon = folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2))))
+    elif (df_carte.segmentation_CAH[i]==2):
+        icon = folium.features.CustomIcon('https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2))))
+    elif (df_carte.segmentation_CAH[i]==3):
+        icon = folium.features.CustomIcon('https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2))))
+    else :
+        icon = folium.features.CustomIcon('https://svgsilh.com/svg/157354.svg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2))))
+
     folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
-                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2)))),
-                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
+                  icon=icon, popup = folium.Popup('<b><center>' + df_carte.libelleCommuneAcheteur[i] + '</center></b></br>'
                   + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
                   + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i]/1000,0).astype(int).astype(str) + ' mille euros</b> '
                   + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
@@ -1020,22 +1045,22 @@ for i in range(len(df_carte)):
                   max_width = 320, min_width = 200), 
                   tooltip=folium.Tooltip(df_carte.libelleCommuneAcheteur[i]), clustered_marker = True).add_to(marker_cluster)
 
-HeatMap(data=dfHM[['latitudeAcheteur', 'longitudeAcheteur']], radius=10, name="HeatMap Répartition", show=False,overlay=False).add_to(c)
+HeatMap(data=dfHM[['latitudeAcheteur', 'longitudeAcheteur']], radius=10, name="HeatMap des marchés", show=False,overlay=False).add_to(c)
 
-choropleth = folium.Choropleth(geo_data=geojson, name='Montant en million / Region', data=df_Reg, columns=['code', 'montant'],
+choropleth = folium.Choropleth(geo_data=geojson, name='Régions', data=df_Reg, columns=['code', 'montant'],
     key_on='feature.properties.code', fill_color= 'YlGnBu', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
-    highlight=True, line_color='black', show=False,overlay=False, legend_name= 'Mettre légende').add_to(c)
+    highlight=True, line_color='black', show=False,overlay=False, legend_name= "Montant total des marchés (en millions €)").add_to(c)
 choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
 
-choropleth = folium.Choropleth(geo_data=geojson2, name='Montant/NbHabitants', data=df_Dep, columns=['code', 'montant'],
+choropleth = folium.Choropleth(geo_data=geojson2, name='Départements', data=df_Dep, columns=['code', 'montant'],
     key_on='feature.properties.code', fill_color= 'YlOrRd', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
-    highlight=True, line_color='black', show=False,overlay=False, legend_name= 'Mettre légende').add_to(c)
+    highlight=False, line_color='black', show=False,overlay=False, legend_name= "Montant total par habitants (en milliers €)").add_to(c)
 choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
 
-folium.TileLayer('OpenStreetMap', overlay=True, show=True,control =False).add_to(c)
-folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
-folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
-folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
+folium.TileLayer('OpenStreetMap', overlay=True, show=True, control =False).add_to(c)
+#folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
+#folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
+#folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
 folium.LayerControl(collapsed=False).add_to(c)
 c.save('carte/carteDECP.html')
 
