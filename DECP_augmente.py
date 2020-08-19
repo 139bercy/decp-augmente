@@ -9,16 +9,17 @@ from pandas.io.json import json_normalize
 import numpy as np
 import json
 import os
+import time
 
 from lxml import html
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
-import time
+import urllib
 
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
+#from sklearn.decomposition import PCA
+#from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 
@@ -31,7 +32,7 @@ from folium.plugins import HeatMap
 #warnings.filterwarnings("ignore")
 ######################################################################
 #Chargement des données
-chemin = "H:/Desktop/MEF_dep"
+chemin = "H:/Desktop/MEF_dep/decp-augmente/.gitignore"
 os.chdir(chemin)
 with open("dataJSON/decp.json", encoding='utf-8') as json_data:
     data = json.load(json_data)
@@ -312,11 +313,28 @@ for i in range (len(dfSIRET)):
         dfSIRET.typeIdentifiant[i] = 'Oui'
     else:
         dfSIRET.typeIdentifiant[i] = 'Non'
-dfSIRET = dfSIRET[dfSIRET.typeIdentifiant=='Oui']
+
+dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
 del dfSIRET['index']
+dfSIRET.reset_index(inplace=True, drop=True) 
 dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
 dfSIRET.siren = dfSIRET.siret.str[0:9]
+dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
+######################################################################
+### On supprime les siret déjà identifié comme faux 
+try :
+    archiveErrorSIRET = pd.read_csv('errorSIRET.csv', sep=';', encoding='utf-8', dtype={'siren' : str, 'siret' : str, 'denominationSociale' : str})
+    dfSIRET = pd.merge(dfSIRET, archiveErrorSIRET, how='outer', indicator='source')
+    dfSIRET = dfSIRET[dfSIRET.source.eq('left_only')].drop('source', axis=1)
+    dfSIRET.reset_index(inplace=True, drop=True)
+    print('Erreurs archivées supprimées')
+except:
+    archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
+    print('Aucune archive d\'erreur')
+    pass
+
+######################################################################
 #StockEtablissement_utf8
 chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
@@ -374,20 +392,6 @@ nanSiren.columns = ['siret', 'siren', 'denominationSociale']
 nanSiren.reset_index(inplace=True, drop=True)
 del dfSIRET, i, nanSiret, result, result2, myList
 
-######################################################################
-### On supprimer les siret déjà identifié comme faux 
-try :
-    archiveErrorSIRET = pd.read_csv('errorSIRET.csv', sep=';', encoding='utf-8', dtype={'siren' : str, 'siret' : str, 'denominationSociale' : str})
-    nanSiren = pd.merge(nanSiren, archiveErrorSIRET, how='outer', indicator='source')
-    nanSiren = nanSiren[nanSiren.source.eq('left_only')].drop('source', axis=1)
-    nanSiren.reset_index(inplace=True, drop=True)
-    print('Erreurs archivées supprimées')
-except:
-    archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
-    print('Aucune archive d\'erreur')
-    pass
-######################################################################
-
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
 for i in range(len(nanSiren)):
@@ -401,7 +405,7 @@ for i in range(len(nanSiren)):
         infos = tree.xpath('//p/text()')
         details = tree.xpath('//a/text()')
         
-        print(i)
+        print(i,'/',len(nanSiren))
         index = i
         rue = rueSiret[1]
         siret = rueSiret[5].replace(" ","")
@@ -444,7 +448,7 @@ for i in range(len(nanSiren)):
             infos = tree.xpath('//p/text()')
             details = tree.xpath('//a/text()')
             
-            print(i)
+            #print(i)
             index = i
             rue = rueSiret[1]
             siret = rueSiret[5].replace(" ","")
@@ -518,7 +522,7 @@ for i in range(len(dfDS)):
         infos = tree.xpath('//p/text()')
         details = tree.xpath('//a/text()')
         
-        print(i)
+        print(i,'/',len(dfDS))
         index = i
         rue = rueSiret[1]
         siret = rueSiret[5].replace(" ","")
@@ -553,7 +557,7 @@ errorSIRET = resultat[(resultat.siret_y=='')|(resultat.siret_y=='')|(resultat.si
 errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]; errorSIRET.columns = ['siret', 'siren', 'denominationSociale']; errorSIRET.reset_index(inplace=True, drop=True)
 errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0)
 errorSIRET = errorSIRET.drop_duplicates(subset=['siret', 'siren', 'denominationSociale'], keep='first')
-errorSIRET.to_csv(r'errorSIRET.csv', sep=';',index = False, header=True, encoding='utf-8')
+errorSIRET.to_csv('errorSIRET.csv', sep=';',index = False, header=True, encoding='utf-8')
 ###############################################################################
 
 # On réuni les résultats du scraping
@@ -627,6 +631,7 @@ df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
 df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
 del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
 
+
 ######################################################################
 ############## Enrichissement des données des acheteurs ##############
 ######################################################################
@@ -650,8 +655,6 @@ result = result.drop_duplicates(subset=['siret'], keep='first')
 
 dfAcheteurId["siren"] = np.nan
 dfAcheteurId.siren = dfAcheteurId.siret.str[0:9]
-dfAcheteurId.siren = dfAcheteurId.siren.astype(int)
-dfAcheteurId.siren = dfAcheteurId.siren.astype(str)
 chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'codePostalEtablissement', 
@@ -666,23 +669,38 @@ result2 = pd.merge(result2, siret, how='outer',  left_on='siret', right_on='s')
 result2 = result2[result2.s.isnull()]; del result2['s']
 
 dfManquant = pd.merge(dfAcheteurId, result, how='outer', on='siret')
-dfManquant = dfManquant[dfManquant['codePostalEtablissement'].isnull()]
+dfManquant = dfManquant[dfManquant['codeCommuneEtablissement'].isnull()]
 dfManquant  = dfManquant .iloc[:,:2]
 result2 = pd.merge(dfManquant, result2, how='inner', on='siren')
 del result2['siret_y'], result2['siren']
 result2.columns = ['siret', 'codeCommuneEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement']
 
+
 enrichissementAcheteur = pd.concat([result, result2])
 enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
+enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
+
 
 df = pd.merge(df, enrichissementAcheteur, how='outer', on='acheteur.id')
+#dfEnregistrement = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
 
 del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
+'''
+#utiliser :
+from tqdm import tnrange 
+from time import sleep
+for j in tnrange(5, desc ="loop 1"): 
+    sleep(0.2) 
+'''
 
 ######################################################################
 ######################################################################
 # Ajustement de certaines colonnes
 df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
+df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
+df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
+df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(str).str[:5]
+
 df.anneeNotification = df.anneeNotification.astype(str)
 df.codePostal = df.codePostal.astype(str)
 
@@ -710,14 +728,29 @@ df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dat
          'codeCommuneEtablissement', 'codePostalEtablissement', 'codeTypeEtablissement', 'communeEtablissement',
          'denominationSocialeEtablissement','sirenEtablissement', 'siretEtablissement']]
 
-# Rectification codePostalAcheteur et codeCommuneEtablissement
-df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
-df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
+# Rectification codePostalAcheteur et codeCommuneAcheteur
+df.codePostalAcheteur = df.codePostalAcheteur.str.replace(".", "")
+df.codePostalAcheteur = df.codePostalAcheteur.str.replace(" ", "")
+if len(df.codePostalAcheteur)<5:
+    df.codePostalAcheteur = '0'+df.codePostalAcheteur
 
+df.codeCommuneAcheteur = df.codeCommuneAcheteur.str.replace(".", "")
+df.codeCommuneAcheteur = df.codeCommuneAcheteur.str.replace(" ", "")
+if len(df.codeCommuneAcheteur)<5:
+    df.codeCommuneAcheteur = '0'+df.codeCommuneAcheteur
+
+######################################################################
+######################################################################
+df.to_csv(r'decpBACKUP.csv', sep=';',index = False, header=True, encoding='utf-8')
+#df_decpBACKUP = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
+#                      dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
+#                             'moisNotification' : str,  'idEtablissement' : str, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
+#                             'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
+#                             'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
+#                             'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True); 
-
 #del df
 del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
      detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee, 
@@ -816,7 +849,7 @@ dfMT = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().
 dfMM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame('montantMoyen').reset_index()
 dfIN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame('nbMarches').reset_index()
 dfSN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame('nbEntreprises').reset_index()
-dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame('distanceMoyenne').reset_index()
+dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame('distanceMediane').reset_index()
 
 df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
 df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
@@ -829,26 +862,70 @@ df_carte.montantTotal = round(df_carte.montantTotal, 0)
 df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
 df_carte.nbMarches = round(df_carte.nbMarches, 0)
 df_carte.nbEntreprises = round(df_carte.nbEntreprises, 0)
-df_carte.distanceMoyenne = round(df_carte.distanceMoyenne, 0)
-df_carte.distanceMoyenne = np.where(df_carte.distanceMoyenne.isnull(), 0, df_carte.distanceMoyenne)
+df_carte.distanceMediane = round(df_carte.distanceMediane, 0)
+df_carte.distanceMediane = np.where(df_carte.distanceMediane.isnull(), 0, df_carte.distanceMediane)
+
+###############################################################################
+###############################################################################
+### Carte des DECP
+geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
+df_Reg = df_decp.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+df_Reg.columns = ['code','montant']; df_Reg = df_Reg[(df_Reg.code!='nan') & (df_Reg.code!='98')]
+df_Reg.montant=round(df_Reg.montant/1000000,0).astype(int)
+df_Reg.montant = np.where(df_Reg.montant>10000, 10000, df_Reg.montant)
+
+depPop = pd.read_csv("dataEnrichissement/departements-francais.csv", sep='\t', encoding='utf-8', usecols=['NUMÉRO', 'POPULATION'])
+depPop.columns= ['code','population']; depPop.code = depPop.code.astype(str); depPop=depPop[depPop.population.notnull()]; depPop.population = depPop.population.astype(int)
+for i in range(len(depPop)):
+    if len(depPop['code'][i])<2:
+        depPop['code'][i] = '0' + depPop['code'][i]
+
+geojson2 = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/departements.geojson').read())
+df_Dep = df_decp.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+df_Dep.columns = ['code','montant']; df_Dep = df_Dep[(df_Dep.code!='nan')]
+df_Dep = pd.merge(df_Dep, depPop, how='left', on='code'); df_Dep = df_Dep[df_Dep.population.notnull()]
+df_Dep.montant = round(df_Dep.montant/df_Dep.population,0).astype(int)
+del df_Dep['population']
+df_Dep.montant = np.where(df_Dep.montant>2000, 2000, df_Dep.montant)
+
+dfHM = df_decp[['latitudeAcheteur', 'longitudeAcheteur']]
+dfHM = dfHM[(dfHM.latitudeAcheteur!='nan') | (dfHM.longitudeAcheteur!='nan')]
 
 ### Mise en forme
-c= folium.Map(location=[47, 2.0],zoom_start=6, tiles='OpenStreetMap')
-marker_cluster = MarkerCluster().add_to(c)
-for i in range (len(df_carte)):
+c= folium.Map(location=[47, 2.0],zoom_start=6, control_scale = True)
+
+marker_cluster = MarkerCluster(name="Marker Marchés",overlay=False).add_to(c)
+for i in range(len(df_carte)):
     folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
-                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMoyenne[i]/2)), max(20, min(40,df_carte.distanceMoyenne[i]/2)))),
+                  icon=folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2)))),
                   popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
                   + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
                   #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
                   + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i]/1000,0).astype(int).astype(str) + ' mille euros</b> '
                   + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
-                  + "à une distance médiane de <b>" + df_carte.distanceMoyenne[i].astype(str) + ' km</b> ',
+                  + "à une distance médiane de <b>" + df_carte.distanceMediane[i].astype(int).astype(str) + ' km</b> ',
                   max_width = 320, min_width = 200)  
                   , clustered_marker = True).add_to(marker_cluster)
+
+HeatMap(data=dfHM[['latitudeAcheteur', 'longitudeAcheteur']], radius=10, name="HeatMap Répartition", show=False,overlay=False).add_to(c)
+
+choropleth = folium.Choropleth(geo_data=geojson, name='Montant en million / Region', data=df_Reg, columns=['code', 'montant'],
+    key_on='feature.properties.code', fill_color= 'YlGnBu', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
+    highlight=True, line_color='black', show=False,overlay=False).add_to(c)
+choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
+
+choropleth = folium.Choropleth(geo_data=geojson2, name='Montant/NbHabitants', data=df_Dep, columns=['code', 'montant'],
+    key_on='feature.properties.code', fill_color= 'YlOrRd', fill_opacity=0.7, line_opacity=0.2, nan_fill_color='#8c8c8c',
+    highlight=True, line_color='black', show=False,overlay=False).add_to(c)
+choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
+
+folium.TileLayer('OpenStreetMap', overlay=True, show=True,control =False).add_to(c)
+folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
+folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
+folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
+folium.LayerControl(collapsed=False).add_to(c)
 c.save('carte/carteDECP.html')
 
-###############################################################################
 ###############################################################################
 del df_decp['superficieEtablissement'], df_decp['populationEtablissement'], df_decp['latitudeAcheteur'], df_decp['longitudeAcheteur'], df_decp['latitudeEtablissement'], df_decp['longitudeEtablissement']
 
@@ -954,60 +1031,6 @@ df = df_nom.join(df)
 del df_nom
 
 ###############################################################################
-### Réalisation de l'ACP
-n=np.shape(scaled_df)[0] #nb lignes
-p=np.shape(scaled_df)[1] #nb col
-acp = PCA(svd_solver='full')
-coord = acp.fit_transform(scaled_df)
-#scree plot
-eigval = (n-1)/n*acp.explained_variance_
-plt.plot(np.arange(1,p+1), eigval)
-#cumul de variance expliquée
-plt.plot(np.arange(1,p+1),np.cumsum(acp.explained_variance_ratio_))
-# Test des bâtons brisés
-bs = np.cumsum(1/np.arange(p,0,-1))[::-1]
-# D'après les résultats aucun facteur n'est valide...
-print(pd.DataFrame({'Val.Propre':eigval,'Seuils':bs}))
-
-###############################################################################
-### Application de l'algorithme des k-means - on prend 7 grappes
-model=KMeans(n_clusters=7)
-model.fit(scaled_df)
-print(model.cluster_centers_)
-print(model.labels_)
-res = model.labels_
-    
-# Graphique du résultat
-for point in scaled_df:
-    clusterID = model.predict(point.reshape(1,-1))
-    if clusterID == [0]:
-        plt.scatter(point[0], point[1], c='b')
-    elif clusterID == [1]:
-        plt.scatter(point[0], point[1], c='g')
-    elif clusterID == [2]:
-        plt.scatter(point[0], point[1], c='r')
-    elif clusterID == [3]:
-        plt.scatter(point[0], point[1], c='c')
-    elif clusterID == [4]:
-        plt.scatter(point[0], point[1], c='m')
-    elif clusterID == [5]:
-        plt.scatter(point[0], point[1], c='y')
-    elif clusterID == [6]:
-        plt.scatter(point[0], point[1], c='k')
-#for center in model.cluster_centers_:
-#    plt.scatter(center[0],center[1])
-plt.show()
-
-# Nombre de communes par grappe
-for i in range(7):
-    print((model.labels_==i).sum())
-
-# Ajout des résultats
-res = pd.DataFrame(res, columns=['segmentation_KMEANS'])
-df = df.join(res)
-del coord, eigval, i, point, res, bs, clusterID #center
-
-###############################################################################
 ### Application de l'algorithme de classification ascendante hiérarchique - CAH
 ############ Avec les données normalisée
 # Générer la matrice des liens
@@ -1023,18 +1046,51 @@ df = df.join(groupes_cah)
 del Z, groupes_cah, scaled_df
 
 ###############################################################################
-### Comparons les résultats des deux méthodes
-pd.crosstab(df.segmentation_CAH, df.segmentation_KMEANS)
-resTest = df[(df['segmentation_CAH']==1) | (df['segmentation_CAH']==6) | (df['segmentation_CAH']==5)].groupby(['segmentation_CAH']).mean()
-resTest2 = df[(df['segmentation_KMEANS']==0) | (df['segmentation_KMEANS']==1) | (df['segmentation_KMEANS']==4)].groupby(['segmentation_KMEANS']).mean()
-del resTest, resTest2
+# On créé une 4e catégorie avec toutes les valeurs seules
+df.reset_index(inplace=True)
+a=pd.DataFrame(df.groupby('segmentation_CAH')['index'].nunique())
+a.reset_index(inplace=True); a.columns=['cluster', 'nb']
+a=a.sort_values(by = 'nb', axis = 0, ascending = False)
+a.reset_index(inplace=True, drop=True)
+a=a.drop([0,1,2]); a = list(a.cluster)
+# On remplace
+df['segmentation_CAH']=df['segmentation_CAH'].replace(a, 0)
 
-# Conclusion
-# Séelctionner le clustering avec le CAH car :
-    # Résultat reproductible (pas d'aléatiore)
-    # Forme des amas non hyper-sphérique
-    # Gère mieux les outliers / plus précis
-    # On ne connait pas à l'avance le nombre k de cluster
+###############################################################################
+##### Algorithme de Luhn 
+def luhn(codeSIREN):
+    try:
+        chiffres = pd.DataFrame(map(int, list(str(codeSIREN))), columns=['siren'])        
+        chiffres['parite']=[1,2,1,2,1,2,1,2,1]
+        chiffres['multiplication']=chiffres.siren*chiffres.parite
+        for i in range(len(chiffres)):
+            chiffres.multiplication[i]=sum([int(c) for c in str(chiffres.multiplication[i])])
+        resultat= chiffres.multiplication.sum()
+        if (resultat % 10)==0:
+            resultat=0 # code BON
+        else:
+            resultat=1 # code FAUX
+    except:
+        resultat=1 # code FAUX
+        pass
+    return resultat
+
+# Application sur les siren des acheteurs
+df_decp['siren1'] = df_decp.acheteurId.str[:9]
+df_SA = pd.DataFrame(df_decp['siren1'])
+df_SA = df_SA.drop_duplicates(subset=['siren1'], keep='first')
+df_SA['resultatSirenAcheteur'] = df_SA['siren1'].apply(luhn)
+# Application sur les siren des établissements
+df_decp['siren2'] = df_decp.sirenEtablissement.str[:9]
+df_SE = pd.DataFrame(df_decp['siren2'])
+df_SE = df_SE.drop_duplicates(subset=['siren2'], keep='first')
+df_SE['resultatSirenEtablissement'] = df_SE.siren2.apply(luhn)
+# Merge avec le df principal
+df_decp = pd.merge(df_decp, df_SA, how='left', on = 'siren1')
+df_decp = pd.merge(df_decp, df_SE, how='left', on = 'siren2')
+del df_decp['siren1'], df_decp['siren2']
+
+###############################################################################
 ###############################################################################
 ### Ratio nb entreprises / nb marchés
 df_carte['ratioEntreprisesMarchés']=df_carte['nbEntreprises']/df_carte['nbMarches']
@@ -1048,75 +1104,25 @@ plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelle
 del df_barGraph
 round(df_bar.ratioEntreprisesMarchés.mean(),2)
 df_bar.to_csv(r'resultatsCSV/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
-'''
-### HeatMap montantTotal / Population
-df_HeatMap = pd.merge(df_carte, df_decp[['populationAcheteur','libelleCommuneAcheteur']], how='inner', on=['libelleCommuneAcheteur'])
-df_HeatMap = df_HeatMap.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
-df_HeatMap = df_HeatMap[df_HeatMap.populationAcheteur.notnull()]
-df_HeatMap.reset_index(inplace=True, drop=True)
-df_HeatMap['ratioMontantTTPopulation'] = df_HeatMap.montantTotal / df_HeatMap.populationAcheteur
-df_HeatMap['ratioMontantTTPopulation'] = np.where(df_HeatMap['populationAcheteur']==0, 0, df_HeatMap['ratioMontantTTPopulation'])
-df_HeatMap.ratioMontantTTPopulation = round(df_HeatMap.ratioMontantTTPopulation/10,0).astype(int)
-df_HeatMap['ratioMontantTTPopulation'] = np.where(df_HeatMap['ratioMontantTTPopulation']>300, 300, df_HeatMap['ratioMontantTTPopulation'])
 
-df_HeatMap2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
-df_HeatMap2.reset_index(inplace=True, drop = True)
-l=0  
-ran = [i for i in range(0,len(df_HeatMap),250)] + [len(df_HeatMap)]
-for k in ran:
-    df_temp2 = pd.DataFrame(columns=['latitudeAcheteur','longitudeAcheteur'])
-    for i in range(l, k):
-        print(i)
-        for j in range(df_HeatMap.ratioMontantTTPopulation[i]):
-            ar = np.array([[df_HeatMap.latitudeAcheteur[i],df_HeatMap.longitudeAcheteur[i]]])
-            df_temp = pd.DataFrame(ar, columns = ['latitudeAcheteur', 'longitudeAcheteur'])
-            df_temp2 = pd.concat([df_temp2, df_temp])
-    df_HeatMap2 = pd.concat([df_HeatMap2, df_temp2])
-    l=k
-del l, i, j, k, ar, df_temp, df_temp2, ran  
-
-base_map = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=12, min_zoom=5, tiles='OpenStreetMap')
-HeatMap(data=df_HeatMap2[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(base_map)
-marker_cluster = MarkerCluster().add_to(base_map)
-for i in range (len(df_carte)):
-    folium.Marker([df_carte.latitudeAcheteur[i],  df_carte.longitudeAcheteur[i]], 
-                  icon=folium.features.CustomIcon('https://images.emojiterra.com/google/android-nougat/512px/2753.png', icon_size=(10,10)),
-                  popup = folium.Popup('<b>' + df_carte.libelleCommuneAcheteur[i] + '</b></br>'
-                  + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
-                  #+ 'Montant total des marchés : ' + df_carte.montantTotal[i].astype(str) + ' €' + '</br>'
-                  +  " pour <b>" + df_carte.nbEntreprises[i].astype(str) + '</b> entreprises ',
-                  max_width = 320, min_width = 200)  
-                  , clustered_marker = True).add_to(marker_cluster)
-base_map.save('carte/HeatMapDECP.html')
-
-# Répartition des marchés
-a = folium.Map(location=[47, 2.0], zoom_start=6, max_zoom=8, min_zoom=5, tiles='OpenStreetMap')
-HeatMap(data=df_carte[['latitudeAcheteur', 'longitudeAcheteur']], radius=8).add_to(a)
-a.save('carte/carteRépartitionDECP.html')
-del df_HeatMap, df_HeatMap2, df_bar, i
-'''
-###############################################################################
 ###############################################################################
 ### Récap des erreurs
 df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEstime=='Oui') 
-                    | (df_decp.geomAcheteur.isnull()) | (df_decp.geomEtablissement.isnull())]
+                    | (df_decp.resultatSirenAcheteur==1) | (df_decp.resultatSirenEtablissement==1)]
 
-df_ERROR = df_ERROR[['identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
+df_ERROR = df_ERROR[['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
                      'idEtablissement', 'montantOriginal',  'dureeMois',
-                     'montantEstEstime', 'dureeMoisEstEstime', 'geomAcheteur', 'geomEtablissement']]
-df_ERROR.columns = ['identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 'EtablissementID',
+                     'montantEstEstime', 'dureeMoisEstEstime', 'resultatSirenAcheteur', 'resultatSirenEtablissement']]
+df_ERROR.columns = ['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 'EtablissementID',
                      'montantOriginal', 'dureeMoisOriginal', 'montantAberrant', 'dureeMoisAberrant',
                      'siretAcheteur', 'siretEtablissement']
-df_ERROR.siretAcheteur = np.where(df_ERROR.siretAcheteur.isnull(), 'MAUVAIS', 'BON')
-df_ERROR.siretEtablissement = np.where(df_ERROR.siretEtablissement.isnull(), 'MAUVAIS', 'BON')
+df_ERROR.source.value_counts(normalize=True).plot(kind='pie') # Aucune corrélation entre les erreurs et les sources
 
 df_Classement = pd.DataFrame.copy(df_ERROR, deep = True)
 df_Classement = df_Classement[['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteur', 'siretEtablissement']]
 df_Classement.columns = ['acheteurNom', 'montantEstEstime', 'dureeMoisEstEstime', 'siretAcheteur', 'siretEtablissement']
 df_Classement.montantEstEstime = np.where(df_Classement.montantEstEstime=='Oui',1,0)
 df_Classement.dureeMoisEstEstime = np.where(df_Classement.dureeMoisEstEstime=='Oui',1,0)
-df_Classement.siretAcheteur = np.where(df_Classement.siretAcheteur=='MAUVAIS',1,0)
-df_Classement.siretEtablissement = np.where(df_Classement.siretEtablissement=='MAUVAIS',1,0)
 
 df_Classement = df_Classement.groupby(['acheteurNom']).sum().reset_index()
 df_50 = pd.DataFrame(df_Classement[(df_Classement.montantEstEstime >= 50) |
