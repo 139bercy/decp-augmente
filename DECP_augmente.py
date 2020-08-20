@@ -2,6 +2,8 @@
 """
 Created on Mon Aug 10 
 @author: Lucas GEFFARD
+Spyder : 3.3.6
+Python : 3.7
 """
 ######################### Importation des librairies ##########################
 import pandas as pd
@@ -10,6 +12,7 @@ import numpy as np
 import json
 import os
 import time
+from tqdm import tqdm 
 
 from lxml import html
 import requests
@@ -18,18 +21,16 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.options import Options
 import urllib
 
-#from sklearn.decomposition import PCA
-#from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 
-#import matplotlib.pyplot as plt
-#import matplotlib as plt
+import matplotlib.pyplot as plt
 import folium
 from folium.plugins import MarkerCluster
 from folium.plugins import HeatMap
 from folium import plugins
 ######################################################################
+import pickle
 #import warnings
 #warnings.filterwarnings("ignore")
 ######################################################################
@@ -396,7 +397,7 @@ del dfSIRET, i, nanSiret, result, result2, myList
 
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
 df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
-for i in range(len(nanSiren)):
+for i in tqdm(range(len(nanSiren))):
     try:
         url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siret[i]
         
@@ -407,7 +408,6 @@ for i in range(len(nanSiren)):
         infos = tree.xpath('//p/text()')
         details = tree.xpath('//a/text()')
         
-        print(i,'/',len(nanSiren))
         index = i
         rue = rueSiret[1]
         siret = rueSiret[5].replace(" ","")
@@ -450,7 +450,6 @@ for i in range(len(nanSiren)):
             infos = tree.xpath('//p/text()')
             details = tree.xpath('//a/text()')
             
-            #print(i)
             index = i
             rue = rueSiret[1]
             siret = rueSiret[5].replace(" ","")
@@ -513,7 +512,7 @@ pager = webdriver.Firefox(executable_path = "webdriver/geckodriver.exe", options
 #pager = webdriver.PhantomJS('webdriver/phantomjs.exe')
 
 df_scrap2 = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
-for i in range(len(dfDS)):
+for i in tqdm(range(len(dfDS))):
     try:
         url = requete(dfDS.denominationSociale[i])
         
@@ -524,7 +523,6 @@ for i in range(len(dfDS)):
         infos = tree.xpath('//p/text()')
         details = tree.xpath('//a/text()')
         
-        print(i,'/',len(dfDS))
         index = i
         rue = rueSiret[1]
         siret = rueSiret[5].replace(" ","")
@@ -602,7 +600,7 @@ del enrichissementScrap['ville'], enrichissementScrap['typeEntreprise'], enrichi
 
 # Renomme les colonnes
 enrichissementScrap.columns = ['siret', 'siren', 'denominationSociale', 'adresseEtablissement', 'codeTypeEtablissement', 'codePostalEtablissement', 'communeEtablissement']
-enrichissementInsee.columns = ['siret', 'siren', 'denominationSociale', 'codeTypeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement', 'communeEtablissement', 'adresseEtablissement']
+enrichissementInsee.columns = ['siret', 'siren', 'denominationSociale', 'codePostalEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codeTypeEtablissement', 'adresseEtablissement']
 
 # df final pour enrichir les données des entreprises
 dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap])
@@ -614,6 +612,8 @@ dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False
 del df['denominationSociale']
 # Concaténation
 df =  pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
+#df =  pd.merge(df, dfenrichissement, how='left', left_on="idTitulaires", right_on="siret")
+
 del df['CPV_min'], df['uid'], df['uuid']
 
 ######################################################################
@@ -632,6 +632,16 @@ df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
 # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
 df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
 del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
+
+######################################################################
+######################################################################
+with open('config.dictionary', 'wb') as df_backup1:
+  pickle.dump(df, df_backup1)
+#with open('config.dictionary', 'rb') as df_backup1:
+#    df_backup1 = pickle.load(df_backup1)
+#df = pd.DataFrame.copy(df_backup1, deep = True)
+######################################################################
+######################################################################
 
 
 ######################################################################
@@ -675,25 +685,18 @@ dfManquant = dfManquant[dfManquant['codeCommuneEtablissement'].isnull()]
 dfManquant  = dfManquant .iloc[:,:2]
 result2 = pd.merge(dfManquant, result2, how='inner', on='siren')
 del result2['siret_y'], result2['siren']
-result2.columns = ['siret', 'codeCommuneEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement']
+result2.columns = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']
 
 
 enrichissementAcheteur = pd.concat([result, result2])
-enrichissementAcheteur.columns = ['codeCommuneAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'acheteur.id']
+enrichissementAcheteur.columns = ['acheteur.id', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur']
 enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
 
 
-df = pd.merge(df, enrichissementAcheteur, how='outer', on='acheteur.id')
+df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
 #dfEnregistrement = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
 
 del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
-'''
-#utiliser :
-from tqdm import tnrange 
-from time import sleep
-for j in tnrange(5, desc ="loop 1"): 
-    sleep(0.2) 
-'''
 
 ######################################################################
 ######################################################################
@@ -714,11 +717,11 @@ df.columns = ['source', 'type', 'nature', 'procedure', 'dureeMois',
        'acheteurNom', 'typeIdentifiantEtablissement', 'idEtablissement', 'montantOriginal', 'nbTitulairesSurCeMarche',
        'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
        'anneeNotification', 'moisNotification', 'montantEstEstime', 'montantTotalMarche',
-       'dureeMoisEstEstime', 'dureeMoisCalculee', 'adresseEtablissement',
-       'codeCommuneEtablissement', 'codePostalEtablissement',
-       'codeTypeEtablissement', 'communeEtablissement', 'denominationSocialeEtablissement',
-       'sirenEtablissement', 'siretEtablissement', 'referenceCPV', 'codeCommuneAcheteur',
-       'codePostalAcheteur', 'libelleCommuneAcheteur'] 
+       'dureeMoisEstEstime', 'dureeMoisCalculee', 'siretEtablissement', 'sirenEtablissement', 
+       'denominationSocialeEtablissement', 'codePostalEtablissement',
+       'communeEtablissement', 'codeCommuneEtablissement',
+       'codeTypeEtablissement', 'adresseEtablissement', 'referenceCPV',
+       'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur']
 
 df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dateNotification',  
          'anneeNotification', 'moisNotification', 'formePrix', 'identifiantMarche', 'objetMarche' , 'codeCPV',
@@ -742,20 +745,21 @@ if len(df.codeCommuneAcheteur)<5:
     df.codeCommuneAcheteur = '0'+df.codeCommuneAcheteur
 
 ######################################################################
+# Petites corrections
+df['lieuExecutionTypeCode'] = df['lieuExecutionTypeCode'].str.upper()
+df['lieuExecutionTypeCode'] = np.where(df['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT', df['lieuExecutionTypeCode'])
+df['lieuExecutionTypeCode'] = np.where(df['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION', df['lieuExecutionTypeCode'])
+
+df['nature'] = np.where(df['nature'] == 'Délégation de service public', 'DELEGATION DE SERVICE PUBLIC', df['nature'])
+df['nature'] = df['nature'].str.upper()
+
 ######################################################################
-decpBACKUP = pd.DataFrame.copy(df, deep = True); 
-df.to_csv(r'decpBACKUP.csv', sep=';',index = False, header=True, encoding='utf-8')
-#df_decpBACKUP = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
-#                      dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
-#                             'moisNotification' : str,  'idEtablissement' : str, 'montant' : float, 'montantTotalMarche' : float, 'codeDepartementAcheteur' : str,
-#                             'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
-#                             'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
-#                             'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
-import pickle
-with open('config.dictionary', 'wb') as config_dictionary_file:
-  pickle.dump(decpBACKUP, config_dictionary_file)
-with open('config.dictionary', 'rb') as config_dictionary_file:
-    config_dictionary = pickle.load(config_dictionary_file)
+######################################################################
+with open('config.dictionary', 'wb') as df_backup2:
+  pickle.dump(df, df_backup2)
+#with open('config.dictionary', 'rb') as df_backup2:
+#    df_backup2 = pickle.load(df_backup2)
+#df_decp = pd.DataFrame.copy(df_backup2, deep = True)
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True)
@@ -766,16 +770,11 @@ del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1
      listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
      scrap2, typeEntreprise, url, verification, ville, word, df]
 
-# Petites corrections
-df_decp['lieuExecutionTypeCode'] = df_decp['lieuExecutionTypeCode'].str.upper()
-df_decp['lieuExecutionTypeCode'] = np.where(df_decp['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT', df_decp['lieuExecutionTypeCode'])
-df_decp['lieuExecutionTypeCode'] = np.where(df_decp['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION', df_decp['lieuExecutionTypeCode'])
 
-df_decp['nature'] = np.where(df_decp['nature'] == 'Délégation de service public', 'DELEGATION DE SERVICE PUBLIC', df_decp['nature'])
-df_decp['nature'] = df_decp['nature'].str.upper()
-######################################################################
-######################################################################
 
+
+
+######################################################################
 ######## Enrichissement latitude & longitude avec adresse la ville 
 df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv', 
                         sep=';', header = 0, error_bad_lines=False,
@@ -923,9 +922,9 @@ del df_nom
 # Générer la matrice des liens
 Z = linkage(scaled_df, method='ward', metric='euclidean')
 # Dendrogramme
-#plt.title('CAH avec matérialisation des X classes')
-#dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
-#plt.show()
+plt.title('CAH avec matérialisation des X classes')
+dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
+plt.show()
 # Récupération des classes
 groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
 ### Ajout au df 
@@ -1213,8 +1212,6 @@ del depPop, df, dfHM, df_Dep, df_Reg, df_carte, geojson, geojson2, i
 ###############################################################################
 ###############################################################################
 ###############################################################################
-
-
 # Exportation des données 
 #df.dtypes
 df_decp.to_csv(r'decp.csv', sep=';',index = False, header=True, encoding='utf-8')
@@ -1226,7 +1223,6 @@ df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
                              'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
                              'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
                              'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
-
 #### Comparaison de toutes les autres colonnes
 dftest = df.drop(columns=['formePrix', 'denominationSocialeEtablissement'])
 dftest_copy = df.drop(columns=['formePrix' , 'denominationSocialeEtablissement'])
@@ -1236,4 +1232,3 @@ try:
 except:
     print(False)
 '''
-
