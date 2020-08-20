@@ -23,7 +23,8 @@ import urllib
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+#import matplotlib as plt
 import folium
 from folium.plugins import MarkerCluster
 from folium.plugins import HeatMap
@@ -742,6 +743,7 @@ if len(df.codeCommuneAcheteur)<5:
 
 ######################################################################
 ######################################################################
+decpBACKUP = pd.DataFrame.copy(df, deep = True); 
 df.to_csv(r'decpBACKUP.csv', sep=';',index = False, header=True, encoding='utf-8')
 #df_decpBACKUP = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
 #                      dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
@@ -749,15 +751,20 @@ df.to_csv(r'decpBACKUP.csv', sep=';',index = False, header=True, encoding='utf-8
 #                             'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
 #                             'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
 #                             'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
+import pickle
+with open('config.dictionary', 'wb') as config_dictionary_file:
+  pickle.dump(decpBACKUP, config_dictionary_file)
+with open('config.dictionary', 'rb') as config_dictionary_file:
+    config_dictionary = pickle.load(config_dictionary_file)
 ######################################################################
 ######################################################################
-df_decp = pd.DataFrame.copy(df, deep = True); 
-#del df
+df_decp = pd.DataFrame.copy(df, deep = True)
+
 del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
      detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee, 
      enrichissementScrap, errorSIRET, index, infos, initial, listCorrespondance, 
      listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
-     scrap2, typeEntreprise, url, verification, ville, word]
+     scrap2, typeEntreprise, url, verification, ville, word, df]
 
 # Petites corrections
 df_decp['lieuExecutionTypeCode'] = df_decp['lieuExecutionTypeCode'].str.upper()
@@ -914,11 +921,11 @@ del df_nom
 ### Application de l'algorithme de classification ascendante hiérarchique - CAH
 ############ Avec les données normalisée
 # Générer la matrice des liens
-Z = linkage(scaled_df ,method='ward',metric='euclidean')
-''' # Dendrogramme
-plt.title('CAH avec matérialisation des X classes')
-dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
-plt.show() '''
+Z = linkage(scaled_df, method='ward', metric='euclidean')
+# Dendrogramme
+#plt.title('CAH avec matérialisation des X classes')
+#dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
+#plt.show()
 # Récupération des classes
 groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
 ### Ajout au df 
@@ -952,8 +959,6 @@ df_decp = pd.merge(df_decp, df, how='left', on='libelleCommuneAcheteur')
 df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
 df_decp.segmentation_CAH = df_decp.segmentation_CAH.astype(int)
 
-###############################################################################
-###############################################################################
 ###############################################################################
 ############........ CARTE DES MARCHES PAR VILLE
 df_carte = df_decp[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
@@ -1058,9 +1063,6 @@ choropleth = folium.Choropleth(geo_data=geojson2, name='Départements', data=df_
 choropleth.geojson.add_child(folium.features.GeoJsonTooltip(['nom'],labels=False))
 
 folium.TileLayer('OpenStreetMap', overlay=True, show=True, control =False).add_to(c)
-#folium.TileLayer('Stamen Terrain', overlay=True, show=False).add_to(c)
-#folium.TileLayer('Stamen Toner', overlay=True, show=False).add_to(c)
-#folium.TileLayer('cartodbpositron', overlay=True, show=False).add_to(c)
 folium.LayerControl(collapsed=False).add_to(c)
 c.save('carte/carteDECP.html')
 
@@ -1084,19 +1086,21 @@ def luhn(codeSIREN):
     return resultat
 
 # Application sur les siren des acheteurs
-df_decp['siren1'] = df_decp.acheteurId.str[:9]
-df_SA = pd.DataFrame(df_decp['siren1'])
-df_SA = df_SA.drop_duplicates(subset=['siren1'], keep='first')
-df_SA['resultatSirenAcheteur'] = df_SA['siren1'].apply(luhn)
+df_decp['siren1Acheteur'] = df_decp.acheteurId.str[:9]
+df_SA = pd.DataFrame(df_decp['siren1Acheteur'])
+df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
+df_SA['verifSirenAcheteur'] = df_SA['siren1Acheteur'].apply(luhn)
 # Application sur les siren des établissements
-df_decp['siren2'] = df_decp.sirenEtablissement.str[:9]
-df_SE = pd.DataFrame(df_decp['siren2'])
-df_SE = df_SE.drop_duplicates(subset=['siren2'], keep='first')
-df_SE['resultatSirenEtablissement'] = df_SE.siren2.apply(luhn)
+df_decp['siren2Etablissement'] = df_decp.sirenEtablissement.str[:9]
+df_SE = pd.DataFrame(df_decp['siren2Etablissement'])
+df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
+df_SE['verifSirenEtablissement'] = df_SE['siren2Etablissement'].apply(luhn)
 # Merge avec le df principal
-df_decp = pd.merge(df_decp, df_SA, how='left', on = 'siren1')
-df_decp = pd.merge(df_decp, df_SE, how='left', on = 'siren2')
-del df_decp['siren1'], df_decp['siren2']
+df_decp = pd.merge(df_decp, df_SA, how='left', on = 'siren1Acheteur')
+df_decp = pd.merge(df_decp, df_SE, how='left', on = 'siren2Etablissement')
+del df_decp['siren1Acheteur'], df_decp['siren2Etablissement']
+# On rectifie pour les codes non-siret
+df_decp.verifSirenEtablissement = np.where((df_decp.typeIdentifiantEtablissement!='SIRET') | (df_decp.typeIdentifiantEtablissement.isnull()), 0, df_decp.verifSirenEtablissement)
 
 ###############################################################################
 ###############################################################################
@@ -1111,16 +1115,44 @@ df_barGraph.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des commune
 plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelleCommuneAcheteur)
 del df_barGraph
 round(df_bar.ratioEntreprisesMarchés.mean(),2)
+
+### Ratio nb entreprises / nb marchés > 40K
+df_ratio = pd.DataFrame.copy(df_decp, deep = True); 
+df_ratio = df_ratio[df_ratio.montantTotalMarche>=40000]
+df_ratio_marche = df_ratio.groupby(['libelleCommuneAcheteur']).identifiantMarche.nunique().to_frame('nbMarches').reset_index()
+df_ratio_entreprises = df_ratio.groupby(['libelleCommuneAcheteur']).siretEtablissement.nunique().to_frame('nbEntreprises').reset_index()
+df_ratio = pd.merge(df_ratio_marche, df_ratio_entreprises, how='inner', on='libelleCommuneAcheteur')
+df_ratio['ratioEntreprisesMarchés']=df_carte['nbEntreprises']/df_carte['nbMarches']
+df_ratio = df_ratio[(df_ratio.nbMarches>100) & (df_ratio.ratioEntreprisesMarchés>0)]
+df_ratio = df_ratio.sort_values(by = 'ratioEntreprisesMarchés')
+# Graphique des résultats : top 10
+df_barGraph = df_ratio.head(20)
+df_barGraph.ratioEntreprisesMarchés.plot(kind='barh', title='Top 10 des communes avec le plus petit ratio NBentreprise/NBmarchés')
+plt.yticks(range(0,len(df_barGraph.libelleCommuneAcheteur)), df_barGraph.libelleCommuneAcheteur)
+del df_barGraph
+round(df_ratio.ratioEntreprisesMarchés.mean(),2) # Moyenne à 0.9
+
 df_bar.to_csv(r'resultatsCSV/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_bar.to_csv(r'resultatsCSV/df_Ratio40K.csv', sep=';',index = False, header=True, encoding='utf-8')
 
 ###############################################################################
 ### Récap des erreurs
 df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEstime=='Oui') 
-                    | (df_decp.resultatSirenAcheteur==1) | (df_decp.resultatSirenEtablissement==1)]
+                    | ((df_decp.verifSirenAcheteur==1) | (df_decp.acheteurId=='00000000000000'))  
+                    | ((df_decp.verifSirenEtablissement==1) & (df_decp.typeIdentifiantEtablissement=='SIRET'))
+                    | ((df_decp.verifSirenEtablissement==1) & (df_decp.typeIdentifiantEtablissement.isnull()))
+                    | ((df_decp.idEtablissement=='00000000000000') & (df_decp.typeIdentifiantEtablissement=='SIRET'))
+                    | ((df_decp.idEtablissement=='00000000000000') & (df_decp.typeIdentifiantEtablissement.isnull()))]
 
 df_ERROR = df_ERROR[['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
-                     'idEtablissement', 'montantOriginal',  'dureeMois',
-                     'montantEstEstime', 'dureeMoisEstEstime', 'resultatSirenAcheteur', 'resultatSirenEtablissement']]
+                     'idEtablissement', 'montantOriginal',  'dureeMois','typeIdentifiantEtablissement',
+                     'montantEstEstime', 'dureeMoisEstEstime', 'verifSirenAcheteur', 'verifSirenEtablissement']] 
+(df_ERROR.montantEstEstime=='Oui').sum()
+(df_ERROR.dureeMoisEstEstime=='Oui').sum()
+((df_ERROR.verifSirenAcheteur==1) |(df_ERROR.acheteurId=='00000000000000')).sum()
+((df_ERROR.verifSirenEtablissement==1) |(df_ERROR.idEtablissement=='00000000000000')).sum()
+
+
 df_ERROR.columns = ['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 'EtablissementID',
                      'montantOriginal', 'dureeMoisOriginal', 'montantAberrant', 'dureeMoisAberrant',
                      'siretAcheteur', 'siretEtablissement']
