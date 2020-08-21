@@ -293,13 +293,15 @@ del df['conca'], df['montantEstimation'], df['index']
 del medianeRegFP
 
 # Colonne par marché
-df['montantTotalMarché'] = df["montant"] * df["Count?"]
+df['montantTotalMarché'] = df["montant"] * df["nbTitulairesSurCeMarche"]
 
 ##############################################################################
 ##############################################################################
 ### Rectification des durées en mois aberrantes
+
+# On cherche les éventuelles erreurs mois -> jours
 df['dureeMoisEstime'] = np.where(
-    (df['montant']==df['dureeMois'])
+      (df['montant']==df['dureeMois'])
     | (df['montant']/df['dureeMois'] < 100)
     | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
     | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
@@ -307,20 +309,25 @@ df['dureeMoisEstime'] = np.where(
     | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
     | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
     | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), "Oui", "Non")
+    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), 
+    "Oui", "Non")
 
+# On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
 df['dureeMoisCalculee'] = np.where(df['dureeMoisEstime'] == "Oui", round(df['dureeMois']/30,0), df['dureeMois'])
+# Comme certaines valeurs atteignent zero, on remplace par un mois
 df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
 
-# Au cas ils restent encore des données aberrantes
-df['dureeMoisCalculee'] = np.where((df['montant']/df['dureeMois'] < 100)
+# Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
+df['dureeMoisCalculee'] = np.where(
+      (df['montant']/df['dureeMois'] < 100)
     | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
     | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
     | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
     | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
     | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
     | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), 1, df.dureeMoisCalculee)
+    | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)), 
+    1, df.dureeMoisCalculee)
 
 ######################################################################
 ######## Enrichissement des données via les codes siret/siren ########
@@ -329,15 +336,15 @@ dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
 dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
 dfSIRET.reset_index(inplace=True) 
 dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
-for i in range (len(dfSIRET)):
-    if (dfSIRET.idTitulaires[i].isdigit() == True):
-        dfSIRET.typeIdentifiant[i] = 'Oui'
-    else:
-        dfSIRET.typeIdentifiant[i] = 'Non'
+
+dfSIRET["typeIdentifiant"] = np.where(dfSIRET["idTitulaires"].str.isdigit() == True, 'Oui', 'Non')
 
 dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
 del dfSIRET['index']
 dfSIRET.reset_index(inplace=True, drop=True) 
+
+df_siret_col_dict = {}
+df.rename
 dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
 dfSIRET.siren = dfSIRET.siret.str[0:9]
 dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
