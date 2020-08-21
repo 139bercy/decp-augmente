@@ -31,6 +31,7 @@ from folium.plugins import HeatMap
 from folium import plugins
 ######################################################################
 import pickle
+#conda install xlrd
 #import warnings
 #warnings.filterwarnings("ignore")
 ######################################################################
@@ -611,8 +612,8 @@ dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False
 ########### Ajout au df principal !
 del df['denominationSociale']
 # Concaténation
-df =  pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
-#df =  pd.merge(df, dfenrichissement, how='left', left_on="idTitulaires", right_on="siret")
+df =  pd.merge(df, dfenrichissement, how='left', left_on="idTitulaires", right_on="siret")
+#df =  pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
 
 del df['CPV_min'], df['uid'], df['uuid']
 
@@ -637,6 +638,7 @@ del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup1:
   pickle.dump(df, df_backup1)
+# 140 931 lignes, 40 colonnes
 #with open('config.dictionary', 'rb') as df_backup1:
 #    df_backup1 = pickle.load(df_backup1)
 #df = pd.DataFrame.copy(df_backup1, deep = True)
@@ -701,7 +703,7 @@ del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, 
 ######################################################################
 ######################################################################
 # Ajustement de certaines colonnes
-df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
+dfenrichissement.codePostalEtablissement = dfenrichissement.codePostalEtablissement.astype(str).str[:5]
 df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
 df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
 df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(str).str[:5]
@@ -757,9 +759,9 @@ df['nature'] = df['nature'].str.upper()
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup2:
   pickle.dump(df, df_backup2)
-#with open('config.dictionary', 'rb') as df_backup2:
-#    df_backup2 = pickle.load(df_backup2)
-#df_decp = pd.DataFrame.copy(df_backup2, deep = True)
+# with open('config.dictionary', 'rb') as df_backup2:
+#     df_backup2 = pickle.load(df_backup2)
+# df_decp = pd.DataFrame.copy(df_backup2, deep = True)
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True)
@@ -769,10 +771,6 @@ del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1
      enrichissementScrap, errorSIRET, index, infos, initial, listCorrespondance, 
      listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
      scrap2, typeEntreprise, url, verification, ville, word, df]
-
-
-
-
 
 ######################################################################
 ######## Enrichissement latitude & longitude avec adresse la ville 
@@ -811,10 +809,10 @@ df_villes.longitude = df_villes.longitude.astype(float)
 
 ################################# Ajout au dataframe principal
 # Ajout pour les acheteurs
-df_villes.columns = ['codeCommuneAcheteur', 'populationAcheteur', 'superficieAcheteur', 'latitudeAcheteur','longitudeAcheteur']
+df_villes.columns = ['superficieAcheteur', 'populationAcheteur', 'codeCommuneAcheteur', 'latitudeAcheteur','longitudeAcheteur']
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneAcheteur')
 # Ajout pour les etablissement
-df_villes.columns = ['codeCommuneEtablissement', 'populationEtablissement', 'superficieEtablissement', 'latitudeEtablissement','longitudeEtablissement']
+df_villes.columns = ['superficieEtablissement', 'populationEtablissement', 'codeCommuneEtablissement', 'latitudeEtablissement','longitudeEtablissement']
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
 del df_villes
 ########### Calcul de la distance entre l'acheteur et l'etablissement
