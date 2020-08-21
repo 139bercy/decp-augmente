@@ -1,4 +1,5 @@
 {
 	"path_to_project":"/home/qdesrousseaux-adc/Projects/decp-augmente",
-	"path_to_data" : "data"
+	"path_to_data" : "data",
+	"decp_file_name" : "decp.json"
 }

@@ -7,7 +7,7 @@ Python : 3.7
 """
 ######################### Importation des librairies ##########################
 import pandas as pd
-from pandas.io.json import json_normalize
+from pandas import json_normalize
 import numpy as np
 import json
 import os
@@ -37,11 +37,12 @@ import pickle
 #Chargement des données
 with open("config.json") as f:
     conf = json.load(f)
-    
-path_to_project = conf["path_to_project"]
-path_to_data = conf["path_to_data"]
 
-with open("dataJSON/decp.json", encoding='utf-8') as json_data:
+path_to_data = conf["path_to_data"]
+decp_file_name = conf["decp_file_name"]
+
+
+with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
     data = json.load(json_data)
 df = json_normalize(data['marches']) #Aplatir les données Json imbriquées
 
@@ -59,28 +60,12 @@ df.titulaires.fillna('0', inplace=True)
 dfO = df[df['titulaires'] == '0']
 df = df[df['titulaires'] != '0']
 
-def reorga(x):
-    return pd.DataFrame.from_dict(x,orient='index').T
 
-liste_col = []
-for index, liste in enumerate(df.titulaires) :
-    for i in liste :
-        col = reorga(i)
-        col["index"] = index
-        liste_col.append(col)
+df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']], keys=df.index).reset_index(level=1,drop=True)
+df_titulaires.rename(columns={"id":  "idTitulaires"}, inplace=True)
+df = df.drop('titulaires', axis=1).join(df_titulaires).reset_index(drop=True)
 
-df.reset_index(level=0, inplace=True)
-del df['index']
-df.reset_index(level=0, inplace=True) 
-myList = list(df.columns); myList[0] = 'index'; df.columns = myList
-
-dfTitulaires = pd.concat(liste_col, sort = False)
-dfTitulaires.reset_index(level=0, inplace=True) 
-myList = list(dfTitulaires.columns); myList[2] = 'idTitulaires'; dfTitulaires.columns = myList
-
-df = pd.merge(df, dfTitulaires, on=['index'])
-df = df.drop(columns=['titulaires','level_0'])
-del i, index, liste, liste_col, col, dfTitulaires, myList, donneesInutiles
+del df_titulaires, donneesInutiles
 
 ######################################################################
 #...............    Nettoyage/formatage des données
