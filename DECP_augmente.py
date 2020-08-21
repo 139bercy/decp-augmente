@@ -164,7 +164,7 @@ listeCP = ['01','02','03','04','05','06','07','08','09','2A','2B','98','976','97
     + [str(i) for i in list(np.arange(10,96,1))]
     
 
-df['codePostal'] = np.where(df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
+df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
 #Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
 df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
@@ -197,30 +197,28 @@ listCorrespondance = {
 #Inversion du dict
 listCorrespondanceI = {value : str(key) for key, values in listCorrespondance.items() for value in values}
 
-df['codeRegion'].replace(listCorrespondanceI)
+df['codeRegion'].replace(listCorrespondanceI, inplace=True)
 
 # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
 df['codeRegion'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegion'])
 df['codeRegion'] = df['codeRegion'].astype(str)
 # Vérification des codes région 
-listeReg = ['84', '27', '53', '24', '94', '44', '32', '11', '28', '75', '76', '52', '93', '01', '02', '03', '04', '06', '98'] #98 = collectivité d'outre mer
-def check_reg(codeRegion):
-    if codeRegion not in listeReg:
-        return np.NaN
-    return codeRegion
-df['codeRegion'] = df['codeRegion'].apply(check_reg)
+listeReg = ['84', '27', '53', '24', '94', '44', '32', '11', '28', '75', '76', 
+            '52', '93', '01', '02', '03', '04', '06', '98'] #98 = collectivité d'outre mer
+
+
+df['codeRegion'] = np.where(~df['codeRegion'].isin(listeReg), np.NaN, df['codeRegion'])
 
 # Identification du nom des régions
 df['Region'] = df['codeRegion'].astype(str)
-listCorrespondance = {'84' : 'Auvergne-Rhône-Alpes','27' : 'Bourgogne-Franche-Comté','53' : 'Bretagne','24' : 'Centre-Val de Loire',
+correspondance_dict = {'84' : 'Auvergne-Rhône-Alpes','27' : 'Bourgogne-Franche-Comté','53' : 'Bretagne','24' : 'Centre-Val de Loire',
                       '94' : 'Corse','44' : 'Grand Est','32' : 'Hauts-de-France','11' : 'Île-de-France',
                       '28' : 'Normandie','75' : 'Nouvelle-Aquitaine','76' : 'Occitanie','52' : 'Pays de la Loire',
                       '93' : 'Provence-Alpes-Côte d\'Azur','01' : 'Guadeloupe', '02' : 'Martinique',
                       '03' : 'Guyane','04' : 'La Réunion','06' : 'Mayotte','98' : 'Collectivité d\'outre mer'}
-for word, initial in listCorrespondance.items():
-    df['Region'] = np.where(df['Region'] == word, initial, df['Region'])
 
-del chemin, data, dfO, i, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
+df['Region'].replace(correspondance_dict, inplace=True)
+# del chemin, chemindata, dfO, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
 
 ###############################################################################
 ################### Date / Temps ##################    
@@ -243,7 +241,7 @@ df['moisNotification'] = df.dateNotification.str[5:7]
 ######################################################################
 # Mise en forme de la colonne montant
 df["montant"] = pd.to_numeric(df["montant"])
-df["montantOriginal"] = pd.to_numeric(df["montantOriginal"])
+df["montantOriginal"] = pd.to_numeric(df["montant"])
 
 df['codePostal'] = df['codePostal'].astype(str)
 df['codeRegion'] = df['codeRegion'].astype(str)
@@ -252,7 +250,9 @@ df['nic'] = df['nic'].astype(str)
 # Mise en forme des données vides
 df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
 df.idTitulaires = np.where(df.idTitulaires == '', np.NaN, df.idTitulaires)
-df.denominationSociale = np.where((df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'), np.NaN, df.denominationSociale)
+df.denominationSociale = np.where(
+    (df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'),
+    np.NaN, df.denominationSociale)
 
 ######################################################################
 # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
@@ -267,9 +267,7 @@ df['moisNotification'] = df['moisNotification'].astype(str)
 df['anneeNotification'] = df['anneeNotification'].astype(str)
 df['conca'] = df['formePrix'] + df['Region'] + df['codeCPV']
     
-df.reset_index(level=0, inplace=True)
-df.reset_index(level=0, inplace=True)
-del df['index']
+
 # Calcul de la médiane par stratification
 medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
 medianeRegFP.reset_index(level=0, inplace=True)
@@ -277,7 +275,7 @@ medianeRegFP.columns = ['conca','montantEstimation']
 df = pd.merge(df, medianeRegFP, on='conca')
 # Remplacement des valeurs manquantes par la médiane du groupe
 df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-del df['conca'], df['montantEstimation'], df['level_0']
+del df['conca'], df['montantEstimation']
 
 # On recommence avec une plus petite stratification
 df['conca'] = df['formePrix'] + df['Region']
@@ -300,7 +298,8 @@ df['montantTotalMarché'] = df["montant"] * df["Count?"]
 ##############################################################################
 ##############################################################################
 ### Rectification des durées en mois aberrantes
-df['dureeMoisEstime'] = np.where((df['montant']==df['dureeMois'])
+df['dureeMoisEstime'] = np.where(
+    (df['montant']==df['dureeMois'])
     | (df['montant']/df['dureeMois'] < 100)
     | (df['montant']/df['dureeMois'] < 1000) & (df['dureeMois']>=12)
     | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
