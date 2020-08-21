@@ -35,8 +35,12 @@ import pickle
 #warnings.filterwarnings("ignore")
 ######################################################################
 #Chargement des données
-chemin = "H:/Desktop/MEF_dep/decp-augmente/.gitignore"
-os.chdir(chemin)
+with open("config.json") as f:
+    conf = json.load(f)
+    
+path_to_project = conf["path_to_project"]
+path_to_data = conf["path_to_data"]
+
 with open("dataJSON/decp.json", encoding='utf-8') as json_data:
     data = json.load(json_data)
 df = json_normalize(data['marches']) #Aplatir les données Json imbriquées
