@@ -68,6 +68,9 @@ df.titulaires.fillna('0', inplace=True)
 dfO = df[df['titulaires'] == '0']
 df = df[df['titulaires'] != '0']
 
+# Création d'une colonne nbTitulairesSurCeMarche
+df["nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x : len(x))
+
 
 df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']], keys=df.index).reset_index(level=1,drop=True)
 df_titulaires.rename(columns={"id":  "idTitulaires"}, inplace=True)
@@ -100,40 +103,44 @@ df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "App
 ################### Identifier les outliers - travail sur les montants
 df["montant"] = pd.to_numeric(df["montant"])
 df['montantOriginal'] = df["montant"]
-df['montant'] = np.where(df['montant'] <= 200, 0, df['montant']) 
-df['montant'] = np.where(df['montant'] >= 9.99e8, 0, df['montant'])
+
+montant_borne_inf = 200.0
+montant_borne_sup = 9.99e8
+df['montant'] = np.where(df['montant'] <= montant_borne_inf, 0, df['montant']) 
+df['montant'] = np.where(df['montant'] >= montant_borne_sup, 0, df['montant'])
+
 
 ######################################################################
 #################### Gestion des id/code manquants
 df.id = np.where(df.id.isnull(), '0000000000000000', df.id)
 df.codeCPV = np.where(df.codeCPV.isnull(), '00000000', df.codeCPV)
 
-## Gestion du montant en fonction du nombre de titulaires
-dfCount = df.groupby(['source', '_type', 'id', 'montant', 'acheteur.id',
-                    'dureeMois', 'datePublicationDonnees', 'lieuExecution.code', 'codeCPV']).id.count().to_frame('Count?').reset_index()
-
-df = pd.merge(df, dfCount, on=['source', '_type', 'id', 'montant', 'acheteur.id',
-                    'dureeMois', 'datePublicationDonnees', 'lieuExecution.code', 'codeCPV'])
-
 # On applique au df la division
 df["montant"] = pd.to_numeric(df["montant"])
-df["Count?"] = pd.to_numeric(df["Count?"])
-df["montant"] = df["montant"]/df["Count?"]
+df["montant"] = df["montant"]/df["nbTitulairesSurCeMarche"]
 
 # Nettoyage colonnes
-df = df.drop(columns=['index'])
-del dfCount
 df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
+
 
 ###############################################################################
 ##################### Nettoyage de ces nouvelles colonnes #####################
-df.reset_index(inplace=True, drop=True) 
-for i in ["\\t","-"," ",".","?","    "]: # Nettoyage des codes
-    df.idTitulaires[(df.typeIdentifiant=='SIRET')|(df.typeIdentifiant.isnull())|(df.typeIdentifiant=='nan')] =  df.idTitulaires[(df.typeIdentifiant=='SIRET')|(df.typeIdentifiant.isnull())|(df.typeIdentifiant=='nan')].astype(str).str.replace(i, "")
+# Nettoyage des codes idTitulaires
+caracteres_speciaux_dict = {"\\t" : "",
+                            "-": "",
+                            " ": "",
+                            ".": "",
+                            "?": "",
+                            "    ":""}
+mask =  (df.typeIdentifiant=='SIRET') | \
+    (df.typeIdentifiant.isnull()) | \
+    (df.typeIdentifiant=='nan')
+df.idTitulaires[mask].replace(caracteres_speciaux_dict, inplace=True)
+
 
 ######## Gestion code CPV
-df.codeCPV = df.codeCPV.astype(str)
-df["CPV_min"] = df.codeCPV.str[:2]
+df.codeCPV = df.codeCPV.astype(str)df.reset_index(inplace=True, drop=True) 
+df["CPV_min"] = df.codeCPV.str[:2]df.reset_index(inplace=True, drop=True) 
 
 ########  Récupération code NIC 
 df.idTitulaires = df.idTitulaires.astype(str)
