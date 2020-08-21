@@ -5,6 +5,13 @@ Created on Mon Aug 10
 Spyder : 3.3.6
 Python : 3.7
 """
+
+######################################################################
+######################################################################
+# I. IMPORTATION ET MISE EN FORME DES DONNEES
+######################################################################
+######################################################################
+
 ######################### Importation des librairies ##########################
 import pandas as pd
 from pandas import json_normalize
@@ -34,6 +41,7 @@ import pickle
 #import warnings
 #warnings.filterwarnings("ignore")
 ######################################################################
+
 #Chargement des données
 with open("config.json") as f:
     conf = json.load(f)
@@ -81,7 +89,14 @@ df.reset_index(inplace=True, drop = True)
 df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
 df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
 
+
 ######################################################################
+######################################################################
+# II. VALORISATION
+######################################################################
+######################################################################
+
+
 ################### Identifier les outliers - travail sur les montants
 df["montant"] = pd.to_numeric(df["montant"])
 df['montantOriginal'] = df["montant"]
