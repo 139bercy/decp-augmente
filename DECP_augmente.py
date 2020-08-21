@@ -139,34 +139,33 @@ df.idTitulaires[mask].replace(caracteres_speciaux_dict, inplace=True)
 
 
 ######## Gestion code CPV
-df.codeCPV = df.codeCPV.astype(str)df.reset_index(inplace=True, drop=True) 
-df["CPV_min"] = df.codeCPV.str[:2]df.reset_index(inplace=True, drop=True) 
+df.codeCPV = df.codeCPV.astype(str)
+df["CPV_min"] = df.codeCPV.str[:2]
 
 ########  Récupération code NIC 
 df.idTitulaires = df.idTitulaires.astype(str)
 df['nic'] = df.idTitulaires.str[-5:]
-for i in range (len(df)):
-    if (df.nic[i].isdigit() == False):
-        df.nic[i] = np.NaN
+
+df.loc[~df["nic"].str.isdigit()] = np.NaN
 
 ################### Régions / Départements ##################
 # Création de la colonne pour distinguer les départements
 df['codePostal'] = df['lieuExecution.code'].str[:3]
 listCorrespondance = {'976': 'YT', '974': 'RE', '972': 'MQ', '971': 'GP', '973': 'GF'}
-for word, initial in listCorrespondance.items():
-    df['codePostal'] = np.where(df['codePostal'] == word, initial, df['codePostal'])
+df['codePostal'].replace(listCorrespondance, inplace=True)
+
 df['codePostal'] = df['codePostal'].str[:2]
-listCorrespondance = {'YT': '976', 'RE': '974', 'MQ': '972', 'GP': '971', 'GF': '973', 'TF': '98', 'NC' : '988','PF' : '987','WF' : '986','MF' : '978','PM' : '975','BL' : '977'}
-for word, initial in listCorrespondance.items():
-    df['codePostal'] = np.where(df['codePostal'] == word, initial, df['codePostal'])
+
+listCorrespondance2 = {'YT': '976', 'RE': '974', 'MQ': '972', 'GP': '971', 'GF': '973', 'TF': '98', 'NC' : '988','PF' : '987','WF' : '986','MF' : '978','PM' : '975','BL' : '977'}
+df['codePostal'].replace(listCorrespondance2, inplace=True)
 
 # Vérification si c'est bien un code postal
-listeCP = ['01','02','03','04','05','06','07','08','09','2A','2B','98','976','974','972','971','973','97','988','987','984','978','975','977', '986'] + [str(i) for i in list(np.arange(10,96,1))]
-def check_cp(codePostal):
-    if codePostal not in listeCP:
-        return np.NaN
-    return codePostal
-df['codePostal'] = df['codePostal'].apply(check_cp)
+listeCP = ['01','02','03','04','05','06','07','08','09','2A','2B','98','976','974','972','971','973','97','988','987','984','978','975','977', '986'] \
+    + [str(i) for i in list(np.arange(10,96,1))]
+    
+
+df['codePostal'] = np.where(df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
+
 #Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
 df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
 
@@ -174,22 +173,31 @@ df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.N
 # Création de la colonne pour distinguer les régions
 df['codeRegion'] = df['codePostal'].astype(str)
 # Définition des codes des régions en fonctions des codes de départements
-listCorrespondance = {'84' : ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74'],
-    '27' : ['21', '25', '39', '58', '70', '71', '89', '90'], '53' : ['35', '22', '56', '29'],
-    '24' : ['18', '28', '36', '37', '41', '45'], '94' : ['2A', '2B', '20'],
-    '44' : ['08', '10', '51', '52', '54', '55', '57', '67', '68', '88'], '32' : ['02', '59', '60', '62', '80'],
-    '11' : ['75', '77', '78', '91', '92', '93', '94', '95'], '28' : ['14', '27', '50', '61', '76'],
+listCorrespondance = {
+    '84' : ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74'],
+    '27' : ['21', '25', '39', '58', '70', '71', '89', '90'], 
+    '53' : ['35', '22', '56', '29'],
+    '24' : ['18', '28', '36', '37', '41', '45'], 
+    '94' : ['2A', '2B', '20'],
+    '44' : ['08', '10', '51', '52', '54', '55', '57', '67', '68', '88'], 
+    '32' : ['02', '59', '60', '62', '80'],
+    '11' : ['75', '77', '78', '91', '92', '93', '94', '95'], 
+    '28' : ['14', '27', '50', '61', '76'],
     '75' : ['16', '17', '19', '23', '24', '33', '40', '47', '64', '79', '86', '87'],
     '76' : ['09', '11', '12', '30', '31', '32', '34', '46', '48', '65', '66', '81', '82'],
     '52' : ['44', '49', '53', '72', '85'], '93' : ['04', '05', '06', '13', '83', '84'],
-    '06': ['976'], '04': ['974'], '02': ['972'], '01': ['971'], '03': ['973'], '98': ['97','98','988','986','984','987','975','977','978']}
+    '06': ['976'], 
+    '04': ['974'], 
+    '02': ['972'], 
+    '01': ['971'], 
+    '03': ['973'], 
+    '98': ['97','98','988','986','984','987','975','977','978']
+    }
+
 #Inversion du dict
-listCorrespondanceI = {}
-for key, value in listCorrespondance.items():
-    for string in value:
-        listCorrespondanceI.setdefault(string, []).append(key)
-listCorrespondanceI={k: str(v[0]) for k,v in listCorrespondanceI.items()}
-df['codeRegion']=df['codeRegion'].map(listCorrespondanceI)
+listCorrespondanceI = {value : str(key) for key, values in listCorrespondance.items() for value in values}
+
+df['codeRegion'].replace(listCorrespondanceI)
 
 # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
 df['codeRegion'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegion'])
