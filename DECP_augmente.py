@@ -459,7 +459,7 @@ for i in tqdm(range(len(nanSiren))):
             codeType = infos[16].replace(" : ","")
             detailsType1 = details[28]
             detailsType2 = details[29]
-            verification = (siret == nanSiren.siret[i])
+            verification = (siret[:9] == nanSiren.siren[i])
             if (detailsType1 ==' '):
                 detailType = detailsType2
             else:
@@ -755,6 +755,8 @@ df['lieuExecutionTypeCode'] = np.where(df['lieuExecutionTypeCode'] == 'CODE RÉG
 df['nature'] = np.where(df['nature'] == 'Délégation de service public', 'DELEGATION DE SERVICE PUBLIC', df['nature'])
 df['nature'] = df['nature'].str.upper()
 
+df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
+
 ######################################################################
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup2:
@@ -762,7 +764,6 @@ with open('config.dictionary', 'wb') as df_backup2:
 #with open('config.dictionary', 'rb') as df_backup2:
 #    df_backup2 = pickle.load(df_backup2)
 #df_decp = pd.DataFrame.copy(df_backup2, deep = True)
-#df_decp.codePostalEtablissement = df_decp.codePostalEtablissement.astype(str).str[:5]
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True)
@@ -933,7 +934,7 @@ except :
 groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
 ### Ajout au df 
 df = df.join(groupes_cah)
-del Z, groupes_cah, scaled_df
+#del Z, groupes_cah, scaled_df
 
 # On créé une 4e catégorie avec toutes les valeurs seules
 df.reset_index(inplace=True)
@@ -1033,7 +1034,7 @@ mapMarker = folium.Marker([44,-4],icon=folium.features.CustomIcon('https://uploa
                                    '<img src="https://svgsilh.com/svg/157354.svg"  width=20 height=20/> : Hors-segmentation',
                                    max_width=320, show=True), overlay=False).add_to(c)
 
-marker_cluster = MarkerCluster(name='DECP par communes').add_to(c)
+marker_cluster = MarkerCluster(name='DECP par communes', color='red').add_to(c)
 for i in range(len(df_carte)):
     if (df_carte.segmentation_CAH[i]==1):
         icon = folium.features.CustomIcon('https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg', icon_size=(max(20, min(40,df_carte.distanceMediane[i]/2)), max(20, min(40,df_carte.distanceMediane[i]/2))))
@@ -1105,6 +1106,13 @@ del df_decp['siren1Acheteur'], df_decp['siren2Etablissement']
 # On rectifie pour les codes non-siret
 df_decp.verifSirenEtablissement = np.where((df_decp.typeIdentifiantEtablissement!='SIRET') | (df_decp.typeIdentifiantEtablissement.isnull()), 0, df_decp.verifSirenEtablissement)
 
+
+with open('config.dictionary', 'wb') as df_backup5:
+  pickle.dump(df_backup5, df_backup5)
+with open('config.dictionary', 'rb') as df_backup5:
+    df_backup5 = pickle.load(df_backup5)
+
+
 ###############################################################################
 ###############################################################################
 ### Ratio nb entreprises / nb marchés
@@ -1136,8 +1144,15 @@ del df_barGraph
 round(df_ratio.ratioEntreprisesMarchés.mean(),2) # Moyenne à 0.9
 
 df_bar.to_csv(r'resultatsCSV/df_Ratio.csv', sep=';',index = False, header=True, encoding='utf-8')
-df_bar.to_csv(r'resultatsCSV/df_Ratio40K.csv', sep=';',index = False, header=True, encoding='utf-8')
+df_ratio.to_csv(r'resultatsCSV/df_Ratio40K.csv', sep=';',index = False, header=True, encoding='utf-8')
 
+###############################################################################
+with open('config.dictionary', 'wb') as df_bar_SAVE:
+  pickle.dump(df_bar, df_bar_SAVE)
+with open('config.dictionary', 'wb') as df_ratio_SAVE:
+  pickle.dump(df_ratio, df_ratio_SAVE)
+###############################################################################
+#del cahORDER, depPop, dfHM, df_SA, df_SE, geojson, geojson2, groupes_cah, i, initial, scaled_df, word
 ###############################################################################
 ### Récap des erreurs
 df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEstime=='Oui') 
@@ -1150,43 +1165,57 @@ df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEsti
 df_ERROR = df_ERROR[['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
                      'idEtablissement', 'montantOriginal',  'dureeMois','montantEstEstime',
                      'dureeMoisEstEstime', 'verifSirenAcheteur', 'verifSirenEtablissement']] 
+# Check des erreurs
 (df_ERROR.montantEstEstime=='Oui').sum()
 (df_ERROR.dureeMoisEstEstime=='Oui').sum()
 ((df_ERROR.verifSirenAcheteur==1) |(df_ERROR.acheteurId=='00000000000000')).sum()
 ((df_ERROR.verifSirenEtablissement==1) |(df_ERROR.idEtablissement=='00000000000000')).sum()
-
+df_ERROR.source.value_counts(normalize=True).plot(kind='pie') # Aucune corrélation entre les erreurs et les sources
 
 df_ERROR.columns = ['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 'EtablissementID',
                      'montantOriginal', 'dureeMoisOriginal', 'montantAberrant', 'dureeMoisAberrant',
                      'siretAcheteur', 'siretEtablissement']
-df_ERROR.source.value_counts(normalize=True).plot(kind='pie') # Aucune corrélation entre les erreurs et les sources
-
-df_Classement = pd.DataFrame.copy(df_ERROR, deep = True)
-df_Classement = df_Classement[['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteur', 'siretEtablissement']]
-df_Classement.columns = ['acheteurNom', 'montantEstEstime', 'dureeMoisEstEstime', 'siretAcheteur', 'siretEtablissement']
-df_Classement.montantEstEstime = np.where(df_Classement.montantEstEstime=='Oui',1,0)
-df_Classement.dureeMoisEstEstime = np.where(df_Classement.dureeMoisEstEstime=='Oui',1,0)
-
-df_Classement = df_Classement.groupby(['acheteurNom']).sum().reset_index()
-df_50 = pd.DataFrame(df_Classement[(df_Classement.montantEstEstime >= 50) |
-        (df_Classement.dureeMoisEstEstime >= 300) |
-        (df_Classement.siretAcheteur >= 180) |
-        (df_Classement.siretEtablissement >= 50)])
-df_50['Note']=df_50.montantEstEstime*4+df_50.dureeMoisEstEstime*1+df_50.siretAcheteur*1+df_50.siretEtablissement*2
-df_50=df_50.sort_values(by = 'Note', ascending = False)
-del df_50['Note']
-
-#siretEtablissement
-Bilan=pd.DataFrame(df_Classement.sum()[1:5]).T; Bilan.columns=['Montant aberrant ','Durée en mois aberrante ','Siret acheteur mauvais ','Siret entreprise mauvais ']
-
-# Les pires lignes (4 erreurs): 
-F = df_ERROR[(df_ERROR.montantAberrant=='Oui') & (df_ERROR.dureeMoisAberrant=='Oui') & (df_ERROR.siretAcheteur=='MAUVAIS') & (df_ERROR.siretEtablissement=='MAUVAIS')]
-
-# Liste de tous les acheteurs ayant fait au moins 10 supposées erreurs :
-df_Classement['Total'] = df_Classement.montantEstEstime + df_Classement.dureeMoisEstEstime + df_Classement.siretAcheteur + df_Classement.siretEtablissement
-ListeMauvaixAcheteurs = pd.DataFrame(np.array([df_Classement.acheteurNom[df_Classement['Total']>10].unique()]).T, columns=['Acheteur'])
+df_ERROR.siretAcheteur = np.where(df_ERROR.siretAcheteur==1, 'Incorrect', 'Correct')
+df_ERROR.siretEtablissement = np.where(df_ERROR.siretEtablissement==1, 'Incorrect', 'Correct')
 
 ###############################################################################
+df_ERROR.to_csv(r'resultatsCSV/df_ERROR.csv', sep=';',index = False, header=True, encoding='utf-8')
+with open('config.dictionary', 'wb') as df_ERROR_SAVE:
+  pickle.dump(df_ERROR, df_ERROR_SAVE)
+###############################################################################
+
+
+# Récap du nb erreurs par commune
+df_Classement = pd.DataFrame.copy(df_ERROR, deep = True)
+df_Classement = df_Classement[['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteur', 'siretEtablissement']]
+df_Classement.montantAberrant = np.where(df_Classement.montantAberrant=='Oui', 1, 0)
+df_Classement.dureeMoisAberrant = np.where(df_Classement.dureeMoisAberrant=='Oui' ,1, 0)
+df_Classement.siretAcheteur = np.where(df_Classement.siretAcheteur=='Incorrect', 1, 0)
+df_Classement.siretEtablissement = np.where(df_Classement.siretEtablissement=='Incorrect', 1, 0)
+df_Classement = df_Classement.groupby(['acheteurNom']).sum().reset_index()
+# Sommes de toutes les erreurs
+Bilan=pd.DataFrame(df_Classement.sum()[1:5]).T; Bilan.columns=['Montant aberrant ','Durée en mois aberrante ','Siret acheteur mauvais ','Siret entreprise mauvais ']
+df_Classement['Total'] = df_Classement.montantAberrant + df_Classement.dureeMoisAberrant + df_Classement.siretAcheteur + df_Classement.siretEtablissement
+###############################################################################
+df_Classement.to_csv(r'resultatsCSV/ListeMauvaixAcheteurs.csv', sep=';',index = False, header=True, encoding='utf-8')
+print(Bilan)
+###############################################################################
+
+
+# 50 'pires' communes
+df_50 = pd.DataFrame.copy(df_Classement[(df_Classement.montantAberrant >= 50) |
+        (df_Classement.dureeMoisAberrant >= 120) |
+        (df_Classement.siretAcheteur >= 2) |
+        (df_Classement.siretEtablissement >= 8)])
+df_50['Note']=df_50.montantAberrant*4+df_50.dureeMoisAberrant*1+df_50.siretAcheteur*3+df_50.siretEtablissement*2
+df_50=df_50.sort_values(by = 'Note', ascending = False).head(50)
+del df_50['Note'], df_50['Total']
+###############################################################################
+df_50.columns = ['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteurFAUX', 'siretEtablissementFAUX']
+df_50.to_csv(r'resultatsCSV/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
+###############################################################################
+
+
 ### Rapide aperçu des données principales
 # Aperçu répartition des sources
 round(df_decp.source.value_counts(normalize=True)*100,2) # pourcentage des sources
@@ -1200,18 +1229,46 @@ df_RECAP = pd.concat([df_decp.montantOriginal.describe(),
                       df_decp.distanceAcheteurEtablissement.describe()], axis=1)
 df_RECAP.columns=['Montant original (€)', 'Montant calculé (€)', 'Durée en mois originale', 'Durée en mois calculée','Distance acheteur - établissement (km)']
 df_RECAP = df_RECAP[1:8]
+# O enregistre les résultats
+df_RECAP.to_csv(r'resultatsCSV/df_RECAP.csv', sep=';',index = False, header=True, encoding='utf-8')
 
-# Récupération sous format CSV
-df_ERROR.to_csv(r'resultatsCSV/df_ERROR.csv', sep=';',index = False, header=True, encoding='utf-8')
-ListeMauvaixAcheteurs.to_csv(r'resultatsCSV/ListeMauvaixAcheteurs.csv', sep=';',index = False, header=True, encoding='utf-8')
-df_50.columns = ['acheteurNom', 'montantAberrant', 'dureeMoisAberrant', 'siretAcheteurFAUX', 'siretEtablissementFAUX']
-df_50.to_csv(r'resultatsCSV/df_50.csv', sep=';',index = False, header=True, encoding='utf-8')
+### Exportation et importation des données importantes pour le dashboard
+with open("test.pickle","wb") as f:
+    pickle.dump(Bilan, f)
+    pickle.dump(Z, f)
+    pickle.dump(df, f)
+    pickle.dump(df_50, f)
+    pickle.dump(df_Classement, f)
+    pickle.dump(df_Dep, f)
+    pickle.dump(df_ERROR, f)
+    pickle.dump(df_RECAP, f)
+    pickle.dump(df_Reg, f)
+    pickle.dump(df_bar, f)
+    pickle.dump(df_carte, f)
+    pickle.dump(df_decp, f)
+    pickle.dump(df_ratio, f)
+    pickle.dump(df_ratio_entreprises, f)
+    pickle.dump(df_ratio_marche, f)
+    
+import pickle
+with open("test.pickle", "rb") as f:
+     Bilan= pickle.load(f)
+     Z= pickle.load(f)
+     df= pickle.load(f)
+     df_50= pickle.load(f)
+     df_Classement= pickle.load(f)
+     df_Dep= pickle.load(f)
+     df_ERROR= pickle.load(f)
+     df_RECAP= pickle.load(f)
+     df_Reg= pickle.load(f)
+     df_bar= pickle.load(f)
+     df_carte= pickle.load(f)
+     df_decp= pickle.load(f)
+     df_ratio= pickle.load(f)
+     df_ratio_entreprises= pickle.load(f)
+     df_ratio_marche = pickle.load(f)
 
-###############################################################################
-del F, ListeMauvaixAcheteurs, df_ERROR, df_RECAP, df_50, df_Classement, Bilan
-del depPop, df, dfHM, df_Dep, df_Reg, df_carte, geojson, geojson2, i
 
-'''
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -1227,12 +1284,3 @@ df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
                              'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
                              'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
                              'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
-#### Comparaison de toutes les autres colonnes
-dftest = df.drop(columns=['formePrix', 'denominationSocialeEtablissement'])
-dftest_copy = df.drop(columns=['formePrix' , 'denominationSocialeEtablissement'])
-try:
-    assert_frame_equal(dftest, dftest_copy)
-    print(True)
-except:
-    print(False)
-'''
