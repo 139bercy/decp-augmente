@@ -759,9 +759,10 @@ df['nature'] = df['nature'].str.upper()
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup2:
   pickle.dump(df, df_backup2)
-# with open('config.dictionary', 'rb') as df_backup2:
-#     df_backup2 = pickle.load(df_backup2)
-# df_decp = pd.DataFrame.copy(df_backup2, deep = True)
+#with open('config.dictionary', 'rb') as df_backup2:
+#    df_backup2 = pickle.load(df_backup2)
+#df_decp = pd.DataFrame.copy(df_backup2, deep = True)
+#df_decp.codePostalEtablissement = df_decp.codePostalEtablissement.astype(str).str[:5]
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True)
@@ -920,9 +921,14 @@ del df_nom
 # Générer la matrice des liens
 Z = linkage(scaled_df, method='ward', metric='euclidean')
 # Dendrogramme
-plt.title('CAH avec matérialisation des X classes')
-dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
-plt.show()
+from colorama import Fore, Style
+try : 
+    plt.title('CAH avec matérialisation des X classes')
+    dendrogram(Z,labels=df.index,orientation='left',color_threshold=65)
+    plt.show()
+except :
+    print(f'{Fore.RED}Problème avec la dernière mise à jour pandas, impossible de charger le dendrogramme du CAH.{Style.RESET_ALL}')
+    pass
 # Récupération des classes
 groupes_cah = pd.DataFrame(fcluster(Z,t=65,criterion='distance'), columns = ['segmentation_CAH'])
 ### Ajout au df 
@@ -1142,8 +1148,8 @@ df_ERROR = df_decp[(df_decp.montantEstEstime=='Oui') | (df_decp.dureeMoisEstEsti
                     | ((df_decp.idEtablissement=='00000000000000') & (df_decp.typeIdentifiantEtablissement.isnull()))]
 
 df_ERROR = df_ERROR[['source', 'identifiantMarche','objetMarche', 'acheteurId','acheteurNom', 
-                     'idEtablissement', 'montantOriginal',  'dureeMois','typeIdentifiantEtablissement',
-                     'montantEstEstime', 'dureeMoisEstEstime', 'verifSirenAcheteur', 'verifSirenEtablissement']] 
+                     'idEtablissement', 'montantOriginal',  'dureeMois','montantEstEstime',
+                     'dureeMoisEstEstime', 'verifSirenAcheteur', 'verifSirenEtablissement']] 
 (df_ERROR.montantEstEstime=='Oui').sum()
 (df_ERROR.dureeMoisEstEstime=='Oui').sum()
 ((df_ERROR.verifSirenAcheteur==1) |(df_ERROR.acheteurId=='00000000000000')).sum()
