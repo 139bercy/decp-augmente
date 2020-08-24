@@ -48,6 +48,7 @@ with open("config.json") as f:
 
 path_to_data = conf["path_to_data"]
 decp_file_name = conf["decp_file_name"]
+error_siret_file_name = conf["error_siret_file_name"]
 
 
 with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
@@ -332,27 +333,29 @@ df['dureeMoisCalculee'] = np.where(
 ######################################################################
 ######## Enrichissement des données via les codes siret/siren ########
 ### Utilisation d'un autre data frame pour traiter les Siret unique
-dfSIRET = df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']]
+
+dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
 dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
 dfSIRET.reset_index(inplace=True) 
 dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
 
-dfSIRET["typeIdentifiant"] = np.where(dfSIRET["idTitulaires"].str.isdigit() == True, 'Oui', 'Non')
+dfSIRET["idTitulaires"] = np.where(~dfSIRET["idTitulaires"].str.isdigit(), '00000000000000', dfSIRET.idTitulaires)
 
-dfSIRET.idTitulaires = np.where(dfSIRET.typeIdentifiant=='Non', '00000000000000', dfSIRET.idTitulaires)
 del dfSIRET['index']
 dfSIRET.reset_index(inplace=True, drop=True) 
 
-df_siret_col_dict = {}
-df.rename
-dfSIRET.columns = ['siret', 'siren', 'denominationSociale'] 
+
+dfSIRET.rename(columns={"idTitulaires" : "siret", "typeIdentifiant" : "siren"}, inplace=True)
 dfSIRET.siren = dfSIRET.siret.str[0:9]
 dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
 ######################################################################
 ### On supprime les siret déjà identifié comme faux 
+path = os.path.join(path_to_data, error_siret_file_name)
+
 try :
-    archiveErrorSIRET = pd.read_csv('errorSIRET.csv', sep=';', encoding='utf-8', dtype={'siren' : str, 'siret' : str, 'denominationSociale' : str})
+    archiveErrorSIRET = pd.read_csv(path, sep=';', encoding='utf-8', 
+                                    dtype={'siren' : str, 'siret' : str, 'denominationSociale' : str})
     dfSIRET = pd.merge(dfSIRET, archiveErrorSIRET, how='outer', indicator='source')
     dfSIRET = dfSIRET[dfSIRET.source.eq('left_only')].drop('source', axis=1)
     dfSIRET.reset_index(inplace=True, drop=True)
@@ -364,45 +367,44 @@ except:
 
 ######################################################################
 #StockEtablissement_utf8
-chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
-result = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
-dfSIRET['siret'] = dfSIRET['siret'].astype(str)
-for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
-                                                               'siret', 'typeVoieEtablissement', 
-                                                               'libelleVoieEtablissement',
-                                                               'codePostalEtablissement',
-                                                               'libelleCommuneEtablissement',
-                                                               'codeCommuneEtablissement',
-                                                               'activitePrincipaleEtablissement',
-                                                               'nomenclatureActivitePrincipaleEtablissement']):
+path = os.path.join(path_to_data, conf["stock_etablissement"])
+columns = [
+    'siren', 
+    'nic', 
+    'siret', 
+    'typeVoieEtablissement', 
+    'libelleVoieEtablissement', 
+    'codePostalEtablissement', 
+    'libelleCommuneEtablissement', 
+    'codeCommuneEtablissement', 
+    'activitePrincipaleEtablissement', 
+    'nomenclatureActivitePrincipaleEtablissement']    
+
+result = pd.DataFrame(columns)
+chunksize = 1000000
+for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
     gm_chunk['siret'] = gm_chunk['siret'].astype(str)
     resultTemp = pd.merge(dfSIRET, gm_chunk, on=['siret'])
     result = pd.concat([result, resultTemp], axis=0)
 result = result.drop_duplicates(subset=['siret'], keep='first')
-del [resultTemp, gm_chunk, chemin]
+del resultTemp, gm_chunk
 
-del result['siren_x'], result['siren_y'], result['siren']
+del result['siren_x'], result['siren_y']
 dfSIRET = pd.merge(dfSIRET, result, how='outer', on=['siret'])
 nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
 dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
-nanSiret = nanSiret.iloc[:,:3]
+nanSiret = nanSiret.iloc[:,["siret", "siren", "denominationSociale_x"]]
 
-chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
-result2 = pd.DataFrame(columns = ['siren', 'nic', 'siret', 'typeVoieEtablissement', 'libelleVoieEtablissement', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement', 'activitePrincipaleEtablissement', 'nomenclatureActivitePrincipaleEtablissement'])    
-for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'nic',
-                                                               'siret', 'typeVoieEtablissement', 
-                                                               'libelleVoieEtablissement',
-                                                               'codePostalEtablissement',
-                                                               'libelleCommuneEtablissement',
-                                                               'codeCommuneEtablissement',
-                                                               'activitePrincipaleEtablissement',
-                                                               'nomenclatureActivitePrincipaleEtablissement']):
+
+result2 = pd.DataFrame(columns)
+for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
     gm_chunk['siren'] = gm_chunk['siren'].astype(str)
     resultTemp = pd.merge(nanSiret, gm_chunk, on=['siren'])
     result2 = pd.concat([result2, resultTemp], axis=0)
+    
 result2 = result2.drop_duplicates(subset=['siren'], keep='first')
-del result2['siret_x'], result2['siret_y'], result2['siret'], result2['denominationSociale_x']
-del [resultTemp, gm_chunk, chemin]
+del result2['siret_x'], result2['siret_y'], result2['denominationSociale_x']
+del resultTemp, gm_chunk, chemin
 
 result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
 myList = list(result2.columns); myList[2] = 'denominationSociale'; result2.columns = myList
@@ -418,10 +420,20 @@ nanSiren = nanSiren[nanSiren['activitePrincipaleEtablissement'].isnull()]
 nanSiren = nanSiren.iloc[:,:3]
 nanSiren.columns = ['siret', 'siren', 'denominationSociale'] 
 nanSiren.reset_index(inplace=True, drop=True)
-del dfSIRET, i, nanSiret, result, result2, myList
+del dfSIRET, nanSiret, result, result2, myList
 
 #....... Solution complémentaire pour ceux non-identifié dans la BDD
-df_scrap = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
+columns = [
+    'index', 
+    'rue', 
+    'siret', 
+    'ville', 
+    'typeEntreprise', 
+    'codeType', 
+    'detailsType', 
+    'verification']
+
+df_scrap = pd.DataFrame(columns = )    
 for i in tqdm(range(len(nanSiren))):
     try:
         url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siret[i]
