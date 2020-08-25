@@ -1108,7 +1108,7 @@ df_decp.verifSirenEtablissement = np.where((df_decp.typeIdentifiantEtablissement
 
 
 with open('config.dictionary', 'wb') as df_backup5:
-  pickle.dump(df_backup5, df_backup5)
+  pickle.dump(df_decp, df_backup5)
 with open('config.dictionary', 'rb') as df_backup5:
     df_backup5 = pickle.load(df_backup5)
 
@@ -1250,7 +1250,11 @@ with open("test.pickle","wb") as f:
     pickle.dump(df_ratio_entreprises, f)
     pickle.dump(df_ratio_marche, f)
     
+###############################################################################
 import pickle
+import os
+chemin = "H:/Desktop/MEF_dep/decp-augmente/.gitignore"
+os.chdir(chemin)
 with open("test.pickle", "rb") as f:
      Bilan= pickle.load(f)
      Z= pickle.load(f)
@@ -1276,7 +1280,7 @@ with open("test.pickle", "rb") as f:
 # Exportation des données 
 #df.dtypes
 df_decp.to_csv(r'decp.csv', sep=';',index = False, header=True, encoding='utf-8')
- 
+
 # Réimportation des données
 df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8', 
                       dtype={'acheteurId' : str, 'nicEtablissement' : str, 'codeRegionAcheteur' : str, 'denominationSocialeEtablissement' : str,
@@ -1284,3 +1288,129 @@ df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
                              'anneeNotification' : str, 'codeCommuneEtablissement' : str, 'codePostalEtablissement' : str,  'identifiantMarche' : str,
                              'codeTypeEtablissement' : str, 'sirenEtablissement' : str, 'siretEtablissement' : str, 'codeCPV' : str,
                              'nbTitulairesSurCeMarche' : int, 'dureeMois': int, 'dureeMoisCalculee': int, 'codeCommuneAcheteur': str, 'codePostalAcheteur': str})
+
+
+
+###############################################################################
+    ###########################################################################
+    ###########################################################################
+    ###########################################################################
+    ###########################################################################
+###############################################################################
+import pickle
+import os
+chemin = "H:/Desktop/MEF_dep/decp-augmente/.gitignore"
+os.chdir(chemin)
+with open("test.pickle", "rb") as f:
+     Bilan= pickle.load(f)
+     Z= pickle.load(f)
+     df= pickle.load(f)
+     df_50= pickle.load(f)
+     df_Classement= pickle.load(f)
+     df_Dep= pickle.load(f)
+     df_ERROR= pickle.load(f)
+     df_RECAP= pickle.load(f)
+     df_Reg= pickle.load(f)
+     df_bar= pickle.load(f)
+     df_carte= pickle.load(f)
+     df_decp= pickle.load(f)
+     df_ratio= pickle.load(f)
+     df_ratio_entreprises= pickle.load(f)
+     df_ratio_marche = pickle.load(f)
+###############################################################################
+
+import pandas as pd
+from math import pi
+from wordcloud import WordCloud
+
+
+from bokeh.io import output_file, show
+from bokeh.plotting  import gridplot
+from bokeh.palettes import Category20c
+from bokeh.plotting import figure
+from bokeh.transform import cumsum
+from bokeh.models.widgets import Div
+
+#import numpy as np
+#import matplotlib.pyplot as plt
+#from bokeh.models import Title
+#from bokeh.models import HoverTool
+
+output_file("DB1.html")
+
+### Pie chart des sources
+source = pd.DataFrame(round(df_decp.source.value_counts(normalize=True)*100,2)).reset_index()
+source['angle'] = source['source']/source['source'].sum() * 2*pi
+source['color'] = ['#FD8E75','#FDDC75','#75FDA8','#7595FD','#DA75FD']
+
+p = figure(width=480, height=300, title="Provenance des données en pourcentage", toolbar_location=None,
+           tools="hover", tooltips="@source", x_range=(-0.5, 1.0))
+p.wedge(x=0, y=1, radius=0.35, start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+        line_color="white", fill_color='color', legend_field='index', source=source)
+p.axis.axis_label=None
+p.axis.visible=False
+p.grid.grid_line_color = None
+
+
+### Barplot de la nature des marchés
+natureMarche = pd.DataFrame(round(df_decp.nature.value_counts(),2)).reset_index()
+autre = pd.DataFrame([['AUTRE', natureMarche.nature[3:].sum()]], columns=['index','nature'])
+natureMarche = pd.concat([natureMarche.head(3),autre])
+natureMarche.reset_index(inplace=True, drop=True)
+natureMarche.columns = ['index', 'nb']
+
+n = figure(width=480, height=300, title="Nature des marchés", toolbar_location=None,
+           x_range=natureMarche['index'], tools="", tooltips='@nb')
+n.vbar(x=natureMarche['index'], top=natureMarche['nb'], width=0.9, color=Category20c[len(natureMarche.nb)])
+n.xgrid.grid_line_color = None
+n.y_range.start = 0
+
+
+### Lines des montants totaux par mois par ans
+notification = df_decp.groupby(['anneeNotification', 'moisNotification']).moisNotification.count().to_frame('nb').reset_index()
+notification = notification[(notification.anneeNotification!='nan') | (notification.moisNotification!='nan')]
+notification = notification[(notification['anneeNotification']!='2012')] 
+notification = notification[(notification['anneeNotification']!='2013')]  
+notification = notification[(notification['anneeNotification']!='2014')]  
+notification = notification[(notification['anneeNotification']!='2015')]  
+notification = notification[(notification['anneeNotification']!='2016')]  
+notification.moisNotification = notification.moisNotification.astype(int)
+notification.anneeNotification = notification.anneeNotification.astype(int)
+notification = pd.pivot_table(notification, values='nb', index='moisNotification', columns=['anneeNotification'])
+
+numlines=len(notification.columns)
+mypalette=Category20c[numlines]
+
+notif = figure(width=480, height=300, x_axis_type="datetime", title="Notification des marchés par année") 
+notif.multi_line(xs=[notification.index.values]*numlines,
+                ys=[notification[name].values for name in notification],
+                line_color=mypalette, line_width=5)
+
+formeMarche = pd.DataFrame(round(df_decp.formePrix.value_counts(),2)).reset_index()
+typeMarche = pd.DataFrame(round(df_decp.type.value_counts(),2)).reset_index()
+procedureMarche = pd.DataFrame(round(df_decp.procedure.value_counts(),2)).reset_index()
+
+
+### Création d"un nuage de mots
+a=pd.DataFrame(df_decp.referenceCPV)
+a = pd.DataFrame(a['referenceCPV'].astype(str).apply(lambda x: x.split()))
+a = pd.DataFrame(a.referenceCPV.explode())
+a = a[a.referenceCPV!='nan']
+a['referenceCPV']=a['referenceCPV'].str.upper()
+a=a.loc[(a['referenceCPV'].str.len() > 3)]
+for i in ["\\t","-"," ",".","?","    ", "D'", "L'", ',', '_', '(', ')']: 
+    a.referenceCPV =  a.referenceCPV.astype(str).str.replace(i, "")
+a.reset_index(inplace=True, drop=True)
+resA = pd.DataFrame(round(a.referenceCPV.value_counts(),2)).reset_index()
+wocl = resA['index'].head(100)
+text = wocl.str.cat(sep = ' ')
+
+wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
+wordcloud.to_file('wordcloud.png')
+div_image = Div(text="""<p style="margin-top:5px; margin-left:30px; font-family: Helvetica, Arial ; font-size:13px"><b>Nuage de mots des références des marchés</b></p><img style="height:250px; width:440px; margin-left:30px;" src="wordcloud.png" alt="div_image">""")
+
+# show the results
+sortie = gridplot([[p, div_image], [n, notif]])
+show(sortie)
+
+    
