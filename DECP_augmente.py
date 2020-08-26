@@ -1331,6 +1331,10 @@ from bokeh.plotting import figure
 from bokeh.transform import cumsum
 from bokeh.models.widgets import Div
 
+from bokeh.layouts import widgetbox
+from bokeh.models.widgets import Paragraph
+from bokeh.models.widgets import PreText
+
 #import numpy as np
 #import matplotlib.pyplot as plt
 #from bokeh.models import Title
@@ -1402,15 +1406,63 @@ for i in ["\\t","-"," ",".","?","    ", "D'", "L'", ',', '_', '(', ')']:
     a.referenceCPV =  a.referenceCPV.astype(str).str.replace(i, "")
 a.reset_index(inplace=True, drop=True)
 resA = pd.DataFrame(round(a.referenceCPV.value_counts(),2)).reset_index()
-wocl = resA['index'].head(100)
+wocl = resA['index'].head(30)
 text = wocl.str.cat(sep = ' ')
 
 wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
 wordcloud.to_file('wordcloud.png')
-div_image = Div(text="""<p style="margin-top:5px; margin-left:30px; font-family: Helvetica, Arial ; font-size:13px"><b>Nuage de mots des références des marchés</b></p><img style="height:250px; width:440px; margin-left:30px;" src="wordcloud.png" alt="div_image">""")
+div_image = Div(text="""<p style="margin-top:5px; margin-left:30px; font-family: Helvetica, Arial ; font-size:13px"><b>Nuage de mots des références des marchés</b></p><img style="height:250px; width:440px; margin-left:15px;" src="wordcloud.png" alt="div_image">""")
 
 # show the results
 sortie = gridplot([[p, div_image], [n, notif]])
+show(sortie)
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+def split_int(number, separator=' ', count=3):
+    return separator.join(
+        [str(number)[::-1][i:i+count] for i in range(0, len(str(number)), count)]
+    )[::-1]
+
+output_file("NB1.html")
+
+template=("""<div onmouseover="this.style.background='#E7F6FE';this.style.color='#000000';" onmouseout="this.style.background='{colour}';this.style.color='';"
+          style="height:200px; width:200px; border: 2px solid #959595; border-radius:10px 10px 10px 10px; background-color: {colour};
+          border-left:2px solid #959595">
+                <div  style="height:40%; width:50%;padding:10px; margin-left: 10px;margin-top: 10px; border-bottom:1px solid #4d493e; font-size:15px; border-right:1px solid #4d493e;font-weight: bold;">{insertText1}</div>
+                <div style="height:50%; width:70%;padding:10px; margin-top: 10px; margin-left: 10px; font-size:38px; color:#3182bd;"><center>{insertText2}</center></div>
+            </div>""")
+
+nb_contrats = len(df_decp)
+nb_contrats=split_int(nb_contrats, ' ')
+text1 = template.format(insertText1 = "Nombre de contrats", insertText2 = nb_contrats, colour='#d4e3eb')
+div1 = Div(text=text1, style={})
+
+nb_entreprises = df_decp.siretEtablissement.nunique()
+nb_entreprises=split_int(nb_entreprises, ' ')
+text2 = template.format(insertText1 = "Nombre d'entreprises distinctes", insertText2 = nb_entreprises, colour='#d4e3eb')
+div2 = Div(text=text2, style={})
+
+
+nb_concession = df_decp[df_decp.type=='Contrat de concession']
+nb_concession = nb_concession[['type', 'identifiantMarche', 'montantOriginal', 'acheteurId']]
+nb_concession = len(nb_concession.drop_duplicates(subset=['type', 'identifiantMarche', 'montantOriginal', 'acheteurId'], keep='first'))
+nb_concession=split_int(nb_concession, ' ')
+text3 = template.format(insertText1 = "Nombre de concessions", insertText2 = nb_concession, colour='#d4e3eb')
+div3 = Div(text=text3, style={})
+
+
+
+nb_titulaires = df_decp[df_decp.type=='Marché']
+nb_titulaires = nb_titulaires[['type', 'identifiantMarche', 'montantOriginal', 'acheteurId']]
+nb_titulaires = len(nb_titulaires.drop_duplicates(subset=['type', 'identifiantMarche', 'montantOriginal', 'acheteurId'], keep='first'))
+nb_titulaires=split_int(nb_titulaires, ' ')
+text4 = template.format(insertText1 = "Nombre de marchés", insertText2 = nb_titulaires, colour='#d4e3eb')
+div4 = Div(text=text4, style={})
+
+sortie = gridplot([[div1, div2], [div4, div3]], toolbar_options={'logo': None})
 show(sortie)
 
     
