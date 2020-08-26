@@ -42,6 +42,8 @@ import pickle
 #warnings.filterwarnings("ignore")
 ######################################################################
 
+siren_len = 9
+
 #Chargement des données
 with open("config.json") as f:
     conf = json.load(f)
@@ -346,7 +348,7 @@ dfSIRET.reset_index(inplace=True, drop=True)
 
 
 dfSIRET.rename(columns={"idTitulaires" : "siret", "typeIdentifiant" : "siren"}, inplace=True)
-dfSIRET.siren = dfSIRET.siret.str[0:9]
+dfSIRET.siren = dfSIRET.siret.str[:siren_len]
 dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
 ######################################################################
@@ -393,9 +395,12 @@ del result['siren_x'], result['siren_y']
 dfSIRET = pd.merge(dfSIRET, result, how='outer', on=['siret'])
 nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
 dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
-nanSiret = nanSiret.iloc[:,["siret", "siren", "denominationSociale_x"]]
+nanSiret = nanSiret.loc[:,["siret", "siren", "denominationSociale_x"]]
 
+# %%
+print("hello")
 
+#%%
 result2 = pd.DataFrame(columns)
 for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
     gm_chunk['siren'] = gm_chunk['siren'].astype(str)
@@ -404,7 +409,7 @@ for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8'
     
 result2 = result2.drop_duplicates(subset=['siren'], keep='first')
 del result2['siret_x'], result2['siret_y'], result2['denominationSociale_x']
-del resultTemp, gm_chunk, chemin
+del resultTemp, gm_chunk
 
 result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
 myList = list(result2.columns); myList[2] = 'denominationSociale'; result2.columns = myList
@@ -431,96 +436,63 @@ columns = [
     'typeEntreprise', 
     'codeType', 
     'detailsType', 
-    'verification']
+    'SIRETisMatched']
 
-df_scrap = pd.DataFrame(columns = )    
+def get_scrap_dataframe(index, code):
+    url = 'https://www.infogreffe.fr/entreprise-societe/' + code
+        
+    page = requests.get(url)
+    tree = html.fromstring(page.content)
+    
+    rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
+    infos = tree.xpath('//p/text()')
+    details = tree.xpath('//a/text()')
+
+    rue = rueSiret[1]
+    siret = rueSiret[5].replace(" ","")
+    ville = infos[7]
+    typeEntreprise = infos[15]
+    codeType = infos[16].replace(" : ","")
+    detailsType1 = details[28]
+    detailsType2 = details[29]
+    
+    if len(code) == 9:
+        SIRETisMatched = siret[:9] == code
+    else:
+        SIRETisMatched = siret == code
+    
+    if (detailsType1 ==' '):
+        detailsType = detailsType2
+    else:
+        detailsType = detailsType1
+    
+    if not SIRETisMatched:
+        codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
+        infos = tree.xpath('//span[@class="data"]/text()')
+        
+        rue = infos[8]
+        siret = codeSiret[0].replace(" ", "")
+        ville = infos[9].replace(",\xa0","")
+        typeEntreprise = infos[4]
+        detailsType = infos[11]
+        SIRETisMatched = (siret == code)
+        
+    scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
+    scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
+    return scrap    
+    
+df_scrap = pd.DataFrame(columns = columns)    
 for i in tqdm(range(len(nanSiren))):
     try:
-        url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siret[i]
-        
-        page = requests.get(url)
-        tree = html.fromstring(page.content)
-        
-        rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
-        infos = tree.xpath('//p/text()')
-        details = tree.xpath('//a/text()')
-        
-        index = i
-        rue = rueSiret[1]
-        siret = rueSiret[5].replace(" ","")
-        ville = infos[7]
-        typeEntreprise = infos[15]
-        codeType = infos[16].replace(" : ","")
-        detailsType1 = details[28]
-        detailsType2 = details[29]
-        verification = (siret == nanSiren.siret[i])
-        if (detailsType1 ==' '):
-            detailType = detailsType2
-        else:
-            detailsType = detailsType1
-        
-        if (verification == False):
-            codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
-            infos = tree.xpath('//span[@class="data"]/text()')
-            
-            index = i
-            rue = infos[8]
-            siret = codeSiret[0].replace(" ", "")
-            ville = infos[9].replace(",\xa0","")
-            typeEntreprise = infos[4]
-            #codeType = infos[12].replace(" : ","")
-            detailsType = infos[11]
-            #detailsType2 = infos[29]
-            verification = (siret == nanSiren.siret[i])
-            
-        scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
-        df_scrap = pd.concat([df_scrap, scrap], axis=0)
-        
+        scrap = get_scrap_dataframe(i, nanSiren.siret[i])
+        df_scrap = pd.concat([df_scrap, scrap], axis=0)       
     except:
         try :
-            url = 'https://www.infogreffe.fr/entreprise-societe/' + nanSiren.siren[i]
-        
-            page = requests.get(url)
-            tree = html.fromstring(page.content)
-            
-            rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
-            infos = tree.xpath('//p/text()')
-            details = tree.xpath('//a/text()')
-            
-            index = i
-            rue = rueSiret[1]
-            siret = rueSiret[5].replace(" ","")
-            ville = infos[7]
-            typeEntreprise = infos[15]
-            codeType = infos[16].replace(" : ","")
-            detailsType1 = details[28]
-            detailsType2 = details[29]
-            verification = (siret == nanSiren.siret[i])
-            if (detailsType1 ==' '):
-                detailType = detailsType2
-            else:
-                detailsType = detailsType1
-                
-            if (verification == False):
-                codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
-                infos = tree.xpath('//span[@class="data"]/text()')
-                
-                index = i
-                rue = infos[8]
-                siret = codeSiret[0].replace(" ", "")
-                ville = infos[9].replace(",\xa0","")
-                typeEntreprise = infos[4]
-                #codeType = infos[12].replace(" : ","")
-                detailsType = infos[11]
-                #detailsType2 = infos[29]
-                verification = (siret == nanSiren.siret[i])
-                
-                scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
-                df_scrap = pd.concat([df_scrap, scrap], axis=0)
-        
+            scrap = get_scrap_dataframe(i, nanSiren.siren[i])
+            df_scrap = pd.concat([df_scrap, scrap], axis=0)        
         except:
-            index = i
-            scrap = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+            scrap = pd.DataFrame([i, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; 
+            scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
             df_scrap = pd.concat([df_scrap, scrap], axis=0)
             pass
 
@@ -534,7 +506,7 @@ dfDS = resultat[resultat.rue == ' ']
 dfDS = dfDS.iloc[:,1:4]
 dfDS.columns = ['siret', 'siren', 'denominationSociale'] 
 dfDS.reset_index(inplace=True, drop=True)
-del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, verification, ville, df_scrap, nanSiren, resultat
+#del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, SIRETisMatched, ville, df_scrap, nanSiren, resultat
 
 ######################################################################
 def requete(nom):
@@ -545,10 +517,10 @@ def requete(nom):
     return url
 options = Options()
 options.add_argument('--headless')
-pager = webdriver.Firefox(executable_path = "webdriver/geckodriver.exe", options=options)
+pager = webdriver.Firefox(options=options)
 #pager = webdriver.PhantomJS('webdriver/phantomjs.exe')
 
-df_scrap2 = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification'])    
+df_scrap2 = pd.DataFrame(columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched'])    
 for i in tqdm(range(len(dfDS))):
     try:
         url = requete(dfDS.denominationSociale[i])
@@ -568,17 +540,17 @@ for i in tqdm(range(len(dfDS))):
         codeType = infos[16].replace(" : ","")
         detailsType1 = details[28]
         detailsType2 = details[29]
-        verification = (siret == dfDS.siret[i])
+        SIRETisMatched = (siret == dfDS.siret[i])
         if (detailsType1 ==' '):
             detailType = detailsType2
         else:
             detailsType = detailsType1
         
-        scrap2 = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, verification]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+        scrap2 = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
         df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
     except:
         index = i
-        scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'verification']
+        scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T; scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
         df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
         pass
 pager.quit()
@@ -599,12 +571,11 @@ errorSIRET.to_csv('errorSIRET.csv', sep=';',index = False, header=True, encoding
 
 # On réuni les résultats du scraping
 enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
-del enrichissementScrap['index'], enrichissementScrap['siret_y'], enrichissementScrap['verification']
+del enrichissementScrap['index'], enrichissementScrap['siret_y'], enrichissementScrap['SIRETisMatched']
 
 ############ Arrangement des colonnes 
 # Gestion bdd insee
 enrichissementInsee.reset_index(inplace=True, drop=True)
-enrichissementInsee['typeVoieEtablissement'].unique()
 listCorrespondance = {'ALL': 'Allée', 'AV': 'Avenue', 'BD': 'Boulevard', 'CAR': 'Carrefour',
                       'CHE': 'Chemin', 'CHS': 'Chaussée', 'CITE': 'Cité', 'COR': 'Corniche',
                       'CRS': 'Cours', 'DOM': 'Domaine', 'DSC': 'Descente', 'ECA': 'Ecart',
@@ -616,8 +587,8 @@ listCorrespondance = {'ALL': 'Allée', 'AV': 'Avenue', 'BD': 'Boulevard', 'CAR':
                       'ROC': 'Rocade', 'RPT': 'Rond Point', 'RTE': 'Route', 'RUE': 'Rue', 
                       'SEN': 'Sentier', 'SQ': 'Square', 'TPL': 'Terre-plein', 'TRA': 'Traverse',
                       'VLA': 'Villa', 'VLGE': 'Village'}
-for word, initial in listCorrespondance.items():
-    enrichissementInsee['typeVoieEtablissement'] = enrichissementInsee['typeVoieEtablissement'].replace(word, initial)
+
+enrichissementInsee['typeVoieEtablissement'].replace(listCorrespondance, inplace=True)
 enrichissementInsee['rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
 enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee['activitePrincipaleEtablissement'].str.replace(".", "")
 del enrichissementInsee['typeVoieEtablissement'], enrichissementInsee['libelleVoieEtablissement'], enrichissementInsee['nic'], enrichissementInsee['nomenclatureActivitePrincipaleEtablissement']
@@ -636,8 +607,32 @@ enrichissementScrap["commune"] = enrichissementScrap.ville.str[7:]
 del enrichissementScrap['ville'], enrichissementScrap['typeEntreprise'], enrichissementScrap['detailsType']
 
 # Renomme les colonnes
-enrichissementScrap.columns = ['siret', 'siren', 'denominationSociale', 'adresseEtablissement', 'codeTypeEtablissement', 'codePostalEtablissement', 'communeEtablissement']
-enrichissementInsee.columns = ['siret', 'siren', 'denominationSociale', 'codePostalEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codeTypeEtablissement', 'adresseEtablissement']
+enrichissementScrap.columns = [
+    'siret', 
+    'siren', 
+    'denominationSociale', 
+    'adresseEtablissement', 
+    'codeTypeEtablissement', 
+    'codePostalEtablissement', 
+    'communeEtablissement']
+
+enrichissementInsee = enrichissementInsee[['siret',
+                        'siren',
+                        'denominationSociale',
+                        'activitePrincipaleEtablissement',
+                        'codeCommuneEtablissement',
+                        'codePostalEtablissement',
+                        'libelleCommuneEtablissement',
+                        'rue']]
+enrichissementInsee.columns = [
+    'siret', 
+    'siren', 
+    'denominationSociale', 
+    'codePostalEtablissement', 
+    'communeEtablissement', 
+    'codeCommuneEtablissement', 
+    'codeTypeEtablissement', 
+    'adresseEtablissement']
 
 # df final pour enrichir les données des entreprises
 dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap])
@@ -703,7 +698,7 @@ for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8'
 result = result.drop_duplicates(subset=['siret'], keep='first')
 
 dfAcheteurId["siren"] = np.nan
-dfAcheteurId.siren = dfAcheteurId.siret.str[0:9]
+dfAcheteurId.siren = dfAcheteurId.siret.str[:siren_len]
 chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
 result2 = pd.DataFrame(columns = ['siren', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])    
 for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8', usecols=['siren', 'codePostalEtablissement', 
@@ -803,9 +798,9 @@ df_decp = pd.DataFrame.copy(df, deep = True)
 
 del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
      detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee, 
-     enrichissementScrap, errorSIRET, index, infos, initial, listCorrespondance, 
+     enrichissementScrap, errorSIRET, index, infos, listCorrespondance, 
      listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret, 
-     scrap2, typeEntreprise, url, verification, ville, word, df]
+     scrap2, typeEntreprise, url, SIRETisMatched, ville, df]
 
 
 
