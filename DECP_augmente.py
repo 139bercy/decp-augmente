@@ -1432,7 +1432,7 @@ template=("""<div onmouseover="this.style.background='#E7F6FE';this.style.color=
           style="height:200px; width:200px; border: 2px solid #959595; border-radius:10px 10px 10px 10px; background-color: {colour};
           border-left:2px solid #959595">
                 <div  style="height:40%; width:50%;padding:10px; margin-left: 10px;margin-top: 10px; border-bottom:1px solid #4d493e; font-size:15px; border-right:1px solid #4d493e;font-weight: bold;">{insertText1}</div>
-                <div style="height:50%; width:70%;padding:10px; margin-top: 10px; margin-left: 10px; font-size:38px; color:#3182bd;"><center>{insertText2}</center></div>
+                <div style="height:50%; width:90%;padding:10px; margin-top: 10px; margin-left: -5px; font-size:38px; color:#3182bd;"><center>{insertText2}</center></div>
             </div>""")
 
 nb_contrats = len(df_decp)
@@ -1465,4 +1465,107 @@ div4 = Div(text=text4, style={})
 sortie = gridplot([[div1, div2], [div4, div3]], toolbar_options={'logo': None})
 show(sortie)
 
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###############################################################################
+
+output_file("NB2.html")
+
+nbVilles_Carte = len(df_carte)
+nbVilles_Carte=split_int(nbVilles_Carte, ' ')
+text1 = template.format(insertText1 = "Nombre de villes géolocalisées", insertText2 = nbVilles_Carte, colour='#d4e3eb')
+div1 = Div(text=text1, style={})
+
+distanceMoyenneVille = round(df_carte.distanceMediane.mean(),0).astype(int)
+distanceMoyenneVille=split_int(distanceMoyenneVille, ' ')
+text2 = template.format(insertText1 = "Distance moyenne avec les entreprises", insertText2 = distanceMoyenneVille + ' km', colour='#d4e3eb')
+div2 = Div(text=text2, style={})
+
+RegMontantMoyen = round(df_Reg.montant.mean(),0).astype(int)
+RegMontantMoyen=split_int(RegMontantMoyen, ' ')
+text3 = template.format(insertText1 = "Montant moyen par région", insertText2 = RegMontantMoyen + ' M€', colour='#d4e3eb')
+div3 = Div(text=text3, style={})
+
+dREG = pd.DataFrame(df_decp.regionAcheteur)
+dREG.reset_index(inplace=True)
+dREG=dREG.groupby(['regionAcheteur']).index.count().to_frame('count').sort_values(by = 'count', ascending = False)
+regionMax = dREG.index[0]
+text4 = template.format(insertText1 = "Région la plus représentée", insertText2 = '<a style="font-size:15px !important;">' + regionMax + '</a>', colour='#d4e3eb')
+div4 = Div(text=text4, style={})
+
+sortie = gridplot([[div1, div2], [div3, div4]], toolbar_options={'logo': None})
+show(sortie)
+
+
+# Région et département le plus représenté
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###############################################################################
+
+output_file("NB3.html")
+
+montantMoyenMarche = round(df_decp.montant.mean(),0).astype(int)
+montantMoyenMarche=split_int(montantMoyenMarche, ' ')
+text1 = template.format(insertText1 = "Montant moyen par contrat", insertText2 = montantMoyenMarche + ' €', colour='#d4e3eb')
+div1 = Div(text=text1, style={})
+
+montantMoyenMarche = round(df_decp.montant.median(),0).astype(int)
+montantMoyenMarche=split_int(montantMoyenMarche, ' ')
+text3 = template.format(insertText1 = "Montant median par contrat", insertText2 = montantMoyenMarche + ' €', colour='#d4e3eb')
+div3 = Div(text=text3, style={})
+
+dureeMoyenneMarche = round(df_decp.dureeMoisCalculee.mean(),0).astype(int)
+dureeMoyenneMarche=split_int(dureeMoyenneMarche, ' ')
+text2 = template.format(insertText1 = "Durée moyenne par contrat", insertText2 = dureeMoyenneMarche + ' mois', colour='#d4e3eb')
+div2 = Div(text=text2, style={})
+
+DepMontantMoyen = round(df_Dep.montant.mean(),0).astype(int)
+DepMontantMoyen=split_int(DepMontantMoyen, ' ')
+text4 = template.format(insertText1 = "Montant moyen par habitant", insertText2 = DepMontantMoyen + ' €', colour='#d4e3eb')
+div4 = Div(text=text4, style={})
+
+sortie = gridplot([[div1, div3], [div2, div4]], toolbar_options={'logo': None})
+show(sortie)
+
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+
+
+###############################################################################
+
+output_file("NB4.html")
+
+montantAberrant=split_int(Bilan['Montant aberrant '].iloc[0], ' ')
+text1 = template.format(insertText1 = "Nombre de montants aberrants", insertText2 = montantAberrant, colour='#d4e3eb')
+div1 = Div(text=text1, style={})
+
+dureeAberrante=split_int(Bilan['Durée en mois aberrante '].iloc[0], ' ')
+text2 = template.format(insertText1 = "Nombre de durées aberrantes", insertText2 = dureeAberrante, colour='#d4e3eb')
+div2 = Div(text=text2, style={})
+
+siretA_Faux=split_int(Bilan['Siret acheteur mauvais '].iloc[0], ' ')
+text3 = template.format(insertText1 = "Nombre de siret acheteur incorrects", insertText2 = siretA_Faux, colour='#d4e3eb')
+div3 = Div(text=text3, style={})
+
+siretE_Faux=split_int(Bilan['Siret entreprise mauvais '].iloc[0], ' ')
+text4 = template.format(insertText1 = "Nombre de siret entreprise incorrects", insertText2 = siretE_Faux, colour='#d4e3eb')
+div4 = Div(text=text4, style={})
+
+sortie = gridplot([[div1, div2], [div3, div4]], toolbar_options={'logo': None})
+show(sortie)
+
+
+# violin graph 
     
