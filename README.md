@@ -1,7 +1,6 @@
 # PROJET DECP - Données Essentielles de la Commande Publique
 
-<img src="H:/Desktop/logoProjetDECP.PNG" alt="PROJET DECP - Données Essentielles de la Commande Publique"/>
-
+![alt text](H:/Desktop/logoProjetDECP.PNG)
 
 ## Description
 
