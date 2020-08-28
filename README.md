@@ -9,6 +9,26 @@
 Pour l'instant (28/08/2020) le script est fonctionnel uniquement sur Python 3.7 et Spyder 3.3.6.
 Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
 
+### Les librairies Python utilisées
+- pandas
+- numpy
+- json 
+- os 
+- time
+- tqdm
+- lxml
+- requests
+- selenium
+- urllib
+- scikit-learn
+- scipy
+- matplotlib
+- folium
+- colorama
+- math
+- bokeh
+- pickle (optionel)
+
 ### Données
 #### JSON
 Le fichier des DECP utilisé dans ce projet est en format JSON, il se nomme : 'decp.json'. Ce fichier est mis à jour régulièrement sur le site de data.gouv : 
