@@ -15,7 +15,16 @@ Le fichier des DECP utilisé dans ce projet est en format JSON, il se nomme : 'd
 https://www.data.gouv.fr/fr/datasets/fichiers-consolides-des-donnees-essentielles-de-la-commande-publique/
 
 #### CSV
+Plusieurs données sous format csv - xlsx sont nécessaires afin d'enrichir les données :
+- code-insee-postaux-geoflar.csv : Pour ajouter l
+- cpv_2008_ver_2013.xlsx :
+- departements-francais.csv :
+- StockEtablissement_utf8.csv :
 
+#### GEOJSON
+
+
+### Webdriver
 
 
 ## Détails du script
