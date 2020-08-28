@@ -16,33 +16,24 @@ Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
        <td>numpy</td>
        <td>json</td>
        <td>os</td>
-   </tr>
-   <tr>
        <td>time</td>
        <td>tqdm</td>
        <td>lxml</td>
        <td>requests</td>
+       <td>pickle (optionel)</td>
+   </tr>
+   <tr>
+       <td>selenium</td>
+       <td>urllib</td>
+       <td>scikit-learn</td>
+       <td>scipy</td>
+       <td>matplotlib</td>
+       <td>folium</td>
+       <td>colorama</td>
+       <td>math</td>
+       <td>bokeh</td>
    </tr>
 </table>
-
-- pandas 
-- numpy
-- json 
-- os 
-- time
-- tqdm
-- lxml
-- requests
-- selenium
-- urllib
-- scikit-learn
-- scipy
-- matplotlib
-- folium
-- colorama
-- math
-- bokeh
-- pickle (optionel)
 
 ### Données
 #### JSON
