@@ -1297,6 +1297,7 @@ df_decp = pd.read_csv('H:/Desktop/Data/decp.csv', sep=';', encoding='utf-8',
     ###########################################################################
     ###########################################################################
 ###############################################################################
+###############################################################################
 import pickle
 import os
 chemin = "H:/Desktop/MEF_dep/decp-augmente/.gitignore"
@@ -1331,15 +1332,6 @@ from bokeh.plotting import figure
 from bokeh.transform import cumsum
 from bokeh.models.widgets import Div
 
-from bokeh.layouts import widgetbox
-from bokeh.models.widgets import Paragraph
-from bokeh.models.widgets import PreText
-
-#import numpy as np
-#import matplotlib.pyplot as plt
-#from bokeh.models import Title
-#from bokeh.models import HoverTool
-
 output_file("DB1.html")
 
 ### Pie chart des sources
@@ -1348,7 +1340,7 @@ source['angle'] = source['source']/source['source'].sum() * 2*pi
 source['color'] = ['#FD8E75','#FDDC75','#75FDA8','#7595FD','#DA75FD']
 
 p = figure(width=480, height=300, title="Provenance des données en pourcentage", toolbar_location=None,
-           tools="hover", tooltips="@source", x_range=(-0.5, 1.0))
+           tools="hover", tooltips="@source", x_range=(-0.5, 1.0), background_fill_color="#fafafa")
 p.wedge(x=0, y=1, radius=0.35, start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
         line_color="white", fill_color='color', legend_field='index', source=source)
 p.axis.axis_label=None
@@ -1364,7 +1356,7 @@ natureMarche.reset_index(inplace=True, drop=True)
 natureMarche.columns = ['index', 'nb']
 
 n = figure(width=480, height=300, title="Nature des marchés", toolbar_location=None,
-           x_range=natureMarche['index'], tools="", tooltips='@nb')
+           x_range=natureMarche['index'], tools="", tooltips='@nb', background_fill_color="#fafafa")
 n.vbar(x=natureMarche['index'], top=natureMarche['nb'], width=0.9, color=Category20c[len(natureMarche.nb)])
 n.xgrid.grid_line_color = None
 n.y_range.start = 0
@@ -1385,7 +1377,7 @@ notification = pd.pivot_table(notification, values='nb', index='moisNotification
 numlines=len(notification.columns)
 mypalette=Category20c[numlines]
 
-notif = figure(width=480, height=300, x_axis_type="datetime", title="Notification des marchés par année") 
+notif = figure(width=480, height=300, x_axis_type="datetime", title="Notification des marchés par année", background_fill_color="#fafafa") 
 notif.multi_line(xs=[notification.index.values]*numlines,
                 ys=[notification[name].values for name in notification],
                 line_color=mypalette, line_width=5)
@@ -1409,7 +1401,7 @@ resA = pd.DataFrame(round(a.referenceCPV.value_counts(),2)).reset_index()
 wocl = resA['index'].head(30)
 text = wocl.str.cat(sep = ' ')
 
-wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="white").generate(text)
+wordcloud = WordCloud(max_font_size=50, max_words=100, background_color="#fafafa").generate(text)
 wordcloud.to_file('wordcloud.png')
 div_image = Div(text="""<p style="margin-top:5px; margin-left:30px; font-family: Helvetica, Arial ; font-size:13px"><b>Nuage de mots des références des marchés</b></p><img style="height:250px; width:440px; margin-left:15px;" src="wordcloud.png" alt="div_image">""")
 
@@ -1417,8 +1409,6 @@ div_image = Div(text="""<p style="margin-top:5px; margin-left:30px; font-family:
 sortie = gridplot([[p, div_image], [n, notif]])
 show(sortie)
 
-###############################################################################
-###############################################################################
 ###############################################################################
 
 def split_int(number, separator=' ', count=3):
@@ -1468,9 +1458,7 @@ show(sortie)
 ###############################################################################
 ###############################################################################
 ###############################################################################
-
-
-
+# Iframe DB2 = carte
 ###############################################################################
 
 output_file("NB2.html")
@@ -1507,6 +1495,36 @@ show(sortie)
 ###############################################################################
 ###############################################################################
 
+output_file("DB3.html")
+# Montant / Durée
+montantDuree = pd.DataFrame(df_decp.groupby('dureeMoisCalculee')['montant'].mean())
+montantDuree = montantDuree[montantDuree.index <120]
+montantDuree.reset_index(inplace=True)
+montantDuree.dureeMoisCalculee=montantDuree.dureeMoisCalculee.astype(int).astype(str)
+
+md = figure(width=800, height=275, title="Montant en fonction de la durée", background_fill_color="#fafafa")
+md.line(montantDuree['dureeMoisCalculee'], montantDuree['montant'], line_width=2, line_color='#3182bd', legend='Montant')
+md.xaxis.axis_label = 'Durée des marchés'
+md.yaxis.axis_label = 'Montant des marchés'
+
+# Graph par région
+boxplotMontantRegion=pd.DataFrame(df_decp.groupby('regionAcheteur')['montant'].mean())
+boxplotMontantRegion.reset_index(inplace=True)
+boxplotMontantRegion.sort_values(by = 'montant', ascending = False, inplace=True)
+
+bmr = figure(width=800, height=375, title="Montant par région", toolbar_location=None,
+           x_range=boxplotMontantRegion['regionAcheteur'], background_fill_color="#fafafa")
+
+bmr.vbar(x=boxplotMontantRegion['regionAcheteur'], top=boxplotMontantRegion['montant'], width=0.9, color=Category20c[len(boxplotMontantRegion)])
+bmr.xaxis.major_label_orientation = 0.8
+bmr.xgrid.grid_line_color = None
+bmr.y_range.start = 0
+bmr.yaxis.axis_label = 'Montant moyen'
+
+
+sortie = gridplot([[md],[bmr],])
+show(sortie)
+
 
 
 ###############################################################################
@@ -1541,31 +1559,81 @@ show(sortie)
 ###############################################################################
 ###############################################################################
 
+output_file("DB4.html")
+source = pd.DataFrame(round(df_ERROR.source.value_counts(normalize=True)*100,2)).reset_index()
+source['angle'] = source['source']/source['source'].sum() * 2*pi
+source['color'] = ['#FD8E75','#FDDC75','#75FDA8','#7595FD','#DA75FD']
 
+p = figure(width=460, height=300, title="Provenance des erreurs en pourcentage", toolbar_location=None,
+           tools="hover", tooltips="@source", x_range=(-0.5, 1.0), background_fill_color="#fafafa")
+p.wedge(x=0, y=1, radius=0.35, start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+        line_color="white", fill_color='color', legend_field='index', source=source)
+p.axis.axis_label=None
+p.axis.visible=False
+p.grid.grid_line_color = None
+
+
+pieBilan = pd.DataFrame(Bilan.T)
+pieBilan.reset_index(inplace=True)
+pieBilan = pd.DataFrame([tup[1] for tup in pieBilan.itertuples() for i in range(int(tup[2]))])
+source = pd.DataFrame(round(pieBilan[0].value_counts(normalize=True)*100,2)).reset_index()
+source=source.rename(columns = {0: 'source'})
+
+source['angle'] = source['source']/source['source'].sum() * 2*pi
+source['color'] = ['#FD8E75','#FDDC75','#75FDA8','#7595FD']
+p2 = figure(width=460, height=300, title="Provenance des erreurs en pourcentage", toolbar_location=None,
+           tools="hover", tooltips="@source", x_range=(-0.5, 1.0), background_fill_color="#fafafa")
+p2.wedge(x=0, y=1, radius=0.35, start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
+        line_color="white", fill_color='color', legend_field='index', source=source)
+p2.axis.axis_label=None
+p2.axis.visible=False
+p2.grid.grid_line_color = None
+
+
+
+df_ratioGraph = df_ratio.head(10)
+bmr = figure(width=460, height=350, title="Ratio nb entreprises / nb marchés (>40K)", toolbar_location=None,
+           x_range=df_ratioGraph['libelleCommuneAcheteur'], background_fill_color="#fafafa")
+
+bmr.vbar(x=df_ratioGraph['libelleCommuneAcheteur'], top=df_ratioGraph['ratioEntreprisesMarchés'], width=0.9, color=Category20c[len(df_ratioGraph)])
+bmr.xaxis.major_label_orientation = 0.8
+bmr.xgrid.grid_line_color = None
+bmr.y_range.start = 0
+bmr.yaxis.axis_label = 'Ratio (Moyenne 0.9)'
+
+df_ratioGraph = df_bar.head(10)
+bmr2 = figure(width=460, height=350, title="Ratio nb entreprises / nb marchés", toolbar_location=None,
+           x_range=df_ratioGraph['libelleCommuneAcheteur'], background_fill_color="#fafafa")
+
+bmr2.vbar(x=df_ratioGraph['libelleCommuneAcheteur'], top=df_ratioGraph['ratioEntreprisesMarchés'], width=0.9, color=Category20c[len(df_ratioGraph)])
+bmr2.xaxis.major_label_orientation = 0.8
+bmr2.xgrid.grid_line_color = None
+bmr2.y_range.start = 0
+bmr2.yaxis.axis_label = 'Ratio (Moyenne 0.7)'
+
+#, background_fill_color="#fafafa"
+sortie = gridplot([[p, p2], [bmr2, bmr]])
+show(sortie)
 
 ###############################################################################
 
 output_file("NB4.html")
 
-montantAberrant=split_int(Bilan['Montant aberrant '].iloc[0], ' ')
-text1 = template.format(insertText1 = "Nombre de montants aberrants", insertText2 = montantAberrant, colour='#d4e3eb')
+montantAberrant=round(Bilan['Montant aberrant '].iloc[0]/len(df_decp)*100,2).astype(str)
+text1 = template.format(insertText1 = "Nombre de montants aberrants", insertText2 = montantAberrant + '%', colour='#d4e3eb')
 div1 = Div(text=text1, style={})
 
-dureeAberrante=split_int(Bilan['Durée en mois aberrante '].iloc[0], ' ')
-text2 = template.format(insertText1 = "Nombre de durées aberrantes", insertText2 = dureeAberrante, colour='#d4e3eb')
+dureeAberrante= round(Bilan['Durée en mois aberrante '].iloc[0]/len(df_decp)*100,2).astype(str)
+text2 = template.format(insertText1 = "Nombre de durées aberrantes", insertText2 = dureeAberrante + '%', colour='#d4e3eb')
 div2 = Div(text=text2, style={})
 
-siretA_Faux=split_int(Bilan['Siret acheteur mauvais '].iloc[0], ' ')
-text3 = template.format(insertText1 = "Nombre de siret acheteur incorrects", insertText2 = siretA_Faux, colour='#d4e3eb')
+siretA_Faux=round(Bilan['Siret acheteur mauvais '].iloc[0]/len(df_decp)*100,2).astype(str)
+text3 = template.format(insertText1 = "Nombre de siret acheteur incorrects", insertText2 = siretA_Faux + '%', colour='#d4e3eb')
 div3 = Div(text=text3, style={})
 
-siretE_Faux=split_int(Bilan['Siret entreprise mauvais '].iloc[0], ' ')
-text4 = template.format(insertText1 = "Nombre de siret entreprise incorrects", insertText2 = siretE_Faux, colour='#d4e3eb')
+siretE_Faux= round(Bilan['Siret entreprise mauvais '].iloc[0]/len(df_decp)*100,2).astype(str)
+text4 = template.format(insertText1 = "Nombre de siret entreprise incorrects", insertText2 = siretE_Faux + '%', colour='#d4e3eb')
 div4 = Div(text=text4, style={})
 
 sortie = gridplot([[div1, div2], [div3, div4]], toolbar_options={'logo': None})
 show(sortie)
-
-
-# violin graph 
-    
