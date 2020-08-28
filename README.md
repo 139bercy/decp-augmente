@@ -1,10 +1,10 @@
+
+
 # PROJET DECP - Données Essentielles de la Commande Publique
 
-## Introduction
 
 
-## TO DO
-
+## Description
 
 
 ## Les éléments nécessaires 
@@ -52,6 +52,12 @@ Pour réaliser la représentation graphique divisée par régions et départemen
 ### Webdriver
 Afin d'optimiser l'enrichissement via le code siret/siren, une partie des données sont récupérées via une méthode de scrapping sur le site infogreffe.fr. Pour une partie du code, le fichier exécutable geckodriver.exe est obligatoire. 
 
+
+## To Do
+- Posséder tous les éléments cités ci-dessus
+- Changer le chemin indiquer dans le code à la ligne 39 (mettre le chemin où se situe le code et les données)
+- S'assurer que les données sont dans les bons sous-chemins (le fichier decp.zip permet de vérifier cela)
+- Exécuter tout le code 
 
 ## Détails sur le script
 ### Importation et mise en forme des données 
