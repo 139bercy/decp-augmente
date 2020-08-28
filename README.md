@@ -27,6 +27,7 @@ Pour réaliser la représentation graphique divisée par régions et départemen
 - https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-avec-outre-mer.geojson
 
 ### Webdriver
+Afin d'optimiser l'enrichissement via le code siret/siren, une partie des données sont récupérées via une méthode de scrapping sur le site infogreffe.fr. Pour une partie du code, le fichier exécutable geckodriver.exe est obligatoire. 
 
 
 ## Détails du script
