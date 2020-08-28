@@ -1,7 +1,7 @@
-# decp-projet
-Projet sur les données essentielles de la commande publique
+# PROJET DECP - Données Essentielles de la Commande Publique
 
-## Explication du projet
+## Introduction
+
 
 
 ## Les éléments nécessaires 
@@ -9,7 +9,6 @@ Projet sur les données essentielles de la commande publique
 
 
 ## Détails du script
-
 ### Importation et mise en forme des données 
 - Importation des librairies (certaines ont besoin d’être installées au préalable)
 - Chargement des données JSON puis aplatissement par marchés
