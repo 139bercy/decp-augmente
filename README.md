@@ -87,9 +87,10 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Segmentation de marché : utilisation de la classification par ascendant hiérarchique (CAH) afin de classer les acheteurs dans des clusters (au total 3 clusters principaux + quelques données hors-clusters)
 
 ### Vérification de la qualité des données
-- tilisation de l’algorithme de Luhn pour détecter les SIREN faux
-- Calcul du ratio nb entreprises / nb marchés (avec tous les montants et avec montants>40K)
+- Utilisation de l’algorithme de Luhn pour détecter les SIREN faux
+- Calcul du ratio nb entreprises / nb marchés (avec tous les montants et avec les montants>40K)
 - Récapitulatif de toutes les erreurs supposées répertoriées dans le df_ERROR
+- Calcul et sauvegarde du nombre d'erreurs par commune
 
 ### Réalisation d'un dashboard 
 - Représentation cartographique des données
@@ -97,6 +98,8 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
   - HeatMap des contrats au niveau national
   - Répartition des montants totaux par région
   - Répartition des montants / nb population par département
+- Réalisation de vignettes mettant en avant les chiffres / indicateurs quantitatifs les plus importants
+- Réalisation de nombreux graphiques permettant d'avoir une première approche facile et rapide des données 
 
 ## Règles de décision
 ### Imputation des montants aberrants
