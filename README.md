@@ -11,7 +11,10 @@ Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
 
 ### DATA nécessaires
 #### JSON
-Le fichier des DECP utilisé dans ce projet est en format JSON, il se nomme : 'decp.json'. Ce fichier est mis à jour régulièrement sur le site z
+Le fichier des DECP utilisé dans ce projet est en format JSON, il se nomme : 'decp.json'. Ce fichier est mis à jour régulièrement sur le site de data.gouv : 
+https://www.data.gouv.fr/fr/datasets/fichiers-consolides-des-donnees-essentielles-de-la-commande-publique/
+
+#### CSV
 
 
 
