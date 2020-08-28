@@ -1,17 +1,5 @@
 # PROJET DECP - Données Essentielles de la Commande Publique
 
-![Alt text](H:/Desktop/logoProjetDECP.PNG?raw=true "Title")
-
-# PROJET DECP - Données Essentielles de la Commande Publique
-
-![Screenshot](H:/Desktop/logoProjetDECP.PNG)
-
-<p align="center">
-  <img src="H:/Desktop/logoProjetDECP.PNG" width="350" title="hover text">
-  <img src="H:/Desktop/logoProjetDECP.PNG" width="350" alt="accessibility text">
-</p>
-
-
 ## Description
 
 
