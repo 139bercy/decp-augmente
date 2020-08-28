@@ -1,6 +1,6 @@
 # PROJET DECP - Données Essentielles de la Commande Publique
 
-![alt text](H:/Desktop/logoProjetDECP.PNG)
+![Alt text](H:/Desktop/logoProjetDECP.PNG?raw=true "Title")
 
 ## Description
 
