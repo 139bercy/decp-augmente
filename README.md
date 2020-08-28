@@ -93,10 +93,10 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 
 ### Réalisation d'un dashboard 
 - Représentation cartographique des données
- - Données par commune, information sur le montant total, le nombre de marchés, le nombre d’entreprises, la distance médiane (acheteurs – entreprises) et la segmentation de l’acheteur
- - HeatMap des contrats au niveau national
- - Répartition des montants totaux par région
- - Répartition des montants / nb population par département
+  - Données par commune, information sur le montant total, le nombre de marchés, le nombre d’entreprises, la distance médiane (acheteurs – entreprises) et la segmentation de l’acheteur
+  - HeatMap des contrats au niveau national
+  - Répartition des montants totaux par région
+  - Répartition des montants / nb population par département
 
 ## Règles de décision
 ### Imputation des montants aberrants
