@@ -78,20 +78,13 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 ### Enrichissement des données 
 - Enrichissement des données des acheteurs et des entreprises via le code SIRET/SIREN (et dans le pire des cas grâce à la dénomination sociale des entreprises)
 - Si certains codes SIRET sont déjà identifiés comme faux (lors d’un lancement ultérieur du code) alors ils sont automatiquement supprimés des méthodes d’enrichissement pour gagner du temps
-- 1er enrichissement réalisé avec le code SIRET en mergeant avec une BDD INSEE
-- 2nd enrichissement réalisé avec le code SIREN en mergeant avec une BDD INSEE
+- 1er enrichissement réalisé avec le code SIRET en fusionnant avec une BDD INSEE
+- 2nd enrichissement réalisé avec le code SIREN en fusionnant avec une BDD INSEE
 - 3e enrichissement en utilisant plusieurs méthodes de scraping sur le site INFOGREFFE (en utilisant code SIRET, SIREN, et dénomination sociale)
 - Enrichissement via les codes CPV : identification précise de leur référence via une BDD
-- Ajout de la géolocalisation précise des acheteurs et des entreprises : latitude et longitude de la ville dans laquelle ils sont identifié via les codes SIRET/SIREN
+- Ajout de la géolocalisation précise des acheteurs et des entreprises : latitude et longitude de la ville dans laquelle ils sont identifiés via les codes SIRET/SIREN
 - La géolocalisation précise permet ensuite de calculer la distance entre les acheteurs et les entreprises pour chaque marché (utilisation de la formule de Vincenty avec le rayon moyen de la Terre)
-- Analyse des données
 - Segmentation de marché : utilisation de la classification par ascendant hiérarchique (CAH) afin de classer les acheteurs dans des clusters (au total 3 clusters principaux + quelques données hors-clusters)
-- Représentation cartographique des données
-- Données par commune, information sur le montant total, le nombre de marchés, le nombre d’entreprises, la distance médiane (acheteurs – entreprises) et la segmentation de l’acheteur
-- HeatMap des contrats au niveau national
-- Répartition des montants totaux par région
-- Répartition des montants / nb population par département
- 
 
 ### Vérification de la qualité des données
 - tilisation de l’algorithme de Luhn pour détecter les SIREN faux
@@ -99,7 +92,11 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Récapitulatif de toutes les erreurs supposées répertoriées dans le df_ERROR
 
 ### Réalisation d'un dashboard 
-
+- Représentation cartographique des données
+ - Données par commune, information sur le montant total, le nombre de marchés, le nombre d’entreprises, la distance médiane (acheteurs – entreprises) et la segmentation de l’acheteur
+ - HeatMap des contrats au niveau national
+ - Répartition des montants totaux par région
+ - Répartition des montants / nb population par département
 
 ## Règles de décision
 ### Imputation des montants aberrants
