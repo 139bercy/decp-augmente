@@ -10,7 +10,8 @@ Pour l'instant (28/08/2020) le script est fonctionnel uniquement sur Python 3.7 
 Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
 
 ### Les librairies Python utilisées
-- pandas - numpy
+- pandas 
+- numpy
 - json 
 - os 
 - time
@@ -56,7 +57,7 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Colonnes titulaires et concessionnaires réunies puis traitées ensemble
 - Aplatissement des données par titulaires on obtient alors les données par contrats (relation acheteurs – entreprises), moins de 10% des marchés ont plus de 1 titulaires donc l’impact est faible
 - Suppression des doublons
-- Non prise en charge de la colonne ‘Modification’
+- Non prise en charge de la colonne ‘<b>Modification</b>’
 
 ### Premier traitement – Valorisation 
 - Identification et suppression des montants aberrants (imputés plus tard)
