@@ -72,7 +72,7 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Suppression des caractères spéciaux et alphabétique dans les codes SIRET pour tenter de les récupérer
 - Création de deux colonnes permettant d’attribuer précisément une région et un département à chaque marché (localisation générale des acheteurs)
 - Mise en forme et correction des données temporelles (date/durée)
-- Imputation des montants en utilisant la médiane stratifiée (le plus possible), et création d’une colonne permettant d’identifier les montants imputés
+- Imputation des montants en utilisant la médiane stratifiée (le plus possible : Région, code CPV, forme du marché), et création d’une colonne permettant d’identifier les montants imputés
 - Identification et rectification des durées (en mois) exprimées en jours
 
 ### Enrichissement des données 
@@ -103,7 +103,17 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 
 ## Règles de décision
 ### Imputation des montants aberrants
-
+Les montants corrigés sont ceux :
+- manquants
+- inférieurs à 200€ 
+- supérieurs à 999 000 000€
 
 ### Imputation des durées exprimées en jours
-
+Les durées corrigées sont celles dont la durée est :
+- manquante
+- égale au montant
+- montant / durée < 100 
+- montant / durée < 1000 pour une durée > 12 
+- duréee == 30 ou 31 et montant < 200 000
+- duréee == 360 ou 365 ou 366 et montant < 10 000 000
+- durée > 120 et montant < 2 000 000
