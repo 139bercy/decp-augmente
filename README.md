@@ -110,14 +110,14 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Réalisation de <b>vignettes</b> mettant en avant les chiffres / indicateurs quantitatifs les plus importants
 - Réalisation de nombreux <b>graphiques</b> permettant d'avoir une première approche facile et rapide des données 
 
-## Règles de décision
-### Imputation des montants aberrants
+## Règles d'imputations
+### Montants aberrants
 Les montants corrigés sont ceux :
 - manquants
 - inférieurs à <b>200€</b> 
 - supérieurs à <b>999 000 000€</b>
 
-### Imputation des durées exprimées en jours
+### Durées exprimées en jours
 Les durées corrigées sont celles :
 - manquantes
 - durée égale au montant
