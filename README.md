@@ -9,7 +9,7 @@
 Pour l'instant (28/08/2020) le script est fonctionnel uniquement sur Python 3.7 et Spyder 3.3.6.
 Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
 
-### DATA nécessaires
+### Données
 #### JSON
 Le fichier des DECP utilisé dans ce projet est en format JSON, il se nomme : 'decp.json'. Ce fichier est mis à jour régulièrement sur le site de data.gouv : 
 https://www.data.gouv.fr/fr/datasets/fichiers-consolides-des-donnees-essentielles-de-la-commande-publique/
@@ -30,7 +30,7 @@ Pour réaliser la représentation graphique divisée par régions et départemen
 Afin d'optimiser l'enrichissement via le code siret/siren, une partie des données sont récupérées via une méthode de scrapping sur le site infogreffe.fr. Pour une partie du code, le fichier exécutable geckodriver.exe est obligatoire. 
 
 
-## Détails du script
+## Détails sur le script
 ### Importation et mise en forme des données 
 - Importation des librairies (certaines ont besoin d’être installées au préalable)
 - Chargement des données JSON puis aplatissement par marchés
