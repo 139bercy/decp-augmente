@@ -16,13 +16,15 @@ https://www.data.gouv.fr/fr/datasets/fichiers-consolides-des-donnees-essentielle
 
 #### CSV
 Plusieurs données sous format csv - xlsx sont nécessaires afin d'enrichir les données :
-- code-insee-postaux-geoflar.csv : Pour ajouter l
-- cpv_2008_ver_2013.xlsx :
-- departements-francais.csv :
-- StockEtablissement_utf8.csv :
+- code-insee-postaux-geoflar.csv : https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/export/?flg=fr
+- cpv_2008_ver_2013.xlsx : https://simap.ted.europa.eu/fr/web/simap/cpv
+- departements-francais.csv : https://www.regions-et-departements.fr/departements-francais
+- StockEtablissement_utf8.csv : https://www.data.gouv.fr/fr/datasets/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/
 
 #### GEOJSON
-
+Pour réaliser la représentation graphique divisée par régions et départements, certaines donneés en geojson sont récupérées directement via leur URL.
+- https://france-geojson.gregoiredavid.fr/repo/regions.geojson
+- https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-avec-outre-mer.geojson
 
 ### Webdriver
 
