@@ -10,13 +10,6 @@ Pour l'instant (28/08/2020) le script est fonctionnel uniquement sur Python 3.7 
 Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
 
 ### Les librairies Python utilisées
-
-| ------------- |: -------------: | ---------: |
-| pandas      |        os        |      lxml |
-| numpy       |        time        |      requests |
-| json      |        tqdm        |      selenium |
-| ------------- |: -------------: | ---------: |
-
 - pandas 
 - numpy
 - json 
