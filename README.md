@@ -3,6 +3,9 @@
 ## Introduction
 
 
+## TO DO
+
+
 
 ## Les éléments nécessaires 
 ### Version
@@ -94,4 +97,11 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Récapitulatif de toutes les erreurs supposées répertoriées dans le df_ERROR
 
 ### Réalisation d'un dashboard 
+
+
+## Règles de décision
+### Imputation des montants aberrants
+
+
+### Imputation des durées exprimées en jours
 
