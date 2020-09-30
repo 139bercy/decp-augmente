@@ -1,0 +1,10 @@
+pandas
+numpy
+lxml
+requests
+selenium
+scikit-learn
+scipy
+matplotlib
+folium
+tqdm
