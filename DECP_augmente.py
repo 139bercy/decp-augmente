@@ -19,6 +19,7 @@ import numpy as np
 import json
 import os
 import time
+import pickle
 from tqdm import tqdm 
 
 from lxml import html
@@ -36,8 +37,9 @@ import folium
 from folium.plugins import MarkerCluster
 from folium.plugins import HeatMap
 from folium import plugins
+
 ######################################################################
-import pickle
+
 #import warnings
 #warnings.filterwarnings("ignore")
 ######################################################################
