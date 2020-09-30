@@ -669,9 +669,9 @@ del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup1:
   pickle.dump(df, df_backup1)
-#with open('config.dictionary', 'rb') as df_backup1:
-#    df_backup1 = pickle.load(df_backup1)
-#df = pd.DataFrame.copy(df_backup1, deep = True)
+with open('config.dictionary', 'rb') as df_backup1:
+    df_backup1 = pickle.load(df_backup1)
+df = pd.DataFrame.copy(df_backup1, deep = True)
 ######################################################################
 ######################################################################
 
@@ -681,7 +681,7 @@ with open('config.dictionary', 'wb') as df_backup1:
 ######################################################################
 ######## Enrichissement des données via les codes siret/siren ########
 ### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
-dfAcheteurId = df[['acheteur.id']]; dfAcheteurId.columns = ['siret']
+dfAcheteurId = df['acheteurId']; dfAcheteurId.columns = ['siret']
 dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
 dfAcheteurId.reset_index(inplace=True, drop=True) 
 dfAcheteurId.siret = dfAcheteurId.siret.astype(str)
@@ -789,12 +789,17 @@ df['nature'] = df['nature'].str.upper()
 ######################################################################
 with open('config.dictionary', 'wb') as df_backup2:
   pickle.dump(df, df_backup2)
-#with open('config.dictionary', 'rb') as df_backup2:
-#    df_backup2 = pickle.load(df_backup2)
-#df_decp = pd.DataFrame.copy(df_backup2, deep = True)
+with open('config.dictionary', 'rb') as df_backup2:
+    df_backup2 = pickle.load(df_backup2)
+df_decp = pd.DataFrame.copy(df_backup2, deep = True)
 ######################################################################
 ######################################################################
 df_decp = pd.DataFrame.copy(df, deep = True)
+
+compression_opts = dict(method='zip',
+                        archive_name='out.csv')  
+df_decp.to_csv('out.zip', index=False,
+          compression=compression_opts)  
 
 del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1, 
      detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee, 
@@ -844,9 +849,13 @@ df_villes.longitude = df_villes.longitude.astype(float)
 ################################# Ajout au dataframe principal
 # Ajout pour les acheteurs
 df_villes.columns = ['codeCommuneAcheteur', 'populationAcheteur', 'superficieAcheteur', 'latitudeAcheteur','longitudeAcheteur']
+df_decp.codeCommuneAcheteur = df_decp.codeCommuneAcheteur.astype(object)
+df_villes.codeCommuneAcheteur = df_villes.codeCommuneAcheteur.astype(object)
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneAcheteur')
 # Ajout pour les etablissement
 df_villes.columns = ['codeCommuneEtablissement', 'populationEtablissement', 'superficieEtablissement', 'latitudeEtablissement','longitudeEtablissement']
+df_decp.codeCommuneEtablissement = df_decp.codeCommuneEtablissement.astype(object)
+df_villes.codeCommuneEtablissement = df_villes.codeCommuneEtablissement.astype(object)
 df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
 del df_villes
 ########### Calcul de la distance entre l'acheteur et l'etablissement
