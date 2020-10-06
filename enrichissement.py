@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
-import tqdm
 import time
 import requests
 import urllib
 
+from tqdm import tqdm
 from lxml import html
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -28,6 +28,7 @@ with open("config.json") as f:
 path_to_data = conf["path_to_data"]
 error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
+
 
 def main():
 
@@ -133,8 +134,8 @@ def enrichissement_siret(df):
     del resultTemp, gm_chunk
 
     result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
-    myList = list(result2.columns);
-    myList[2] = 'denominationSociale';
+    myList = list(result2.columns)
+    myList[2] = 'denominationSociale'
     result2.columns = myList
     del dfSIRET['denominationSociale_y']
     dfSIRET.columns = myList
@@ -174,7 +175,7 @@ def enrichissement_siret(df):
                 scrap = get_scrap_dataframe(i, nanSiren.siren[i])
                 df_scrap = pd.concat([df_scrap, scrap], axis=0)
             except:
-                scrap = pd.DataFrame([i, ' ', ' ', ' ', ' ', ' ', ' ', False]).T;
+                scrap = pd.DataFrame([i, ' ', ' ', ' ', ' ', ' ', ' ', False]).T
                 scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType',
                                  'SIRETisMatched']
                 df_scrap = pd.concat([df_scrap, scrap], axis=0)
@@ -231,17 +232,17 @@ def enrichissement_siret(df):
             detailsType2 = details[29]
             SIRETisMatched = (siret == dfDS.siret[i])
             if (detailsType1 == ' '):
-                detailType = detailsType2
+                detailsType = detailsType2
             else:
                 detailsType = detailsType1
 
-            scrap2 = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T;
+            scrap2 = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
             scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType',
                               'SIRETisMatched']
             df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
         except:
             index = i
-            scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T;
+            scrap2 = pd.DataFrame([index, ' ', ' ', ' ', ' ', ' ', ' ', False]).T
             scrap2.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType',
                               'SIRETisMatched']
             df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
@@ -257,8 +258,8 @@ def enrichissement_siret(df):
     ### Enregistrement des entreprises n'ayant aucune correspondance
     errorSIRET = resultat[
         (resultat.siret_y == '') | (resultat.siret_y == '') | (resultat.siret_y == ' ') | (resultat.siret_y.isnull())]
-    errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']];
-    errorSIRET.columns = ['siret', 'siren', 'denominationSociale'];
+    errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]
+    errorSIRET.columns = ['siret', 'siren', 'denominationSociale']
     errorSIRET.reset_index(inplace=True, drop=True)
     errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0)
     errorSIRET = errorSIRET.drop_duplicates(subset=['siret', 'siren', 'denominationSociale'], keep='first')
@@ -456,7 +457,7 @@ def enrichissement_acheteur(df):
     ######################################################################
     ######## Enrichissement des données via les codes siret/siren ########
     ### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
-    dfAcheteurId = df['acheteurId'];
+    dfAcheteurId = df['acheteurId']
     dfAcheteurId.columns = ['siret']
     dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
     dfAcheteurId.reset_index(inplace=True, drop=True)
@@ -488,10 +489,10 @@ def enrichissement_acheteur(df):
         resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siren")
         result2 = pd.concat([result2, resultTemp], axis=0)
     result2 = result2.drop_duplicates(subset=['siren'], keep='first')
-    siret = pd.DataFrame(result['siret']);
+    siret = pd.DataFrame(result['siret'])
     siret.columns = ['s']
     result2 = pd.merge(result2, siret, how='outer', left_on='siret', right_on='s')
-    result2 = result2[result2.s.isnull()];
+    result2 = result2[result2.s.isnull()]
     del result2['s']
 
     dfManquant = pd.merge(dfAcheteurId, result, how='outer', on='siret')
@@ -787,14 +788,14 @@ def CAH(df):
     # On créé une 4e catégorie avec toutes les valeurs seules
     df.reset_index(inplace=True)
     a = pd.DataFrame(df.groupby('segmentation_CAH')['index'].nunique())
-    a.reset_index(inplace=True);
+    a.reset_index(inplace=True)
     a.columns = ['cluster', 'nb']
     a = a.sort_values(by='nb', axis=0, ascending=False)
     a.reset_index(inplace=True, drop=True)
-    a = a.drop([0, 1, 2]);
+    a = a.drop([0, 1, 2])
     a = list(a.cluster)
     # On remplace
-    df['segmentation_CAH'] = df['segmentation_CAH'].replace(a, 0);
+    df['segmentation_CAH'] = df['segmentation_CAH'].replace(a, 0)
     df.segmentation_CAH = df.segmentation_CAH.astype(int)
 
     # Changement / TRI des clusters
@@ -802,7 +803,7 @@ def CAH(df):
     cahORDER = cahORDER.sort_values(by='montantTotal')
     cahORDER = cahORDER[cahORDER.segmentation_CAH != 0]
     l = ['0'] + list(cahORDER.segmentation_CAH.unique())
-    k = [0, 1, 2, 3];
+    k = [0, 1, 2, 3]
     listCorrespondance = {x: y for x, y in zip(k, l)}
     for word, initial in listCorrespondance.items():
         df['segmentation_CAH'] = np.where(df['segmentation_CAH'] == initial, word, df['segmentation_CAH'])
@@ -854,16 +855,16 @@ def carte(df):
     ### Carte des DECP
     geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
     df_Reg = df.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
-    df_Reg.columns = ['code', 'montant'];
+    df_Reg.columns = ['code', 'montant']
     df_Reg = df_Reg[(df_Reg.code != 'nan') & (df_Reg.code != '98')]
     df_Reg.montant = round(df_Reg.montant / 1000000, 0).astype(int)
     df_Reg.montant = np.where(df_Reg.montant > 10000, 10000, df_Reg.montant)
 
     depPop = pd.read_csv("dataEnrichissement/departements-francais.csv", sep='\t', encoding='utf-8',
                          usecols=['NUMÉRO', 'POPULATION'])
-    depPop.columns = ['code', 'population'];
-    depPop.code = depPop.code.astype(str);
-    depPop = depPop[depPop.population.notnull()];
+    depPop.columns = ['code', 'population']
+    depPop.code = depPop.code.astype(str)
+    depPop = depPop[depPop.population.notnull()]
     depPop.population = depPop.population.astype(int)
     for i in range(len(depPop)):
         if len(depPop['code'][i]) < 2:
@@ -872,9 +873,9 @@ def carte(df):
     geojson2 = json.loads(urllib.request.urlopen(
         'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-avec-outre-mer.geojson').read())
     df_Dep = df.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
-    df_Dep.columns = ['code', 'montant'];
+    df_Dep.columns = ['code', 'montant']
     df_Dep = df_Dep[(df_Dep.code != 'nan')]
-    df_Dep = pd.merge(df_Dep, depPop, how='left', on='code');
+    df_Dep = pd.merge(df_Dep, depPop, how='left', on='code')
     df_Dep = df_Dep[df_Dep.population.notnull()]
     df_Dep.montant = round(df_Dep.montant / df_Dep.population, 0).astype(int)
     del df_Dep['population']
