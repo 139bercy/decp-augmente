@@ -1,9 +1,54 @@
+import os
+import json
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import pickle
+import tqdm
+import time
+import requests
+import urllib
+
+from lxml import html
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.firefox.options import Options
+
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+
+import folium
+from folium.plugins import MarkerCluster
+from folium.plugins import HeatMap
+from folium import plugins
+
+
+with open("config.json") as f:
+    conf = json.load(f)
+path_to_data = conf["path_to_data"]
+error_siret_file = conf["error_siret_file_name"]
+siren_len = 9
 
 def main():
+
     with open('df_nettoye', 'rb') as df_nettoye:
-        df_nettoye = pickle.load(df_nettoye)
+        df = pickle.load(df_nettoye)
+
+    df = enrichissement_siret(df)
+
+    df = enrichissement_cpv(df)
+
+    df = enrichissement_acheteur(df)
+
+    df = reorganisation(df)
+
+    df = enrichissement_geo(df)
+
+    df = segmentation(df)
+
+
+def enrichissement_siret(df):
+
     ######## Enrichissement des données via les codes siret/siren ########
     ### Utilisation d'un autre data frame pour traiter les Siret unique
 
@@ -25,10 +70,12 @@ def main():
 
     ######################################################################
     ### On supprime les siret déjà identifié comme faux
-    path = os.path.join(path_to_data, error_siret_file_name)
+    path = os.path.join(path_to_data, error_siret_file)
 
     try:
-        archiveErrorSIRET = pd.read_csv(path, sep=';', encoding='utf-8',
+        archiveErrorSIRET = pd.read_csv(path,
+                                        sep=';',
+                                        encoding='utf-8',
                                         dtype={
                                             'siren': str,
                                             'siret': str,
@@ -36,11 +83,10 @@ def main():
         dfSIRET = pd.merge(dfSIRET, archiveErrorSIRET, how='outer', indicator='source')
         dfSIRET = dfSIRET[dfSIRET.source.eq('left_only')].drop('source', axis=1)
         dfSIRET.reset_index(inplace=True, drop=True)
-        print('Erreurs archivées supprimées')
+        print('Erreurs archivées non trouvées')
     except:
         archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
         print('Aucune archive d\'erreur')
-        pass
 
     ######################################################################
     # StockEtablissement_utf8
@@ -116,48 +162,6 @@ def main():
         'SIRETisMatched']
 
 
-    def get_scrap_dataframe(index, code):
-        url = 'https://www.infogreffe.fr/entreprise-societe/' + code
-
-        page = requests.get(url)
-        tree = html.fromstring(page.content)
-
-        rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
-        infos = tree.xpath('//p/text()')
-        details = tree.xpath('//a/text()')
-
-        rue = rueSiret[1]
-        siret = rueSiret[5].replace(" ", "")
-        ville = infos[7]
-        typeEntreprise = infos[15]
-        codeType = infos[16].replace(" : ", "")
-        detailsType1 = details[28]
-        detailsType2 = details[29]
-
-        if len(code) == 9:
-            SIRETisMatched = siret[:9] == code
-        else:
-            SIRETisMatched = siret == code
-
-        if (detailsType1 == ' '):
-            detailsType = detailsType2
-        else:
-            detailsType = detailsType1
-
-        if not SIRETisMatched:
-            codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
-            infos = tree.xpath('//span[@class="data"]/text()')
-
-            rue = infos[8]
-            siret = codeSiret[0].replace(" ", "")
-            ville = infos[9].replace(",\xa0", "")
-            typeEntreprise = infos[4]
-            detailsType = infos[11]
-            SIRETisMatched = (siret == code)
-
-        scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
-        scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
-        return scrap
 
 
     df_scrap = pd.DataFrame(columns=columns)
@@ -375,6 +379,52 @@ def main():
 
     del df['CPV_min'], df['uid'], df['uuid']
 
+
+def get_scrap_dataframe(index, code):
+    url = 'https://www.infogreffe.fr/entreprise-societe/' + code
+
+    page = requests.get(url)
+    tree = html.fromstring(page.content)
+
+    rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
+    infos = tree.xpath('//p/text()')
+    details = tree.xpath('//a/text()')
+
+    rue = rueSiret[1]
+    siret = rueSiret[5].replace(" ", "")
+    ville = infos[7]
+    typeEntreprise = infos[15]
+    codeType = infos[16].replace(" : ", "")
+    detailsType1 = details[28]
+    detailsType2 = details[29]
+
+    if len(code) == 9:
+        SIRETisMatched = siret[:9] == code
+    else:
+        SIRETisMatched = siret == code
+
+    if (detailsType1 == ' '):
+        detailsType = detailsType2
+    else:
+        detailsType = detailsType1
+
+    if not SIRETisMatched:
+        codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
+        infos = tree.xpath('//span[@class="data"]/text()')
+
+        rue = infos[8]
+        siret = codeSiret[0].replace(" ", "")
+        ville = infos[9].replace(",\xa0", "")
+        typeEntreprise = infos[4]
+        detailsType = infos[11]
+        SIRETisMatched = (siret == code)
+
+    scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
+    scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
+    return scrap
+
+
+def enrichissement_cpv(df):
     ######################################################################
     ################### Enrichissement avec le code CPV ##################
     ######################################################################
@@ -390,7 +440,6 @@ def main():
     df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
-    del df['CODE'], df['CODEmin'], df['FR2'], refCPV, refCPV_min, i
 
     ######################################################################
     ######################################################################
@@ -399,6 +448,9 @@ def main():
     with open('config.dictionary', 'rb') as df_backup1:
         df_backup1 = pickle.load(df_backup1)
     df = pd.DataFrame.copy(df_backup1, deep=True)
+
+
+def enrichissement_acheteur(df):
     ######################################################################
     ############## Enrichissement des données des acheteurs ##############
     ######################################################################
@@ -459,6 +511,8 @@ def main():
 
     del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
 
+
+def reorganisation(df):
     ######################################################################
     ######################################################################
     # Ajustement de certaines colonnes
@@ -536,12 +590,8 @@ def main():
     df_decp.to_csv('out.zip', index=False,
                    compression=compression_opts)
 
-    del [archiveErrorSIRET, codeType, detailType, details, detailsType, detailsType1,
-         detailsType2, dfDS, df_scrap2, dfenrichissement, enrichissementInsee,
-         enrichissementScrap, errorSIRET, index, infos, listCorrespondance,
-         listeCP, listeReg, resultat, resultatScrap1, resultatScrap2, rue, rueSiret,
-         scrap2, typeEntreprise, url, SIRETisMatched, ville, df]
 
+def enrichissement_geo(df):
     ######################################################################
     ######## Enrichissement latitude & longitude avec adresse la ville
     df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',
@@ -581,9 +631,9 @@ def main():
     # Ajout pour les acheteurs
     df_villes.columns = ['codeCommuneAcheteur', 'populationAcheteur', 'superficieAcheteur', 'latitudeAcheteur',
                          'longitudeAcheteur']
-    df_decp.codeCommuneAcheteur = df_decp.codeCommuneAcheteur.astype(object)
+    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df_villes.codeCommuneAcheteur = df_villes.codeCommuneAcheteur.astype(object)
-    df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneAcheteur')
+    df_decp = pd.merge(df, df_villes, how='left', on='codeCommuneAcheteur')
     # Ajout pour les etablissement
     df_villes.columns = ['codeCommuneEtablissement', 'populationEtablissement', 'superficieEtablissement',
                          'latitudeEtablissement', 'longitudeEtablissement']
@@ -635,11 +685,13 @@ def main():
                                             df_decp['geomEtablissement'])
     df_decp.reset_index(inplace=True, drop=True)
 
+
+def segmentation(df):
     ###############################################################################
     ############################ Segmentation de marché ###########################
     ###############################################################################
     # ... Créer une bdd par villes (acheteur/client)
-    dfBIN = df_decp[['type', 'nature', 'procedure', 'lieuExecutionTypeCode']]
+    dfBIN = df[['type', 'nature', 'procedure', 'lieuExecutionTypeCode']]
     # Arrangement du code du lieu d'exécution
     dfBIN['lieuExecutionTypeCode'] = np.where(dfBIN['lieuExecutionTypeCode'] == 'CODE ARRONDISSEMENT',
                                               'CODE DEPARTEMENT', dfBIN['lieuExecutionTypeCode'])
@@ -659,7 +711,7 @@ def main():
     dfBIN = binateur(dfBIN, dfBIN.columns)
 
     # ... Selection des variables quantitatives + nom de la commune
-    dfNoBin = df_decp[
+    dfNoBin = df[
         ['libelleCommuneAcheteur', 'montant', 'dureeMois', 'dureeMoisCalculee', 'distanceAcheteurEtablissement']]
     # Création d'une seule colonne pour la durée du marché
     dfNoBin['duree'] = round(dfNoBin.dureeMoisCalculee, 0)
@@ -671,7 +723,6 @@ def main():
 
     # On obtient alors notre df prêt sans variables qualitatives (sauf libellé)
     df = dfNoBin.join(dfBIN)
-    del dfNoBin, dfBIN
     df = df[df['libelleCommuneAcheteur'].notnull()]
     df['nbContrats'] = 1  # Trouver autre solution
     df = df.groupby(['libelleCommuneAcheteur']).sum().reset_index()
@@ -694,7 +745,6 @@ def main():
                 'lieuExecutionTypeCode_CODE REGION']
     for x in ensemble:
         df[x] = df[x] / df['nbContrats']
-    del ensemble, x
 
     # ... Duree, montant et distance moyenne par ville (par rapport au nb de contrats)
     df.distanceAcheteurEtablissement = round(df.distanceAcheteurEtablissement / df['nbContrats'], 0)
@@ -711,19 +761,20 @@ def main():
 
     # ... Mettre les valeurs sur une même unité de mesure
     df_nom = pd.DataFrame(df.libelleCommuneAcheteur)
-    del df['libelleCommuneAcheteur']
     scaler = StandardScaler()
     scaled_df = scaler.fit_transform(df)
 
     # ... On réassemble le df
     df = df_nom.join(df)
-    del df_nom
+    return df
 
+
+def CAH(df):
     ###############################################################################
     ### Application de l'algorithme de classification ascendante hiérarchique - CAH
     ############ Avec les données normalisée
     # Générer la matrice des liens
-    Z = linkage(scaled_df, method='ward', metric='euclidean')
+    Z = linkage(df, method='ward', metric='euclidean')
     # Dendrogramme
     plt.title('CAH avec matérialisation des X classes')
     dendrogram(Z, labels=df.index, orientation='left', color_threshold=65)
@@ -732,7 +783,6 @@ def main():
     groupes_cah = pd.DataFrame(fcluster(Z, t=65, criterion='distance'), columns=['segmentation_CAH'])
     ### Ajout au df
     df = df.join(groupes_cah)
-    del Z, groupes_cah, scaled_df
 
     # On créé une 4e catégorie avec toutes les valeurs seules
     df.reset_index(inplace=True)
@@ -745,7 +795,6 @@ def main():
     a = list(a.cluster)
     # On remplace
     df['segmentation_CAH'] = df['segmentation_CAH'].replace(a, 0);
-    del a
     df.segmentation_CAH = df.segmentation_CAH.astype(int)
 
     # Changement / TRI des clusters
@@ -761,27 +810,29 @@ def main():
 
     # On ajoute au dataframe principal
     df = df[['libelleCommuneAcheteur', 'segmentation_CAH']]
-    df_decp = pd.merge(df_decp, df, how='left', on='libelleCommuneAcheteur')
+    df_decp = pd.merge(df, df, how='left', on='libelleCommuneAcheteur')
     df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
     df_decp.segmentation_CAH = df_decp.segmentation_CAH.astype(int)
 
+
+def carte(df):
     ###############################################################################
     ############........ CARTE DES MARCHES PAR VILLE
-    df_carte = df_decp[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
+    df_carte = df[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
     df_carte = df_carte[df_carte['latitudeAcheteur'] != 'nan']
     df_carte = df_carte[df_carte['longitudeAcheteur'] != 'nan']
     df_carte = df_carte.drop_duplicates(subset=['latitudeAcheteur', 'longitudeAcheteur'], keep='first')
     df_carte.reset_index(inplace=True, drop=True)
 
-    dfMT = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().to_frame(
+    dfMT = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.sum().to_frame(
         'montantTotal').reset_index()
-    dfMM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame(
+    dfMM = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).montant.mean().to_frame(
         'montantMoyen').reset_index()
-    dfIN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame(
+    dfIN = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).identifiantMarche.nunique().to_frame(
         'nbMarches').reset_index()
-    dfSN = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame(
+    dfSN = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).siretEtablissement.nunique().to_frame(
         'nbEntreprises').reset_index()
-    dfDM = df_decp.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame(
+    dfDM = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame(
         'distanceMediane').reset_index()
 
     df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
@@ -802,7 +853,7 @@ def main():
     ###############################################################################
     ### Carte des DECP
     geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
-    df_Reg = df_decp.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+    df_Reg = df.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
     df_Reg.columns = ['code', 'montant'];
     df_Reg = df_Reg[(df_Reg.code != 'nan') & (df_Reg.code != '98')]
     df_Reg.montant = round(df_Reg.montant / 1000000, 0).astype(int)
@@ -820,7 +871,7 @@ def main():
 
     geojson2 = json.loads(urllib.request.urlopen(
         'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-avec-outre-mer.geojson').read())
-    df_Dep = df_decp.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
+    df_Dep = df.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
     df_Dep.columns = ['code', 'montant'];
     df_Dep = df_Dep[(df_Dep.code != 'nan')]
     df_Dep = pd.merge(df_Dep, depPop, how='left', on='code');
@@ -829,7 +880,7 @@ def main():
     del df_Dep['population']
     df_Dep.montant = np.where(df_Dep.montant > 2000, 2000, df_Dep.montant)
 
-    dfHM = df_decp[['latitudeAcheteur', 'longitudeAcheteur']]
+    dfHM = df[['latitudeAcheteur', 'longitudeAcheteur']]
     dfHM = dfHM[(dfHM.latitudeAcheteur != 'nan') | (dfHM.longitudeAcheteur != 'nan')]
 
     ### Mise en forme
@@ -861,15 +912,15 @@ def main():
             icon = folium.features.CustomIcon(
                 'https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png',
                 icon_size=(
-                max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
+                    max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
         elif (df_carte.segmentation_CAH[i] == 3):
             icon = folium.features.CustomIcon(
                 'https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced',
                 icon_size=(
-                max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
+                    max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
         else:
             icon = folium.features.CustomIcon('https://svgsilh.com/svg/157354.svg', icon_size=(
-            max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
+                max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
 
         folium.Marker([df_carte.latitudeAcheteur[i], df_carte.longitudeAcheteur[i]],
                       icon=icon,
