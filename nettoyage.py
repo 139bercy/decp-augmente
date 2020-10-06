@@ -1,9 +1,8 @@
 import json
 import os
-import pickle
-
 import numpy as np
 import pandas as pd
+import pickle
 
 from pandas import json_normalize
 
@@ -34,7 +33,7 @@ def main():
 
     df = manage_date(df)
 
-    df = data_inputation(df)
+    #df = data_inputation(df)
 
     ### Rectification des durées en mois aberrantes
     df = correct_date(df)
@@ -47,8 +46,8 @@ def main():
 def manage_titulaires(df):
 
     # Gestion différences concessionnaires / titulaires
-    df.titulaires = np.where(df.titulaires.isnull(), df.concessionnaires, df.titulaires)
-    df.montant = np.where(df.montant.isnull(), df.valeurGlobale, df.montant)
+    df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
+    df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
     donneesInutiles = ['dateSignature', 'dateDebutExecution',  'valeurGlobale', 'donneesExecution', 'concessionnaires',
@@ -56,7 +55,7 @@ def manage_titulaires(df):
     df.drop(columns=donneesInutiles, inplace=True)
 
     # Récupération des données titulaires
-    df.titulaires.fillna('0', inplace=True)
+    df["titulaires"].fillna('0', inplace=True)
     dfO = df[df['titulaires'] == '0']
     df = df[df['titulaires'] != '0']
 
@@ -112,8 +111,8 @@ def manage_montant(df):
 
 
 def manage_missing_code(df):
-    df.id = np.where(df.id.isnull(), '0000000000000000', df.id)
-    df.codeCPV = np.where(df.codeCPV.isnull(), '00000000', df.codeCPV)
+    df.id = np.where(df["id"].isnull(), '0000000000000000', df.id)
+    df.codeCPV = np.where(df["codeCPV"].isnull(), '00000000', df.codeCPV)
 
     # Nettoyage des codes idTitulaires
     caracteres_speciaux_dict = {
@@ -131,14 +130,15 @@ def manage_missing_code(df):
 
     ########  Récupération code NIC
     df.idTitulaires = df.idTitulaires.astype(str)
-    df['nic'] = df.idTitulaires.str[-5:]
+    df['nic'] = df["idTitulaires"].str[-5:]
 
-    df.loc[~df["nic"].str.isdigit()] = np.NaN
+    #df.loc[~df["nic"].str.isdigit()] = np.NaN
+    df.nic = np.where(~df["nic"].str.isdigit(), np.NaN, df.nic)
+    df['nic'] = df.nic.astype(str)
 
     ######## Gestion code CPV
     df.codeCPV = df.codeCPV.astype(str)
-    df["CPV_min"] = df.codeCPV.str[:2]
-    df['nic'] = df.nic.astype(str)
+    df["CPV_min"] = df["codeCPV"].str[:2]
 
     # Mise en forme des données vides
     df.denominationSociale = np.where(
@@ -320,8 +320,7 @@ def data_inputation(df):
 
 def correct_date(df):
     # On cherche les éventuelles erreurs mois -> jours
-    df['dureeMoisEstime'] = np.where(
-        (df['montant'] == df['dureeMois'])
+    mask = ((df['montant'] == df['dureeMois'])
         | (df['montant'] / df['dureeMois'] < 100)
         | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
         | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
@@ -329,25 +328,17 @@ def correct_date(df):
         | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
         | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
         | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)),
-        "Oui", "Non")
+        | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
+
+    df['dureeMoisEstime'] = np.where(mask, "Oui", "Non")
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
-    df['dureeMoisCalculee'] = np.where(df['dureeMoisEstime'] == "Oui", round(df['dureeMois'] / 30, 0), df['dureeMois'])
+    df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
     # Comme certaines valeurs atteignent zero, on remplace par un mois
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
 
     # Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
-    df['dureeMoisCalculee'] = np.where(
-        (df['montant'] / df['dureeMois'] < 100)
-        | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
-        | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
-        | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
-        | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)),
-        1, df.dureeMoisCalculee)
+    df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
 
     return df
 
