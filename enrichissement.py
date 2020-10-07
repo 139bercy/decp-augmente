@@ -60,7 +60,6 @@ def enrichissement_siret(df):
 
     dfSIRET["idTitulaires"] = np.where(~dfSIRET["idTitulaires"].str.isdigit(), '00000000000000', dfSIRET.idTitulaires)
 
-    del dfSIRET['index']
     dfSIRET.reset_index(inplace=True, drop=True)
 
     dfSIRET.rename(columns={
@@ -111,16 +110,11 @@ def enrichissement_siret(df):
         resultTemp = pd.merge(dfSIRET, gm_chunk, on=['siret'])
         result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
-    del resultTemp, gm_chunk
 
-    del result['siren_x'], result['siren_y']
     dfSIRET = pd.merge(dfSIRET, result, how='outer', on=['siret'])
     nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
     dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
     nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale_x"]]
-
-    # %%
-    print("hello")
 
     # %%
     result2 = pd.DataFrame(columns)
@@ -130,14 +124,11 @@ def enrichissement_siret(df):
         result2 = pd.concat([result2, resultTemp], axis=0)
 
     result2 = result2.drop_duplicates(subset=['siren'], keep='first')
-    del result2['siret_x'], result2['siret_y'], result2['denominationSociale_x']
-    del resultTemp, gm_chunk
 
     result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
     myList = list(result2.columns)
     myList[2] = 'denominationSociale'
     result2.columns = myList
-    del dfSIRET['denominationSociale_y']
     dfSIRET.columns = myList
 
     ######## Merge des deux resultats
@@ -149,7 +140,6 @@ def enrichissement_siret(df):
     nanSiren = nanSiren.iloc[:, :3]
     nanSiren.columns = ['siret', 'siren', 'denominationSociale']
     nanSiren.reset_index(inplace=True, drop=True)
-    del dfSIRET, nanSiret, result, result2, myList
 
     # ....... Solution complémentaire pour ceux non-identifié dans la BDD
     columns = [
@@ -161,9 +151,6 @@ def enrichissement_siret(df):
         'codeType',
         'detailsType',
         'SIRETisMatched']
-
-
-
 
     df_scrap = pd.DataFrame(columns=columns)
     for i in tqdm(range(len(nanSiren))):
@@ -192,8 +179,6 @@ def enrichissement_siret(df):
     dfDS.columns = ['siret', 'siren', 'denominationSociale']
     dfDS.reset_index(inplace=True, drop=True)
 
-
-    # del codeSiret, codeType, detailType, details, detailsType, detailsType1, detailsType2, i, index, infos, rue, rueSiret, scrap, siret, typeEntreprise, url, SIRETisMatched, ville, df_scrap, nanSiren, resultat
 
     ######################################################################
     def requete(nom):
@@ -268,7 +253,6 @@ def enrichissement_siret(df):
 
     # On réuni les résultats du scraping
     enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
-    del enrichissementScrap['index'], enrichissementScrap['siret_y'], enrichissementScrap['SIRETisMatched']
 
     ############ Arrangement des colonnes
     # Gestion bdd insee
@@ -322,8 +306,6 @@ def enrichissement_siret(df):
         'rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
     enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee[
         'activitePrincipaleEtablissement'].str.replace(".", "")
-    del enrichissementInsee['typeVoieEtablissement'], enrichissementInsee['libelleVoieEtablissement'], enrichissementInsee[
-        'nic'], enrichissementInsee['nomenclatureActivitePrincipaleEtablissement']
 
     # Gestion bdd scrap
     enrichissementScrap.reset_index(inplace=True, drop=True)
@@ -336,7 +318,6 @@ def enrichissement_siret(df):
     enrichissementScrap["codePostal"] = enrichissementScrap.ville.str[0:7]
     enrichissementScrap["codePostal"] = enrichissementScrap["codePostal"].str.replace(" ", "")
     enrichissementScrap["commune"] = enrichissementScrap.ville.str[7:]
-    del enrichissementScrap['ville'], enrichissementScrap['typeEntreprise'], enrichissementScrap['detailsType']
 
     # Renomme les colonnes
     enrichissementScrap.columns = [
@@ -373,12 +354,11 @@ def enrichissement_siret(df):
     dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
 
     ########### Ajout au df principal !
-    del df['denominationSociale']
     # Concaténation
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
-    # df =  pd.merge(df, dfenrichissement, how='left', left_on="idTitulaires", right_on="siret")
 
-    del df['CPV_min'], df['uid'], df['uuid']
+    return df
+
 
 
 def get_scrap_dataframe(index, code):
@@ -493,13 +473,11 @@ def enrichissement_acheteur(df):
     siret.columns = ['s']
     result2 = pd.merge(result2, siret, how='outer', left_on='siret', right_on='s')
     result2 = result2[result2.s.isnull()]
-    del result2['s']
 
     dfManquant = pd.merge(dfAcheteurId, result, how='outer', on='siret')
     dfManquant = dfManquant[dfManquant['codeCommuneEtablissement'].isnull()]
     dfManquant = dfManquant.iloc[:, :2]
     result2 = pd.merge(dfManquant, result2, how='inner', on='siren')
-    del result2['siret_y'], result2['siren']
     result2.columns = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']
 
     enrichissementAcheteur = pd.concat([result, result2])
@@ -510,7 +488,6 @@ def enrichissement_acheteur(df):
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
     # dfEnregistrement = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
 
-    del chemin, dfAcheteurId, dfManquant, enrichissementAcheteur, gm_chunk, result, result2, resultTemp, siret
 
 
 def reorganisation(df):
@@ -605,14 +582,12 @@ def enrichissement_geo(df):
     df_villes2['ordre'] = 1
     df_villes2.columns = ['geom_x_y', 'Superficie', 'Population', 'CODE INSEE', 'ordre']
     df_villes = pd.concat([df_villes2, df_villes])
-    del df_villes2
     # Suppression des doublons
     df_villes = df_villes.sort_values(by='ordre', ascending=False)
     df_villes.reset_index(inplace=True, drop=True)
     df_villes = df_villes.drop_duplicates(subset=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'], keep='last')
     df_villes = df_villes.drop_duplicates(subset=['CODE INSEE'], keep='last')
     df_villes = df_villes[(df_villes['CODE INSEE'].notnull()) & (df_villes.geom_x_y.notnull())]
-    del df_villes['ordre']
     df_villes.reset_index(inplace=True, drop=True)
     # Multiplier population par 1000
     df_villes.Population = df_villes.Population.astype(float)
@@ -624,7 +599,6 @@ def enrichissement_geo(df):
     df_sep.columns = ['latitude', 'longitude']
 
     df_villes = df_villes.join(df_sep)
-    del df_villes['geom_x_y'], df_sep
     df_villes.latitude = df_villes.latitude.astype(float)
     df_villes.longitude = df_villes.longitude.astype(float)
 
@@ -641,7 +615,6 @@ def enrichissement_geo(df):
     df_decp.codeCommuneEtablissement = df_decp.codeCommuneEtablissement.astype(object)
     df_villes.codeCommuneEtablissement = df_villes.codeCommuneEtablissement.astype(object)
     df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
-    del df_villes
     ########### Calcul de la distance entre l'acheteur et l'etablissement
     # Utilisation de la formule de Vincenty avec le rayon moyen de la Terre
     # df_decp['distanceAcheteurEtablissement'] = round((((2*6378137+6356752)/3)*np.arctan2(np.sqrt((np.cos(np.radians(df_decp.latitudeEtablissement))*np.sin(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))*(np.cos(np.radians(df_decp.latitudeEtablissement))*np.sin(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur)))) + (np.cos(np.radians(df_decp.latitudeAcheteur))*np.sin(np.radians(df_decp.latitudeEtablissement)) - np.sin(np.radians(df_decp.latitudeAcheteur))*np.cos(np.radians(df_decp.latitudeEtablissement))*np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))*(np.cos(np.radians(df_decp.latitudeAcheteur))*np.sin(np.radians(df_decp.latitudeEtablissement)) - np.sin(np.radians(df_decp.latitudeAcheteur))*np.cos(np.radians(df_decp.latitudeEtablissement))*np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))), (np.sin(np.radians(df_decp.latitudeAcheteur)))*(np.sin(np.radians(df_decp.latitudeEtablissement))) + (np.cos(np.radians(df_decp.latitudeAcheteur)))*(np.cos(np.radians(df_decp.latitudeEtablissement)))*(np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))))/1000,0)
@@ -716,7 +689,6 @@ def segmentation(df):
         ['libelleCommuneAcheteur', 'montant', 'dureeMois', 'dureeMoisCalculee', 'distanceAcheteurEtablissement']]
     # Création d'une seule colonne pour la durée du marché
     dfNoBin['duree'] = round(dfNoBin.dureeMoisCalculee, 0)
-    del dfNoBin['dureeMois'], dfNoBin['dureeMoisCalculee']
     # On modifie les valeurs manquantes pour la distance en appliquant la médiane
     dfNoBin.distanceAcheteurEtablissement = np.where(dfNoBin['distanceAcheteurEtablissement'].isnull(),
                                                      dfNoBin['distanceAcheteurEtablissement'].median(),
@@ -807,7 +779,6 @@ def CAH(df):
     listCorrespondance = {x: y for x, y in zip(k, l)}
     for word, initial in listCorrespondance.items():
         df['segmentation_CAH'] = np.where(df['segmentation_CAH'] == initial, word, df['segmentation_CAH'])
-    del l, k, listCorrespondance
 
     # On ajoute au dataframe principal
     df = df[['libelleCommuneAcheteur', 'segmentation_CAH']]
@@ -842,7 +813,6 @@ def carte(df):
     df_carte = pd.merge(df_carte, dfSN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
     df_carte = pd.merge(df_carte, dfDM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
     df_carte = pd.merge(df_carte, df, how='left', on=['libelleCommuneAcheteur'])
-    del dfMM, dfMT, dfIN, dfSN, dfDM
 
     df_carte.montantTotal = round(df_carte.montantTotal, 0)
     df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
@@ -878,7 +848,6 @@ def carte(df):
     df_Dep = pd.merge(df_Dep, depPop, how='left', on='code')
     df_Dep = df_Dep[df_Dep.population.notnull()]
     df_Dep.montant = round(df_Dep.montant / df_Dep.population, 0).astype(int)
-    del df_Dep['population']
     df_Dep.montant = np.where(df_Dep.montant > 2000, 2000, df_Dep.montant)
 
     dfHM = df[['latitudeAcheteur', 'longitudeAcheteur']]
