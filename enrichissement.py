@@ -29,6 +29,9 @@ path_to_data = conf["path_to_data"]
 error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
 
+def save(df, nom):
+    with open(nom, 'wb') as df_backup:
+        pickle.dump(df, df_backup)
 
 def main():
 
@@ -50,24 +53,32 @@ def main():
 
 def enrichissement_siret(df):
 
-    ######## Enrichissement des données via les codes siret/siren ########
-    ### Utilisation d'un autre data frame pour traiter les Siret unique
+    dfSIRET = get_siretdf_from_original_data(df)
 
-    dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
-    dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
-    dfSIRET.reset_index(inplace=True)
-    dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
+    archiveErrorSIRET = getArchiveErrorSIRET()
 
-    dfSIRET["idTitulaires"] = np.where(~dfSIRET["idTitulaires"].str.isdigit(), '00000000000000', dfSIRET.idTitulaires)
+    print("enrichissement insee en cours...")
+    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
+    print("enrichissement insee fini")
 
-    dfSIRET.reset_index(inplace=True, drop=True)
+    print("enrichissement infogreffe en cours...")
+    enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
+    print("enrichissement infogreffe fini")
 
-    dfSIRET.rename(columns={
-        "idTitulaires": "siret",
-        "typeIdentifiant": "siren"}, inplace=True)
-    dfSIRET.siren = dfSIRET.siret.str[:siren_len]
-    dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
+    print("Concaténation des dataframes d'enrichissement...")
+    dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
+    print("Fini")
+
+    ########### Ajout au df principal !
+    df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
+
+    return df
+
+
+def getArchiveErrorSIRET():
+
+    """
     ######################################################################
     ### On supprime les siret déjà identifié comme faux
     path = os.path.join(path_to_data, error_siret_file)
@@ -87,7 +98,35 @@ def enrichissement_siret(df):
     except:
         archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
         print('Aucune archive d\'erreur')
+    """
+    archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
+    print('Aucune archive d\'erreur')
+    return archiveErrorSIRET
 
+
+def get_siretdf_from_original_data(df):
+    ######## Enrichissement des données via les codes siret/siren ########
+    ### Utilisation d'un autre data frame pour traiter les Siret unique
+
+    dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
+    dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
+    dfSIRET.reset_index(inplace=True, drop=True)
+    dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
+
+    dfSIRET["idTitulaires"] = np.where(~dfSIRET["idTitulaires"].str.isdigit(), '00000000000000', dfSIRET.idTitulaires)
+
+    dfSIRET.reset_index(inplace=True, drop=True)
+
+    dfSIRET.rename(columns={
+        "idTitulaires": "siret",
+        "typeIdentifiant": "siren"}, inplace=True)
+    dfSIRET.siren = dfSIRET.siret.str[:siren_len]
+    dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
+
+    return dfSIRET
+
+
+def get_enrichissement_insee(dfSIRET, path_to_data):
     ######################################################################
     # StockEtablissement_utf8
     path = os.path.join(path_to_data, conf["stock_etablissement"])
@@ -103,41 +142,46 @@ def enrichissement_siret(df):
         'activitePrincipaleEtablissement',
         'nomenclatureActivitePrincipaleEtablissement']
 
-    result = pd.DataFrame(columns)
+    result = pd.DataFrame(columns=columns)
     chunksize = 1000000
     for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfSIRET, gm_chunk, on=['siret'])
+        resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'])
         result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
     dfSIRET = pd.merge(dfSIRET, result, how='outer', on=['siret'])
+    dfSIRET.rename(columns={ "siren_x": "siren"}, inplace=True)
+    dfSIRET.drop(columns=["siren_y"], axis=1, inplace=True)
     nanSiret = dfSIRET[dfSIRET.activitePrincipaleEtablissement.isnull()]
     dfSIRET = dfSIRET[dfSIRET.activitePrincipaleEtablissement.notnull()]
-    nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale_x"]]
+    nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale"]]
 
-    # %%
-    result2 = pd.DataFrame(columns)
+    # if siret not found in stock-etablissement, let's look if we can match the siren
+    result2 = pd.DataFrame(columns=columns)
     for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
         gm_chunk['siren'] = gm_chunk['siren'].astype(str)
-        resultTemp = pd.merge(nanSiret, gm_chunk, on=['siren'])
+        resultTemp = pd.merge(nanSiret['siren'], gm_chunk, on=['siren'])
         result2 = pd.concat([result2, resultTemp], axis=0)
-
     result2 = result2.drop_duplicates(subset=['siren'], keep='first')
 
     result2 = pd.merge(nanSiret, result2, how='inner', on='siren')
+    # we delete old siret not found in stock-etablissement
+    result2.drop(columns=["siret_x"], axis=1, inplace=True)
+    result2.rename(columns={ "siret_y": "siret"}, inplace=True)
     myList = list(result2.columns)
-    myList[2] = 'denominationSociale'
-    result2.columns = myList
     dfSIRET.columns = myList
 
     ######## Merge des deux resultats
     enrichissementInsee = pd.concat([dfSIRET, result2])
-
-    ####### Récupération des données tjrs pas enrichies
     nanSiren = pd.merge(nanSiret, result2, indicator=True, how='outer', on='siren')
+    return [enrichissementInsee, nanSiren]
+
+
+def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
+    ####### Récupération des données tjrs pas enrichies
     nanSiren = nanSiren[nanSiren['activitePrincipaleEtablissement'].isnull()]
-    nanSiren = nanSiren.iloc[:, :3]
+    nanSiren = nanSiren.iloc[:20, :3]
     nanSiren.columns = ['siret', 'siren', 'denominationSociale']
     nanSiren.reset_index(inplace=True, drop=True)
 
@@ -253,7 +297,54 @@ def enrichissement_siret(df):
 
     # On réuni les résultats du scraping
     enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
+    return enrichissementScrap
 
+
+def get_scrap_dataframe(index, code):
+    url = 'https://www.infogreffe.fr/entreprise-societe/' + code
+
+    page = requests.get(url)
+    tree = html.fromstring(page.content)
+
+    rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
+    infos = tree.xpath('//p/text()')
+    details = tree.xpath('//a/text()')
+
+    rue = rueSiret[1]
+    siret = rueSiret[5].replace(" ", "")
+    ville = infos[7]
+    typeEntreprise = infos[15]
+    codeType = infos[16].replace(" : ", "")
+    detailsType1 = details[28]
+    detailsType2 = details[29]
+
+    if len(code) == 9:
+        SIRETisMatched = siret[:9] == code
+    else:
+        SIRETisMatched = siret == code
+
+    if (detailsType1 == ' '):
+        detailsType = detailsType2
+    else:
+        detailsType = detailsType1
+
+    if not SIRETisMatched:
+        codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
+        infos = tree.xpath('//span[@class="data"]/text()')
+
+        rue = infos[8]
+        siret = codeSiret[0].replace(" ", "")
+        ville = infos[9].replace(",\xa0", "")
+        typeEntreprise = infos[4]
+        detailsType = infos[11]
+        SIRETisMatched = (siret == code)
+
+    scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
+    scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
+    return scrap
+
+
+def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
     ############ Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
@@ -302,10 +393,8 @@ def enrichissement_siret(df):
         'VLGE': 'Village'}
 
     enrichissementInsee['typeVoieEtablissement'].replace(listCorrespondance, inplace=True)
-    enrichissementInsee[
-        'rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
-    enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee[
-        'activitePrincipaleEtablissement'].str.replace(".", "")
+    enrichissementInsee['rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
+    enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee['activitePrincipaleEtablissement'].str.replace(".", "")
 
     # Gestion bdd scrap
     enrichissementScrap.reset_index(inplace=True, drop=True)
@@ -353,56 +442,7 @@ def enrichissement_siret(df):
     # On s'assure qu'il n'y ai pas de doublons
     dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
 
-    ########### Ajout au df principal !
-    # Concaténation
-    df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
-
-    return df
-
-
-
-def get_scrap_dataframe(index, code):
-    url = 'https://www.infogreffe.fr/entreprise-societe/' + code
-
-    page = requests.get(url)
-    tree = html.fromstring(page.content)
-
-    rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
-    infos = tree.xpath('//p/text()')
-    details = tree.xpath('//a/text()')
-
-    rue = rueSiret[1]
-    siret = rueSiret[5].replace(" ", "")
-    ville = infos[7]
-    typeEntreprise = infos[15]
-    codeType = infos[16].replace(" : ", "")
-    detailsType1 = details[28]
-    detailsType2 = details[29]
-
-    if len(code) == 9:
-        SIRETisMatched = siret[:9] == code
-    else:
-        SIRETisMatched = siret == code
-
-    if (detailsType1 == ' '):
-        detailsType = detailsType2
-    else:
-        detailsType = detailsType1
-
-    if not SIRETisMatched:
-        codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
-        infos = tree.xpath('//span[@class="data"]/text()')
-
-        rue = infos[8]
-        siret = codeSiret[0].replace(" ", "")
-        ville = infos[9].replace(",\xa0", "")
-        typeEntreprise = infos[4]
-        detailsType = infos[11]
-        SIRETisMatched = (siret == code)
-
-    scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
-    scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
-    return scrap
+    return dfenrichissement
 
 
 def enrichissement_cpv(df):
@@ -487,7 +527,6 @@ def enrichissement_acheteur(df):
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
     # dfEnregistrement = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
-
 
 
 def reorganisation(df):

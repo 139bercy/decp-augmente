@@ -67,7 +67,6 @@ def manage_titulaires(df):
     df_titulaires.rename(columns={"id":  "idTitulaires"}, inplace=True)
     df = df.drop('titulaires', axis=1).join(df_titulaires).reset_index(drop=True)
 
-    del df_titulaires, donneesInutiles
     return df
 
 
