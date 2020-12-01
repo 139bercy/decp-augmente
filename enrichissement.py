@@ -38,9 +38,9 @@ def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
-    df = enrichissement_siret(df)
+    #df = enrichissement_siret(df)
 
-    df = enrichissement_cpv(df)
+    #df = enrichissement_cpv(df)
 
     df = enrichissement_acheteur(df)
 
@@ -486,25 +486,25 @@ def enrichissement_acheteur(df):
     with open('df_backup_cpv', 'rb') as df_backup_cpv:
         df = pickle.load(df_backup_cpv)
 
-    dfAcheteurId = df['acheteurId']
+    dfAcheteurId = df['acheteur.id'].to_frame()
     dfAcheteurId.columns = ['siret']
-    dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
+    dfAcheteurId = dfAcheteurId.drop_duplicates(keep='first')
     dfAcheteurId.reset_index(inplace=True, drop=True)
-    dfAcheteurId.siret = dfAcheteurId.siret.astype(str)
+    dfAcheteurId = dfAcheteurId.astype(str)
 
     # StockEtablissement_utf8
     chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
-    result = pd.DataFrame(
-        columns=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
-    for gm_chunk in pd.read_csv(chemin, chunksize=1000000, sep=',', encoding='utf-8',
-                                usecols=['siret', 'codePostalEtablissement',
-                                         'libelleCommuneEtablissement',
-                                         'codeCommuneEtablissement']):
+    result = pd.DataFrame( columns=['siret', 'codePostalEtablissement',
+                                    'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
+    for gm_chunk in pd.read_csv(
+            chemin, chunksize=1000000, sep=',', encoding='utf-8',
+            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfAcheteurId, gm_chunk, on=['siret'])
+        resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret")
         result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
+    """
     dfAcheteurId["siren"] = np.nan
     dfAcheteurId.siren = dfAcheteurId.siret.str[:siren_len]
     chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
@@ -528,19 +528,22 @@ def enrichissement_acheteur(df):
     dfManquant = dfManquant.iloc[:, :2]
     result2 = pd.merge(dfManquant, result2, how='inner', on='siren')
     result2.columns = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']
+    """
 
-    enrichissementAcheteur = pd.concat([result, result2])
+    enrichissementAcheteur = result
     enrichissementAcheteur.columns = ['acheteur.id', 'codePostalAcheteur', 'libelleCommuneAcheteur',
                                       'codeCommuneAcheteur']
     enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
-    # dfEnregistrement = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
+    with open('df_backup_acheteur', 'wb') as df_backup_acheteur:
+        pickle.dump(df, df_backup_acheteur)
 
 
 def reorganisation(df):
-    ######################################################################
-    ######################################################################
+    with open('df_backup_acheteur', 'rb') as df_backup_acheteur:
+        df = pickle.load(df_backup_acheteur)
+
     # Ajustement de certaines colonnes
     df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
     df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
