@@ -473,22 +473,19 @@ def enrichissement_cpv(df):
     df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
+    df.drop(columns=["FR2", "CODE", "CODEmin"], inplace=True)
 
-    ######################################################################
-    ######################################################################
-    with open('config.dictionary', 'wb') as df_backup1:
-        pickle.dump(df, df_backup1)
-    with open('config.dictionary', 'rb') as df_backup1:
-        df_backup1 = pickle.load(df_backup1)
-    df = pd.DataFrame.copy(df_backup1, deep=True)
-
+    with open('df_backup_cpv', 'wb') as df_backup_cpv:
+        pickle.dump(df, df_backup_cpv)
 
 def enrichissement_acheteur(df):
-    ######################################################################
     ############## Enrichissement des données des acheteurs ##############
-    ######################################################################
     ######## Enrichissement des données via les codes siret/siren ########
     ### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
+
+    with open('df_backup_cpv', 'rb') as df_backup_cpv:
+        df = pickle.load(df_backup_cpv)
+
     dfAcheteurId = df['acheteurId']
     dfAcheteurId.columns = ['siret']
     dfAcheteurId = dfAcheteurId.drop_duplicates(subset=['siret'], keep='first')
