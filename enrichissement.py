@@ -16,6 +16,7 @@ from selenium.webdriver.firefox.options import Options
 
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+from geopy.distance import distance
 
 import folium
 from folium.plugins import MarkerCluster
@@ -42,9 +43,9 @@ def main():
 
     #df = enrichissement_cpv(df)
 
-    df = enrichissement_acheteur(df)
+    #df = enrichissement_acheteur(df)
 
-    df = reorganisation(df)
+    #df = reorganisation(df)
 
     df = enrichissement_geo(df)
 
@@ -478,6 +479,7 @@ def enrichissement_cpv(df):
     with open('df_backup_cpv', 'wb') as df_backup_cpv:
         pickle.dump(df, df_backup_cpv)
 
+
 def enrichissement_acheteur(df):
     ############## Enrichissement des données des acheteurs ##############
     ######## Enrichissement des données via les codes siret/siren ########
@@ -553,76 +555,94 @@ def reorganisation(df):
     df.anneeNotification = df.anneeNotification.astype(str)
     df.codePostal = df.codePostal.astype(str)
 
-    # Réorganisation des colonnes et de leur nom
-    df.columns = ['source', 'type', 'nature', 'procedure', 'dureeMois',
-                  'datePublicationDonnees', 'lieuExecutionCode',
-                  'lieuExecutionTypeCode', 'lieuExecutionNom', 'identifiantMarche', 'objetMarche', 'codeCPV',
-                  'dateNotification', 'montant', 'formePrix', 'acheteurId',
-                  'acheteurNom', 'typeIdentifiantEtablissement', 'idEtablissement', 'montantOriginal',
-                  'nbTitulairesSurCeMarche',
-                  'nicEtablissement', 'codeDepartementAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
-                  'anneeNotification', 'moisNotification', 'montantEstEstime', 'montantTotalMarche',
-                  'dureeMoisEstEstime', 'dureeMoisCalculee', 'siretEtablissement', 'sirenEtablissement',
-                  'denominationSocialeEtablissement', 'codePostalEtablissement',
-                  'communeEtablissement', 'codeCommuneEtablissement',
-                  'codeTypeEtablissement', 'adresseEtablissement', 'referenceCPV',
-                  'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur']
+    # codePostal est enlevé pour le moment car est un code départemental
+    df.drop(columns=["id", "uid", "uuid", "codePostal"], inplace=True, errors="ignore")
 
-    df = df[['source', 'type', 'nature', 'procedure', 'datePublicationDonnees', 'dateNotification',
-             'anneeNotification', 'moisNotification', 'formePrix', 'identifiantMarche', 'objetMarche', 'codeCPV',
-             'referenceCPV', 'montantOriginal', 'montant', 'montantEstEstime', 'montantTotalMarche',
-             'nbTitulairesSurCeMarche',
-             'dureeMois', 'dureeMoisEstEstime', 'dureeMoisCalculee', 'acheteurId', 'acheteurNom',
-             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', 'codeCommuneAcheteur',
-             'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeDepartementAcheteur', 'codeRegionAcheteur',
-             'regionAcheteur',
-             'typeIdentifiantEtablissement', 'idEtablissement', 'nicEtablissement', 'adresseEtablissement',
-             'codeCommuneEtablissement', 'codePostalEtablissement', 'codeTypeEtablissement', 'communeEtablissement',
-             'denominationSocialeEtablissement', 'sirenEtablissement', 'siretEtablissement']]
+    # Réorganisation des colonnes et de leur nom
+    column_mapping = {
+        '_type' : "type",
+        'objet' : "objetMarche",
+        'lieuExecution.code' : "lieuExecutionCode",
+        'lieuExecution.typeCode' : "lieuExecutionTypeCode",
+        'lieuExecution.nom' :  "lieuExecutionNom",
+        'acheteur.id' : "acheteurId",
+        'acheteur.nom' : "acheteurNom",
+        'typeIdentifiant' : "typeIdentifiantEtablissement",
+        'idTitulaires' : "siretEtablissement",
+        'denominationSociale_x' : "denominationSocialeEtablissement",
+        'nic' : "nicEtablissement",
+        'CPV_min' : "codeCPV",
+        'codeRegion' : "codeRegionAcheteur",
+        'Region': "regionAcheteur",
+        'siret' : "siretEtablissement",
+        'siren': "sirenEtablissement" ,
+        'denominationSociale_y' : "denominationSocialeEtablissement",
+        'refCodeCPV' : "referenceCPV"
+    }
+    df.rename(columns=column_mapping, inplace=True)
 
     # Rectification codePostalAcheteur et codeCommuneAcheteur
-    df.codePostalAcheteur = df.codePostalAcheteur.str.replace(".", "")
-    df.codePostalAcheteur = df.codePostalAcheteur.str.replace(" ", "")
+    d = {"." : "", " ": ""}
+    df.codePostalAcheteur = df.codePostalAcheteur.replace(d)
     if len(df.codePostalAcheteur) < 5:
         df.codePostalAcheteur = '0' + df.codePostalAcheteur
 
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.str.replace(".", "")
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.str.replace(" ", "")
+    df.codeCommuneAcheteur = df.codeCommuneAcheteur.replace(d)
     if len(df.codeCommuneAcheteur) < 5:
         df.codeCommuneAcheteur = '0' + df.codeCommuneAcheteur
 
-    ######################################################################
-    # Petites corrections
-    df['lieuExecutionTypeCode'] = df['lieuExecutionTypeCode'].str.upper()
-    df['lieuExecutionTypeCode'] = np.where(df['lieuExecutionTypeCode'] == 'CODE DÉPARTEMENT', 'CODE DEPARTEMENT',
-                                           df['lieuExecutionTypeCode'])
-    df['lieuExecutionTypeCode'] = np.where(df['lieuExecutionTypeCode'] == 'CODE RÉGION', 'CODE REGION',
-                                           df['lieuExecutionTypeCode'])
+    # Petites corrections sur lieuExecutionTypeCode et nature
+    l = ["lieuExecutionTypeCode", "nature"]
+    for column in l:
+        df[column] = df[column].str.upper()
+        df[column] = df[column].str.replace("É", "E")
 
-    df['nature'] = np.where(df['nature'] == 'Délégation de service public', 'DELEGATION DE SERVICE PUBLIC',
-                            df['nature'])
-    df['nature'] = df['nature'].str.upper()
-
-    ######################################################################
-    ######################################################################
-    with open('config.dictionary', 'wb') as df_backup2:
+    with open('df_reorganisation', 'wb') as df_backup2:
         pickle.dump(df, df_backup2)
-    with open('config.dictionary', 'rb') as df_backup2:
-        df_backup2 = pickle.load(df_backup2)
-    df_decp = pd.DataFrame.copy(df_backup2, deep=True)
-    ######################################################################
-    ######################################################################
-    df_decp = pd.DataFrame.copy(df, deep=True)
 
-    compression_opts = dict(method='zip',
-                            archive_name='out.csv')
-    df_decp.to_csv('out.zip', index=False,
-                   compression=compression_opts)
+    return df
 
 
 def enrichissement_geo(df):
-    ######################################################################
+    with open('df_reorganisation', 'rb') as df_backup_acheteur:
+        df = pickle.load(df_backup_acheteur)
+
     ######## Enrichissement latitude & longitude avec adresse la ville
+    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
+    df_villes = get_df_villes()
+    df_decp = pd.merge(df, df_villes, how='left', on='codeCommuneAcheteur')
+
+    # Ajout pour les établissements
+    df_villes.rename(columns={'codeCommuneAcheteur' : "codeCommuneEtablissement",
+                              "latitudeAcheteur" :'latitudeEtablissement',
+                              "longitudeAcheteur":'longitudeEtablissement',
+                              "superficieCommuneAcheteur": "superficieCommuneEtablissement",
+                              "populationCommuneAcheteur": "populationCommuneEtablissement"},
+                     inplace=True)
+    df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
+
+    ########### Calcul de la distance entre l'acheteur et l'etablissement
+    # Utilisation de la formule de Vincenty avec le rayon moyen de la Terre
+
+    df_decp['distanceAcheteurEtablissement'] = df.apply(
+        lambda x: distance(x.longitudeEtablissement, x.latitudeEtablissement, x.longitudeAcheteur, x.latitudeAcheteur ))
+    # Taux d'enrichissement
+    # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
+
+    # Remise en forme des colonnes géo-spatiales
+    df_decp.latitudeAcheteur = df_decp.latitudeAcheteur.astype(str)
+    df_decp.longitudeAcheteur = df_decp.longitudeAcheteur.astype(str)
+    df_decp['geomAcheteur'] = df_decp.latitudeAcheteur + ',' + df_decp.longitudeAcheteur
+    df_decp.latitudeEtablissement = df_decp.latitudeEtablissement.astype(str)
+    df_decp.longitudeEtablissement = df_decp.longitudeEtablissement.astype(str)
+    df_decp['geomEtablissement'] = df_decp.latitudeEtablissement + ',' + df_decp.longitudeEtablissement
+
+    df_decp['geomAcheteur'] = np.where(df_decp['geomAcheteur'] == 'nan,nan', np.NaN, df_decp['geomAcheteur'])
+    df_decp['geomEtablissement'] = np.where(df_decp['geomEtablissement'] == 'nan,nan', np.NaN,
+                                            df_decp['geomEtablissement'])
+    df_decp.reset_index(inplace=True, drop=True)
+
+def get_df_villes():
     df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',
                             sep=';', header=0, error_bad_lines=False,
                             usecols=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'])
@@ -630,6 +650,7 @@ def enrichissement_geo(df):
     df_villes2 = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',
                              sep=';', header=0, error_bad_lines=False,
                              usecols=['Code commune complet', 'geom_x_y', 'Superficie', 'Population'])
+
     df_villes2['ordre'] = 1
     df_villes2.columns = ['geom_x_y', 'Superficie', 'Population', 'CODE INSEE', 'ordre']
     df_villes = pd.concat([df_villes2, df_villes])
@@ -652,63 +673,18 @@ def enrichissement_geo(df):
     df_villes = df_villes.join(df_sep)
     df_villes.latitude = df_villes.latitude.astype(float)
     df_villes.longitude = df_villes.longitude.astype(float)
+    df_villes.drop(columns = ["geom_x_y", "ordre"], inplace=True, errors="ignore")
 
-    ################################# Ajout au dataframe principal
     # Ajout pour les acheteurs
-    df_villes.columns = ['codeCommuneAcheteur', 'populationAcheteur', 'superficieAcheteur', 'latitudeAcheteur',
-                         'longitudeAcheteur']
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
+    df_villes.rename(columns={"CODE INSEE" : 'codeCommuneAcheteur',
+                              "Population": 'populationAcheteur',
+                              "Superficie": 'superficieAcheteur',
+                              "latitude" :'latitudeAcheteur',
+                              "longitude":'longitudeAcheteur'},
+                     inplace=True)
+
     df_villes.codeCommuneAcheteur = df_villes.codeCommuneAcheteur.astype(object)
-    df_decp = pd.merge(df, df_villes, how='left', on='codeCommuneAcheteur')
-    # Ajout pour les etablissement
-    df_villes.columns = ['codeCommuneEtablissement', 'populationEtablissement', 'superficieEtablissement',
-                         'latitudeEtablissement', 'longitudeEtablissement']
-    df_decp.codeCommuneEtablissement = df_decp.codeCommuneEtablissement.astype(object)
-    df_villes.codeCommuneEtablissement = df_villes.codeCommuneEtablissement.astype(object)
-    df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
-    ########### Calcul de la distance entre l'acheteur et l'etablissement
-    # Utilisation de la formule de Vincenty avec le rayon moyen de la Terre
-    # df_decp['distanceAcheteurEtablissement'] = round((((2*6378137+6356752)/3)*np.arctan2(np.sqrt((np.cos(np.radians(df_decp.latitudeEtablissement))*np.sin(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))*(np.cos(np.radians(df_decp.latitudeEtablissement))*np.sin(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur)))) + (np.cos(np.radians(df_decp.latitudeAcheteur))*np.sin(np.radians(df_decp.latitudeEtablissement)) - np.sin(np.radians(df_decp.latitudeAcheteur))*np.cos(np.radians(df_decp.latitudeEtablissement))*np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))*(np.cos(np.radians(df_decp.latitudeAcheteur))*np.sin(np.radians(df_decp.latitudeEtablissement)) - np.sin(np.radians(df_decp.latitudeAcheteur))*np.cos(np.radians(df_decp.latitudeEtablissement))*np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))), (np.sin(np.radians(df_decp.latitudeAcheteur)))*(np.sin(np.radians(df_decp.latitudeEtablissement))) + (np.cos(np.radians(df_decp.latitudeAcheteur)))*(np.cos(np.radians(df_decp.latitudeEtablissement)))*(np.cos(np.radians(np.fabs(df_decp.longitudeEtablissement-df_decp.longitudeAcheteur))))))/1000,0)
-    df_decp['distanceAcheteurEtablissement'] = round((((2 * 6378137 + 6356752) / 3) * np.arctan2(
-        np.sqrt((np.cos(np.radians(df_decp.latitudeEtablissement)) * np.sin(
-            np.radians(np.fabs(df_decp.longitudeEtablissement - df_decp.longitudeAcheteur)))) * (
-                        np.cos(np.radians(df_decp.latitudeEtablissement)) * np.sin(np.radians(np.fabs(
-                    df_decp.longitudeEtablissement - df_decp.longitudeAcheteur)))) + (np.cos(np.radians(
-            df_decp.latitudeAcheteur)) * np.sin(np.radians(df_decp.latitudeEtablissement)) - np.sin(
-            np.radians(df_decp.latitudeAcheteur)) * np.cos(np.radians(df_decp.latitudeEtablissement)) * np.cos(
-            np.radians(np.fabs(df_decp.longitudeEtablissement - df_decp.longitudeAcheteur)))) * (
-                        np.cos(np.radians(df_decp.latitudeAcheteur)) * np.sin(
-                    np.radians(df_decp.latitudeEtablissement)) - np.sin(
-                    np.radians(df_decp.latitudeAcheteur)) * np.cos(np.radians(df_decp.latitudeEtablissement)) * np.cos(
-                    np.radians(np.fabs(df_decp.longitudeEtablissement - df_decp.longitudeAcheteur))))), (np.sin(
-            np.radians(df_decp.latitudeAcheteur))) * (np.sin(np.radians(df_decp.latitudeEtablissement))) + (
-                                                                                                            np.cos(
-                                                                                                                np.radians(
-                                                                                                                    df_decp.latitudeAcheteur))) * (
-                                                                                                            np.cos(
-                                                                                                                np.radians(
-                                                                                                                    df_decp.latitudeEtablissement))) * (
-                                                                                                            np.cos(
-                                                                                                                np.radians(
-                                                                                                                    np.fabs(
-                                                                                                                        df_decp.longitudeEtablissement - df_decp.longitudeAcheteur)))))) / 1000,
-                                                     0)
-
-    # Taux d'enrichissement
-    round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
-
-    # Remise en forme des colonnes géo-spatiales
-    df_decp.latitudeAcheteur = df_decp.latitudeAcheteur.astype(str)
-    df_decp.longitudeAcheteur = df_decp.longitudeAcheteur.astype(str)
-    df_decp['geomAcheteur'] = df_decp.latitudeAcheteur + ',' + df_decp.longitudeAcheteur
-    df_decp.latitudeEtablissement = df_decp.latitudeEtablissement.astype(str)
-    df_decp.longitudeEtablissement = df_decp.longitudeEtablissement.astype(str)
-    df_decp['geomEtablissement'] = df_decp.latitudeEtablissement + ',' + df_decp.longitudeEtablissement
-
-    df_decp['geomAcheteur'] = np.where(df_decp['geomAcheteur'] == 'nan,nan', np.NaN, df_decp['geomAcheteur'])
-    df_decp['geomEtablissement'] = np.where(df_decp['geomEtablissement'] == 'nan,nan', np.NaN,
-                                            df_decp['geomEtablissement'])
-    df_decp.reset_index(inplace=True, drop=True)
+    return df_villes
 
 
 def segmentation(df):
