@@ -676,14 +676,14 @@ def get_df_villes():
     df_villes.drop(columns = ["geom_x_y", "ordre"], inplace=True, errors="ignore")
 
     # Ajout pour les acheteurs
-    df_villes.rename(columns={"CODE INSEE" : 'codeCommuneAcheteur',
-                              "Population": 'populationAcheteur',
-                              "Superficie": 'superficieAcheteur',
-                              "latitude" :'latitudeAcheteur',
-                              "longitude":'longitudeAcheteur'},
+    df_villes.rename(columns={"CODE INSEE" : 'codeCommune',
+                              "Population": 'population',
+                              "Superficie": 'superficie',
+                              "latitude" :'latitude',
+                              "longitude":'longitude'},
                      inplace=True)
 
-    df_villes.codeCommuneAcheteur = df_villes.codeCommuneAcheteur.astype(object)
+    df_villes.codeCommune = df_villes.codeCommune.astype(object)
     return df_villes
 
 
