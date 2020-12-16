@@ -16,7 +16,7 @@ from selenium.webdriver.firefox.options import Options
 
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
-from geopy.distance import distance
+from geopy.distance import distance, Point
 
 import folium
 from folium.plugins import MarkerCluster
@@ -609,23 +609,27 @@ def enrichissement_geo(df):
 
     ######## Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
-    df_villes = get_df_villes()
-    df_decp = pd.merge(df, df_villes, how='left', on='codeCommuneAcheteur')
+    df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
-    # Ajout pour les établissements
-    df_villes.rename(columns={'codeCommuneAcheteur' : "codeCommuneEtablissement",
-                              "latitudeAcheteur" :'latitudeEtablissement',
-                              "longitudeAcheteur":'longitudeEtablissement',
-                              "superficieCommuneAcheteur": "superficieCommuneEtablissement",
-                              "populationCommuneAcheteur": "populationCommuneEtablissement"},
-                     inplace=True)
-    df_decp = pd.merge(df_decp, df_villes, how='left', on='codeCommuneEtablissement')
+    df_villes = get_df_villes()
+    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune")
+    df.rename(columns={"superficie" : "superficieCommuneAcheteur",
+               "population" : "populationCommuneAcheteur",
+               "latitude" : "latitudeCommuneAcheteur",
+               "longitude": "longitudeCommuneAcheteur"},
+              inplace=True)
+    df.drop(columns="codeCommune", inplace=True)
+
+    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune')
+    df.rename(columns={"superficie" : "superficieCommuneEtablissement",
+               "population" : "populationCommuneEtablissement",
+               "latitude" : "latitudeCommuneEtablissement",
+               "longitude": "longitudeCommuneEtablissement"},
+              inplace=True)
+    df.drop(columns="codeCommune", inplace=True)
 
     ########### Calcul de la distance entre l'acheteur et l'etablissement
-    # Utilisation de la formule de Vincenty avec le rayon moyen de la Terre
-
-    df_decp['distanceAcheteurEtablissement'] = df.apply(
-        lambda x: distance(x.longitudeEtablissement, x.latitudeEtablissement, x.longitudeAcheteur, x.latitudeAcheteur ))
+    df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
     # Taux d'enrichissement
     # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
 
@@ -678,14 +682,20 @@ def get_df_villes():
     # Ajout pour les acheteurs
     df_villes.rename(columns={"CODE INSEE" : 'codeCommune',
                               "Population": 'population',
-                              "Superficie": 'superficie',
-                              "latitude" :'latitude',
-                              "longitude":'longitude'},
+                              "Superficie": 'superficie'},
                      inplace=True)
 
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
     return df_villes
 
+def get_distance(row):
+    try:
+        x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
+        y = Point(row.longitudeCommuneEtablissement, row.latitudeCommuneEtablissement)
+
+        return distance(x, y)
+    except ValueError:
+        return None
 
 def segmentation(df):
     ###############################################################################
