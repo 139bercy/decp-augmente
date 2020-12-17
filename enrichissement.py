@@ -39,13 +39,13 @@ def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
-    #df = enrichissement_siret(df)
+    df = enrichissement_siret(df)
 
-    #df = enrichissement_cpv(df)
+    df = enrichissement_cpv(df)
 
-    #df = enrichissement_acheteur(df)
+    df = enrichissement_acheteur(df)
 
-    #df = reorganisation(df)
+    df = reorganisation(df)
 
     df = enrichissement_geo(df)
 
@@ -634,17 +634,23 @@ def enrichissement_geo(df):
     # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
 
     # Remise en forme des colonnes géo-spatiales
-    df_decp.latitudeAcheteur = df_decp.latitudeAcheteur.astype(str)
-    df_decp.longitudeAcheteur = df_decp.longitudeAcheteur.astype(str)
-    df_decp['geomAcheteur'] = df_decp.latitudeAcheteur + ',' + df_decp.longitudeAcheteur
-    df_decp.latitudeEtablissement = df_decp.latitudeEtablissement.astype(str)
-    df_decp.longitudeEtablissement = df_decp.longitudeEtablissement.astype(str)
-    df_decp['geomEtablissement'] = df_decp.latitudeEtablissement + ',' + df_decp.longitudeEtablissement
+    cols = ["longitudeCommuneAcheteur",
+           "latitudeCommuneAcheteur",
+           "longitudeCommuneEtablissement",
+           "latitudeCommuneEtablissement"]
 
-    df_decp['geomAcheteur'] = np.where(df_decp['geomAcheteur'] == 'nan,nan', np.NaN, df_decp['geomAcheteur'])
-    df_decp['geomEtablissement'] = np.where(df_decp['geomEtablissement'] == 'nan,nan', np.NaN,
-                                            df_decp['geomEtablissement'])
-    df_decp.reset_index(inplace=True, drop=True)
+    df[cols] = df[cols].astype(str)
+
+    df['geolocCommuneAcheteur'] = df.latitudeCommuneAcheteur + ',' + df.longitudeCommuneAcheteur
+    df['geolocCommuneEtablissement'] = df.latitudeCommuneEtablissement + ',' + df.longitudeCommuneEtablissement
+
+    df['geolocCommuneAcheteur'] = np.where(
+        df['geolocCommuneAcheteur'] == 'nan,nan', np.NaN, df['geolocCommuneAcheteur'])
+    df['geolocCommuneEtablissement'] = np.where(
+        df['geolocCommuneEtablissement'] == 'nan,nan', np.NaN, df['geolocCommuneEtablissement'])
+    df.reset_index(inplace=True, drop=True)
+
+    return df
 
 def get_df_villes():
     df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',

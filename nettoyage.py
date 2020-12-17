@@ -26,7 +26,6 @@ def main():
 
     df = manage_montant(df)
 
-    #################### Gestion des id/code manquants
     df = manage_missing_code(df)
 
     df = manage_region(df)
@@ -35,11 +34,12 @@ def main():
 
     #df = data_inputation(df)
 
-    ### Rectification des durées en mois aberrantes
     df = correct_date(df)
 
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
+
+    df.to_csv("decp_nettoye.csv")
     #df = apply_luhn(df)
 
 
