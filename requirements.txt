@@ -8,5 +8,4 @@ scipy
 matplotlib
 folium
 tqdm
-
 geopy
