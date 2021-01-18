@@ -9,4 +9,4 @@ matplotlib
 folium
 tqdm
 geopy
-xlrd
+openpyxl
