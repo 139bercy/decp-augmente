@@ -37,7 +37,7 @@ jobs:
                   command: |
                        cd /home/circleci/project/decp-augmente
                        python3 main.py
-                       lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_augmente.csv ; quit"
+                       lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
 
 workflows:
   version: 2
