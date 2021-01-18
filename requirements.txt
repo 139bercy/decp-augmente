@@ -9,3 +9,4 @@ matplotlib
 folium
 tqdm
 geopy
+xlrd
