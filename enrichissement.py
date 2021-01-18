@@ -213,6 +213,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     nanSiren = nanSiren.iloc[:filter, :]
 
     df_scrap = pd.DataFrame(columns=columns)
+    """
     for i in tqdm(range(len(nanSiren))):
         try:
             scrap = get_scrap_dataframe(i, nanSiren.siret[i])
@@ -227,6 +228,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
                                  'SIRETisMatched']
                 df_scrap = pd.concat([df_scrap, scrap], axis=0)
                 pass
+    """
 
     # Récupération des résultats
     nanSiren.reset_index(inplace=True)
@@ -239,6 +241,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     dfDS.columns = ['siret', 'siren', 'denominationSociale']
     dfDS.reset_index(inplace=True, drop=True)
 
+    """
     def requete(nom):
         pager.get('https://www.infogreffe.fr/recherche-siret-entreprise/chercher-siret-entreprise.html')
         pager.find_element_by_xpath('//*[@id="p1_deno"]').send_keys(nom, Keys.ENTER)
@@ -250,9 +253,11 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     options.add_argument('--headless')
     pager = webdriver.Firefox(options=options)
     # pager = webdriver.PhantomJS('webdriver/phantomjs.exe')
+    """
 
     df_scrap2 = pd.DataFrame(
         columns=['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched'])
+    """
     for i in tqdm(range(len(dfDS))):
         try:
             url = requete(dfDS.denominationSociale[i])
@@ -290,6 +295,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
             df_scrap2 = pd.concat([df_scrap2, scrap2], axis=0)
             pass
     pager.quit()
+    """
 
     # Récupération des résultats
     dfDS.reset_index(inplace=True)
