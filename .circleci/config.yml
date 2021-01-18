@@ -18,6 +18,7 @@ jobs:
             - run:
                   name: Installation des requirements
                   command: |
+                      cd /home/circleci/project/decp-augmente
                       pip3 install -r requirements.txt
             - run:
                   name: Récupération des données utiles
@@ -42,6 +43,7 @@ jobs:
             - run:
                   name: Transfert des données vers data.economie
                   command: |
+                       cd /home/circleci/project/decp-augmente
                        lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
 
 workflows:
