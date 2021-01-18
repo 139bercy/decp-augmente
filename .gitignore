@@ -1,0 +1,11 @@
+# Data
+data/
+*.csv
+*.jq
+config.json
+
+# Fichier Mac
+.DS_Store
+
+# PYTHON
+__pycache__
