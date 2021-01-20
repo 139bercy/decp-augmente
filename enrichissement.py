@@ -49,7 +49,7 @@ def main():
 
     df = enrichissement_geo(df)
 
-    df.to_csv("decp_augmente.csv")
+    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
 
 
 def enrichissement_siret(df):
