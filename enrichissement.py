@@ -706,7 +706,7 @@ def get_distance(row):
         x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
         y = Point(row.longitudeCommuneEtablissement, row.latitudeCommuneEtablissement)
 
-        return distance(x, y)
+        return distance(x, y).km
     except ValueError:
         return None
 
