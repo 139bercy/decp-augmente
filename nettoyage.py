@@ -34,7 +34,10 @@ def main():
 
     #df = data_inputation(df)
 
-    df = correct_date(df)
+    df = correct_date(df)`
+
+    # suppression des caractères mal encodés
+    df = replace_char(df)
 
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
@@ -338,6 +341,12 @@ def correct_date(df):
 
     # Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
     df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
+
+    return df
+
+def replace_char(df):
+
+    df['objetMarche'] = np.char.replace (df['objetMarche'], '�', ' ') 
 
     return df
 
