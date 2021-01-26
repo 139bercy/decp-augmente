@@ -344,8 +344,11 @@ def correct_date(df):
 
     return df
 
+
+##### Fonction pour mettre en qualité le champ objetMarche
 def replace_char(df):
 
+    # Remplacement brutal du caractère (?) par un espace
     df['objetMarche'] = np.char.replace (df['objetMarche'], '�', ' ') 
 
     return df
