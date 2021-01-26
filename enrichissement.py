@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -49,7 +50,7 @@ def main():
 
     df = enrichissement_geo(df)
 
-    df.to_csv("decp_augmente.csv")
+    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
 
 
 def enrichissement_siret(df):
@@ -469,7 +470,8 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
-    refCPV = pd.read_excel("dataEnrichissement/cpv_2008_ver_2013.xlsx", usecols=['CODE', 'FR'])
+    path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
@@ -501,7 +503,8 @@ def enrichissement_acheteur(df):
     dfAcheteurId = dfAcheteurId.astype(str)
 
     # StockEtablissement_utf8
-    chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
+    chemin = os.path.join(path_to_data, conf["stock_etablissement"])
+    #chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
     result = pd.DataFrame( columns=['siret', 'codePostalEtablissement',
                                     'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
     for gm_chunk in pd.read_csv(
@@ -659,12 +662,11 @@ def enrichissement_geo(df):
     return df
 
 def get_df_villes():
-    df_villes = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',
-                            sep=';', header=0, error_bad_lines=False,
+    path = os.path.join(path_to_data, conf["code-insee-postaux-geoflar"])
+    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                             usecols=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'])
     df_villes['ordre'] = 0
-    df_villes2 = pd.read_csv('dataEnrichissement/code-insee-postaux-geoflar.csv',
-                             sep=';', header=0, error_bad_lines=False,
+    df_villes2 = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                              usecols=['Code commune complet', 'geom_x_y', 'Superficie', 'Population'])
 
     df_villes2['ordre'] = 1
@@ -705,7 +707,7 @@ def get_distance(row):
         x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
         y = Point(row.longitudeCommuneEtablissement, row.latitudeCommuneEtablissement)
 
-        return distance(x, y)
+        return distance(x, y).km
     except ValueError:
         return None
 
@@ -879,7 +881,9 @@ def carte(df):
     df_Reg.montant = round(df_Reg.montant / 1000000, 0).astype(int)
     df_Reg.montant = np.where(df_Reg.montant > 10000, 10000, df_Reg.montant)
 
-    depPop = pd.read_csv("dataEnrichissement/departements-francais.csv", sep='\t', encoding='utf-8',
+
+    path = os.path.join(path_to_data, conf["departements-francais"])
+    depPop = pd.read_csv(path, sep='\t', encoding='utf-8',
                          usecols=['NUMÉRO', 'POPULATION'])
     depPop.columns = ['code', 'population']
     depPop.code = depPop.code.astype(str)

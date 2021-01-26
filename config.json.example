@@ -1,0 +1,7 @@
+{
+	"path_to_project" : "/path/to/project",
+	"path_to_data" : "data",
+	"decp_file_name" : "decp.json",
+	"error_siret_file_name" : "errorSIRET.csv",
+	"stock_etablissement" : "StockEtablissement_utf8.csv"
+}
