@@ -34,7 +34,7 @@ def main():
 
     #df = data_inputation(df)
 
-    df = correct_date(df)`
+    df = correct_date(df)
 
     # suppression des caractères mal encodés
     df = replace_char(df)
@@ -349,9 +349,10 @@ def correct_date(df):
 def replace_char(df):
 
     # Remplacement brutal du caractère (?) par un espace
-    df['objetMarche'] = df['objetMarche'].str.replace ('�', ' ') 
+    df['objetMarche'] = df['objetMarche'].str.replace ('�', 'XXXXX') 
 
     return df
+
 
 ##### Algorithme de Luhn
 def luhn(codeSIREN):
