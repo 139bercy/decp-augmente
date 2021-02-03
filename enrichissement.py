@@ -565,7 +565,8 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["id", "uid", "uuid", "codePostal"], inplace=True, errors="ignore")
+    # on enlève siret car doublon avec idTitulaires
+    df.drop(columns=["uid", "uuid", "codePostal", "siret"], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
@@ -583,7 +584,6 @@ def reorganisation(df):
         'CPV_min' : "codeCPV",
         'codeRegion' : "codeRegionAcheteur",
         'Region': "regionAcheteur",
-        'siret' : "siretEtablissement",
         'siren': "sirenEtablissement" ,
         'denominationSociale_y' : "denominationSocialeEtablissement",
         'refCodeCPV' : "referenceCPV"
@@ -638,7 +638,7 @@ def enrichissement_geo(df):
     df.drop(columns="codeCommune", inplace=True)
 
     ########### Calcul de la distance entre l'acheteur et l'etablissement
-    df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
+    #df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
     # Taux d'enrichissement
     # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
 
