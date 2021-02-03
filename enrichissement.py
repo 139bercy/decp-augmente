@@ -60,20 +60,20 @@ def enrichissement_siret(df):
 
     archiveErrorSIRET = getArchiveErrorSIRET()
 
-    print("enrichissement insee en cours...")
+    print("Enrichissement insee en cours...")
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
-    print("enrichissement insee fini")
+    print("Enrichissement insee fini")
 
-    print("enrichissement infogreffe en cours...")
+    print("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
-    print("enrichissement infogreffe fini")
+    print("Enrichissement infogreffe fini")
 
     print("Concaténation des dataframes d'enrichissement...")
     dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
-    print("Fini")
 
     ########### Ajout au df principal !
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
+    print("Enrichissement Siret fini")
 
     return df
 
