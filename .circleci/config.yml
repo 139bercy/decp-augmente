@@ -26,7 +26,8 @@ jobs:
                   command: |
                        cd /home/circleci/project/decp-augmente
                        mkdir data && cd data
-                       wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
+                       wget 'https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O geoflar-communes-2015.csv
+                       #wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
                        wget https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip
                        unzip cpv_2008_xls.zip
                        wget https://www.regions-et-departements.fr/fichiers/departements-francais.csv -O departements-francais.csv

@@ -620,7 +620,7 @@ def enrichissement_geo(df):
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
-    df_villes = get_df_villes()
+    df_villes = get_df_villes_str()
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune")
     df.rename(columns={"superficie" : "superficieCommuneAcheteur",
                "population" : "populationCommuneAcheteur",
@@ -697,6 +697,36 @@ def get_df_villes():
     df_villes.rename(columns={"CODE INSEE" : 'codeCommune',
                               "Population": 'population',
                               "Superficie": 'superficie'},
+                     inplace=True)
+
+    df_villes.codeCommune = df_villes.codeCommune.astype(object)
+    return df_villes
+
+def get_df_villes_str():
+    path = os.path.join(path_to_data, conf["code-insee-postaux-geoflar_str"])
+    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
+                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
+
+    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes.['Geo Point'].notnull())]
+    df_villes.reset_index(inplace=True, drop=True)
+    # Multiplier population par 1000
+    df_villes.POPULATION = df_villes.POPULATION.astype(float)
+    df_villes.POPULATION = round(df_villes.POPULATION * 1000, 0)
+    # Divise la colonne geom_x_y pour obtenir la latitude et la longitude séparemment
+    # Latitude avant longitude
+    df_villes.['Geo Point'] = df_villes.['Geo Point'].astype(str)
+    df_sep = pd.DataFrame(df_villes.['Geo Point'].str.split(',', 1, expand=True))
+    df_sep.columns = ['latitude', 'longitude']
+
+    df_villes = df_villes.join(df_sep)
+    df_villes.latitude = df_villes.latitude.astype(float)
+    df_villes.longitude = df_villes.longitude.astype(float)
+    df_villes.drop(columns = ["Geo Point"], inplace=True, errors="ignore")
+
+    # Ajout pour les acheteurs
+    df_villes.rename(columns={"INSEE_COM" : 'codeCommune',
+                              "POPULATION": 'population',
+                              "SUPERFICIE": 'superficie'},
                      inplace=True)
 
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
