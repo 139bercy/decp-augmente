@@ -14,7 +14,7 @@ jobs:
                       git clone https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME.git
                       cd decp-augmente
                       if [ $CIRCLE_BRANCH -ne 'master' ] ; then
-                        git fetch origin refs/$CIRCLE_BRANCH/head:pull_local
+                        git fetch origin pull/$CIRCLE_PR_NUMBER/head:pull_local
                         git checkout pull_local
                       fi 
                       mv config-circleci.json config.json
