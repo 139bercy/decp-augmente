@@ -707,15 +707,15 @@ def get_df_villes_str():
     df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                             usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
 
-    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes.['Geo Point'].notnull())]
+    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes['Geo Point'].notnull())]
     df_villes.reset_index(inplace=True, drop=True)
     # Multiplier population par 1000
     df_villes.POPULATION = df_villes.POPULATION.astype(float)
     df_villes.POPULATION = round(df_villes.POPULATION * 1000, 0)
     # Divise la colonne geom_x_y pour obtenir la latitude et la longitude séparemment
     # Latitude avant longitude
-    df_villes.['Geo Point'] = df_villes.['Geo Point'].astype(str)
-    df_sep = pd.DataFrame(df_villes.['Geo Point'].str.split(',', 1, expand=True))
+    df_villes['Geo Point'] = df_villes['Geo Point'].astype(str)
+    df_sep = pd.DataFrame(df_villes['Geo Point'].str.split(',', 1, expand=True))
     df_sep.columns = ['latitude', 'longitude']
 
     df_villes = df_villes.join(df_sep)
