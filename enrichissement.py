@@ -729,7 +729,7 @@ def get_df_villes_str():
                      inplace=True)
 
     # Un brin de conversion c'est toujours bien
-    df_villes.POPULATION = df_villes.POPULATION.astype(float)
+    df_villes.population = df_villes.population.astype(float)
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
     df_villes.latitude = df_villes.latitude.astype(float)
     df_villes.longitude = df_villes.longitude.astype(float)
