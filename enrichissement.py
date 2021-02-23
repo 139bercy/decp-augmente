@@ -565,10 +565,11 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["id", "uid", "uuid", "codePostal"], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "codePostal"], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
+        'id' : "id",
         '_type' : "type",
         'objet' : "objetMarche",
         'lieuExecution.code' : "lieuExecutionCode",
