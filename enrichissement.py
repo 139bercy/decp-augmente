@@ -565,10 +565,11 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["id", "uid", "uuid", "codePostal"], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "codePostal"], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
+        'id' : "id",
         '_type' : "type",
         'objet' : "objetMarche",
         'lieuExecution.code' : "lieuExecutionCode",
@@ -620,7 +621,7 @@ def enrichissement_geo(df):
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
-    df_villes = get_df_villes()
+    df_villes = get_df_villes_str()
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune")
     df.rename(columns={"superficie" : "superficieCommuneAcheteur",
                "population" : "populationCommuneAcheteur",
@@ -700,6 +701,40 @@ def get_df_villes():
                      inplace=True)
 
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
+    return df_villes
+
+def get_df_villes_str():
+    path = os.path.join(path_to_data, conf["code-insee-postaux-geoflar_str"])
+    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
+                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
+
+    # Suppression des codes communes sans point geo
+    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes['Geo Point'].notnull())]
+    df_villes.reset_index(inplace=True, drop=True)
+
+    # Séparation de la latitude et la longitude depuis les info géo
+    df_villes['Geo Point'] = df_villes['Geo Point'].astype(str)
+    df_sep = pd.DataFrame(df_villes['Geo Point'].str.split(',', 1, expand=True))
+    df_sep.columns = ['latitude', 'longitude']
+
+    # Fusion des lat/long dans le df
+    df_villes = df_villes.join(df_sep)
+
+    # Suppression des colonnes inutiles
+    df_villes.drop(columns = ["Geo Point"], inplace=True, errors="ignore")
+
+    # Renommer les variables
+    df_villes.rename(columns={"INSEE_COM" : 'codeCommune',
+                              "POPULATION": 'population',
+                              "SUPERFICIE": 'superficie'},
+                     inplace=True)
+
+    # Un brin de conversion c'est toujours bien
+    df_villes.population = df_villes.population.astype(float)
+    df_villes.codeCommune = df_villes.codeCommune.astype(object)
+    df_villes.latitude = df_villes.latitude.astype(float)
+    df_villes.longitude = df_villes.longitude.astype(float)
+
     return df_villes
 
 def get_distance(row):
