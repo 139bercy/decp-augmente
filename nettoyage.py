@@ -138,9 +138,9 @@ def manage_missing_code(df):
     ######## Gestion code CPV
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
-    df["CPV_min_label"] = "Fourniture"
-    df.loc[df["CPV_min"] == '45','CPV_min_label'] = 'Travaux'
-    df.loc[df["CPV_min"] > '45', 'CPV_min_label'] = 'Service'
+    df["natureObjet"] = "Fournitures"
+    df.loc[df["CPV_min"] == '45','natureObjet'] = 'Travaux'
+    df.loc[df["CPV_min"] > '45', 'natureObjet'] = 'Services'
 
 
     # Mise en forme des données vides
