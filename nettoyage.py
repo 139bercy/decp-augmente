@@ -139,8 +139,10 @@ def manage_missing_code(df):
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
     df["CPV_min_label"] = "Fourniture"
-    if(df["CPV_min"] == '45') { df["CPV_min_label"] = "Travaux"; }
-    else if(df["CPV_min"] > '45'){ df["CPV_min_label"] = "Service";}
+    if ( df["CPV_min"] == '45') : 
+        df["CPV_min_label"] = "Travaux"
+    else if ( df["CPV_min"] > '45') : 
+        df["CPV_min_label"] = "Service"
 
     # Mise en forme des données vides
     df.denominationSociale = np.where(
