@@ -1,6 +1,6 @@
 [![CircleCI](https://circleci.com/gh/139bercy/decp-augmente.svg?style=svg)](https://circleci.com/gh/139bercy/decp-augmente)
 
-<img src="https://github.com/139bercy/decp-augmente/blob/V_Python_3_7/decp-augmente.png" alt="logoDECP"/>
+<img src="decp-augmente.png" alt="decp augmenté - logo"/>
 
 # PROJET DECP - Données Essentielles de la Commande Publique
 
