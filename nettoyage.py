@@ -141,7 +141,7 @@ def manage_missing_code(df):
     df["CPV_min_label"] = "Fourniture"
     if ( df["CPV_min"] == '45') : 
         df["CPV_min_label"] = "Travaux"
-    else if ( df["CPV_min"] > '45') : 
+    elif ( df["CPV_min"] > '45') : 
         df["CPV_min_label"] = "Service"
 
     # Mise en forme des données vides
