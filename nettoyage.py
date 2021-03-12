@@ -10,37 +10,64 @@ from pandas import json_normalize
 def main():
     with open("config.json") as f:
         conf = json.load(f)
+    if Check_files(conf):
+        path_to_data = conf["path_to_data"]
+        decp_file_name = conf["decp_file_name"]
+        error_siret_file_name = conf["error_siret_file_name"]
+
+        with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
+            data = json.load(json_data)
+
+        # Applatit les données json en tableau
+        df = json_normalize(data['marches'])
+
+        df = manage_titulaires(df)
+
+        df = drop_duplicates(df)
+
+        df = manage_montant(df)
+
+        df = manage_missing_code(df)
+
+        df = manage_region(df)
+
+        df = manage_date(df)
+
+        #df = data_inputation(df)
+
+        df = correct_date(df)
+
+
+        with open('df_nettoye', 'wb') as df_nettoye:
+            pickle.dump(df, df_nettoye)
+
+        df.to_csv("decp_nettoye.csv")
+        #df = apply_luhn(df)
+
+def Check_files(conf):
+    """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
+        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
+    base_sirene = conf["base_sirene_insee"]
+    cpv = conf["cpv_2008_ver_2013"]
+    #code_postaux_insee = conf["code-insee-postaux-geoflar"]
+    base_geoflar = conf["base_geoflar"]
+    departement = conf["departements-francais"]
     decp_file_name = conf["decp_file_name"]
-    error_siret_file_name = conf["error_siret_file_name"]
+    type_entreprise = conf["base_type_entreprise"]
+    path = os.path.join(os.getcwd(), path_to_data)
+    mask = os.path.exists(os.path.join(path, base_sirene)) and \
+           os.path.exists(os.path.join(path, base_geoflar)) and \
+           os.path.exists(os.path.join(path, cpv)) and \
+           os.path.exists(os.path.join(path, departement)) and \
+           os.path.exists(os.path.join(path, decp_file_name)) and \
+           os.path.exists(os.path.join(path, type_entreprise))
 
-    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-        data = json.load(json_data)
+    if not mask: 
+        raise ValueError("Un des fichiers data n'a pas été trouvé")
+    else:
+        return True
 
-    # Applatit les données json en tableau
-    df = json_normalize(data['marches'])
-
-    df = manage_titulaires(df)
-
-    df = drop_duplicates(df)
-
-    df = manage_montant(df)
-
-    df = manage_missing_code(df)
-
-    df = manage_region(df)
-
-    df = manage_date(df)
-
-    #df = data_inputation(df)
-
-    df = correct_date(df)
-
-    with open('df_nettoye', 'wb') as df_nettoye:
-        pickle.dump(df, df_nettoye)
-
-    df.to_csv("decp_nettoye.csv")
-    #df = apply_luhn(df)
 
 
 def manage_titulaires(df):
@@ -342,50 +369,6 @@ def correct_date(df):
 
     # Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
     df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
-
-    return df
-
-##### Algorithme de Luhn
-def luhn(codeSIREN):
-    try:
-        chiffres = pd.DataFrame(map(int, list(str(codeSIREN))), columns=['siren'])
-        chiffres['parite'] = [1, 2, 1, 2, 1, 2, 1, 2, 1]
-        chiffres['multiplication'] = chiffres.siren * chiffres.parite
-        for i in range(len(chiffres)):
-            chiffres.multiplication[i] = sum([int(c) for c in str(chiffres.multiplication[i])])
-        resultat = chiffres.multiplication.sum()
-        if (resultat % 10) == 0:
-            resultat = 0  # code BON
-        else:
-            resultat = 1  # code FAUX
-    except:
-        resultat = 1  # code FAUX
-        pass
-    return resultat
-
-
-def apply_luhn(df):
-    # Application sur les siren des acheteurs
-    df['siren1Acheteur'] = df["acheteur.id"].str[:9]
-    df_SA = pd.DataFrame(df['siren1Acheteur'])
-    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
-    df_SA['verifSirenAcheteur'] = df_SA['siren1Acheteur'].apply(luhn)
-
-    # Application sur les siren des établissements
-    df['siren2Etablissement'] = df.sirenEtablissement.str[:9]
-    df_SE = pd.DataFrame(df['siren2Etablissement'])
-    df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
-    df_SE['verifSirenEtablissement'] = df_SE['siren2Etablissement'].apply(luhn)
-
-    # Merge avec le df principal
-    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
-    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement')
-    del df['siren1Acheteur'], df['siren2Etablissement']
-
-    # On rectifie pour les codes non-siret
-    df.verifSirenEtablissement = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET') | (df.typeIdentifiantEtablissement.isnull()), 0,
-        df.verifSirenEtablissement)
 
     return df
 
