@@ -4,6 +4,7 @@
 	"decp_file_name" : "decp.json",
 	"error_siret_file_name" : "errorSIRET.csv",
 	"base_sirene_insee" : "StockEtablissement_utf8.csv",
+	"base_type_entreprise" : "StockUniteLegale_utf8.csv",
 	"cpv_2008_ver_2013" : "cpv_2008_ver_2013.xlsx",
 	"code-insee-postaux-geoflar" : "code-insee-postaux-geoflar.csv",  
 	"base_geoflar" : "geoflar-communes-2015.csv", 

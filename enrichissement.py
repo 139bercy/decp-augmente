@@ -49,8 +49,124 @@ def main():
     df = reorganisation(df)
 
     df = enrichissement_geo(df)
+    
+    df = enrichissement_type_entreprise(df)
 
+    df = apply_luhn(df)
+
+    df = manage_column_final(df)
+    
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
+
+
+def manage_column_final(df): 
+    """Rename de certaines colonne et trie des colonnes"""
+    df = df.rename(columns = {
+                     'montant' : 'montantCalcule',
+                     'acheteurId' : "idAcheteur",
+                     "acheteurNom" : "nomAcheteur",
+                     "natureObjet": "natureObjetMarche",
+                     "categorieEntreprise" : "categorieEtablissement"
+                     })
+    
+    df = df.drop(columns = ['latitudeCommuneEtablissement', 'longitudeCommuneEtablissement', 'latitudeCommuneAcheteur', 'longitudeCommuneAcheteur'])
+
+    df = df[['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', 'referenceCPV', 'dureeMois',
+        'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
+        'dureeMoisCalculee', 'datePublicationDonnees','montantOriginal', 'montantEstime', 'montantCalcule', 'nbTitulairesSurCeMarche',
+        'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
+        'lieuExecutionNom', 'nature', 'procedure',
+        'idAcheteur', 'verifSirenAcheteur', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
+        'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
+        'typeIdentifiantEtablissement',
+        'siretEtablissement', 'sirenEtablissement', 'nicEtablissement', 'verifSiretEtablissement', "categorieEtablissement", 'denominationSocialeEtablissement',
+        'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
+        'codeTypeEtablissement', 
+        'superficieCommuneEtablissement', 'populationCommuneEtablissement',
+        'distanceAcheteurEtablissement', 
+        'geolocCommuneEtablissement']]
+    return df
+
+
+def enrichissement_type_entreprise(df):
+    #Recuperation de la base 
+    path = os.path.join(path_to_data, conf["base_type_entreprise"])
+    to_add = pd.read_csv(path, usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
+    #On doit creer Siret
+    to_add["NIC"] = to_add.apply(lambda x: ("00000" + str(x["nicSiegeUniteLegale"]))[-5:], axis=1)
+    to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)    
+    #Jointure sur le Siret entre df et to_add
+    #On vérifie que le code siret n'est qu en un exemplaire dans la base
+    try :
+        df = suppression_Siret_doublon(df)
+        df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
+        return df
+    except:
+        df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
+        return df        
+
+
+def suppression_Siret_doublon(df):
+    Siret = df["siretEtablissement"]
+    Siret = Siret.iloc[:,0]
+    df = df.drop(columns = ["siretEtablissement"])
+    df["siretEtablissement"] = Siret
+    return df
+
+
+##### Algorithme de Luhn
+
+def luhn(nbentier):
+    """Application de la formule de Luhn à un nombre"""
+    try :
+        chiffres = pd.DataFrame(map(int, list(str(nbentier))), columns=['Number_list'])
+        taille = len(str(nbentier))
+        chiffres['parite'] = taille%2 * [1] + taille//2 * [2, 1]  #Permet la creation de la liste [1, 2, 1, 2 ..] en fonction de la taille du numero en entrée
+        chiffres['multiplication'] = chiffres.Number_list * chiffres.parite
+        for i in range(len(chiffres)):
+            chiffres.multiplication[i] = sum([int(c) for c in str(chiffres.multiplication[i])])
+        resultat = chiffres.multiplication.sum()
+        if (resultat % 10) == 0:
+            resultat = 1  # code BON
+        else:
+            if taille == 14:
+                #2nd regle dans le cas ou on traite un SIRET
+                resultat = chiffres.Number_list.sum()
+                if resultat % 5 == 0 :
+                    resultat = 1
+                else:
+                    resultat = 0
+            else:
+                resultat = 0  # code FAUX
+    except :
+        resultat = 0
+    return resultat
+
+
+def apply_luhn(df):
+    # Application sur les siren des acheteurs
+    df['siren1Acheteur'] = df["acheteurId"].str[:9] #Modification acheteur.id = idAcheteur
+    df_SA = pd.DataFrame(df['siren1Acheteur'])
+    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
+    df_SA['verifSirenAcheteur'] = df_SA['siren1Acheteur'].apply(luhn)
+
+    # Application sur les siren des établissements
+    df['siret2Etablissement'] = df.siretEtablissement.str[:]
+    df_SE = pd.DataFrame(df['siret2Etablissement'])
+    df_SE = df_SE.drop_duplicates(subset=['siret2Etablissement'], keep='first')
+    df_SE['verifSiretEtablissement'] = df_SE['siret2Etablissement'].apply(luhn)
+
+    # Merge avec le df principal
+    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
+    df = pd.merge(df, df_SE, how='left', on='siret2Etablissement')
+    del df['siren1Acheteur'], df['siret2Etablissement']
+
+    # On rectifie pour les codes non-siret
+    df.verifSiretEtablissement = np.where(
+        (df.typeIdentifiantEtablissement != 'SIRET') , 1,
+        df.verifSiretEtablissement) #On part du principe que les codes non-siret sont bons
+
+    return df
 
 
 def enrichissement_siret(df):
@@ -471,7 +587,7 @@ def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
-    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'], engine='openpyxl') 
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
@@ -611,6 +727,7 @@ def reorganisation(df):
         pickle.dump(df, df_backup2)
 
     return df
+
 
 
 def enrichissement_geo(df):
@@ -974,6 +1091,11 @@ def carte(df):
     folium.TileLayer('OpenStreetMap', overlay=True, show=True, control=False).add_to(c)
     folium.LayerControl(collapsed=False).add_to(c)
     c.save('carte/carteDECP.html')
+
+
+
+
+
 
 
 if __name__ == "__main__":
