@@ -87,7 +87,7 @@ def manage_column_final(df):
         'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
         'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
         'typeIdentifiantEtablissement',
-        'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirentEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
+        'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
         'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
         'codeTypeEtablissement', 
         'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -1095,6 +1095,7 @@ def carte(df):
     folium.TileLayer('OpenStreetMap', overlay=True, show=True, control=False).add_to(c)
     folium.LayerControl(collapsed=False).add_to(c)
     c.save('carte/carteDECP.html')
+
 
 
 
