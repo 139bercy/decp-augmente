@@ -593,7 +593,7 @@ def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
-    refCPV = pd.read_excel(path, usecols=['CODE', 'FR']) #, engine='openpyxl') 
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR']) 
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
