@@ -132,13 +132,13 @@ def is_luhn_valid(x):
         l = [int(i) for i in list(str(x))]
         l2 = [luhn_corr[i] if (index+1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
         if sum(l2) % 10 == 0 :
-            return "Bon"
+            return True
         elif  str(x)[:9] == "356000000": #SIREN de la Poste
             if sum(l)%5 == 0 :
-                return "Bon"
-        return "Mauvais" 
+                return True
+        return False
     except :
-        return "Mauvais"
+        return False
 
 
 
@@ -1095,10 +1095,6 @@ def carte(df):
     folium.TileLayer('OpenStreetMap', overlay=True, show=True, control=False).add_to(c)
     folium.LayerControl(collapsed=False).add_to(c)
     c.save('carte/carteDECP.html')
-
-
-
-
 
 
 
