@@ -84,10 +84,10 @@ def manage_column_final(df):
         'dureeMoisCalculee', 'datePublicationDonnees','montantOriginal', 'montantEstime', 'montantCalcule', 'nbTitulairesSurCeMarche',
         'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
         'lieuExecutionNom', 'nature', 'procedure',
-        'idAcheteur', 'verifSirenAcheteur', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
+        'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
         'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
         'typeIdentifiantEtablissement',
-        'siretEtablissement', "verifSiretEtablissement", 'sirenEtablissement', 'nicEtablissement', 'verifSirenEtablissement', "categorieEtablissement", 'denominationSocialeEtablissement',
+        'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirentEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
         'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
         'codeTypeEtablissement', 
         'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -132,13 +132,13 @@ def is_luhn_valid(x):
         l = [int(i) for i in list(str(x))]
         l2 = [luhn_corr[i] if (index+1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
         if sum(l2) % 10 == 0 :
-            return 1
+            return "Bon"
         elif  str(x)[:9] == "356000000": #SIREN de la Poste
             if sum(l)%5 == 0 :
-                return True
-        return False 
+                return "Bon"
+        return "Mauvais" 
     except :
-        return False
+        return "Mauvais"
 
 
 
