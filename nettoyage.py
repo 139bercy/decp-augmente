@@ -10,7 +10,7 @@ from pandas import json_normalize
 def main():
     with open("config.json") as f:
         conf = json.load(f)
-    if Check_files(conf):
+    if check_reference_files(conf) :
         path_to_data = conf["path_to_data"]
         decp_file_name = conf["decp_file_name"]
         error_siret_file_name = conf["error_siret_file_name"]
@@ -37,36 +37,25 @@ def main():
 
         df = correct_date(df)
 
-
         with open('df_nettoye', 'wb') as df_nettoye:
             pickle.dump(df, df_nettoye)
 
         df.to_csv("decp_nettoye.csv")
-        #df = apply_luhn(df)
+    #df = apply_luhn(df)
 
-def Check_files(conf):
+def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
         StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
-    base_sirene = conf["base_sirene_insee"]
-    cpv = conf["cpv_2008_ver_2013"]
-    #code_postaux_insee = conf["code-insee-postaux-geoflar"]
-    base_geoflar = conf["base_geoflar"]
-    departement = conf["departements-francais"]
-    decp_file_name = conf["decp_file_name"]
-    type_entreprise = conf["base_type_entreprise"]
+    L_key_useless = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_to_data)
-    mask = os.path.exists(os.path.join(path, base_sirene)) and \
-           os.path.exists(os.path.join(path, base_geoflar)) and \
-           os.path.exists(os.path.join(path, cpv)) and \
-           os.path.exists(os.path.join(path, departement)) and \
-           os.path.exists(os.path.join(path, decp_file_name)) and \
-           os.path.exists(os.path.join(path, type_entreprise))
+    for key in list(conf.keys()):
+        if key not in L_key_useless:
+            mask = os.path.exists(os.path.join(path, conf[key]))
+            if not mask: 
+                raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
+    return True
 
-    if not mask: 
-        raise ValueError("Un des fichiers data n'a pas été trouvé")
-    else:
-        return True
 
 
 

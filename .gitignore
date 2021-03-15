@@ -10,3 +10,4 @@ config.json
 
 # PYTHON
 __pycache__
+test.py
