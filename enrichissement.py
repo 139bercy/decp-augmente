@@ -67,9 +67,19 @@ def manage_column_final(df):
                      "categorieEntreprise" : "categorieEtablissement"
                      })
     
-    #df = df.drop(columns = ['latitudeCommuneEtablissement', 'longitudeCommuneEtablissement', 'latitudeCommuneAcheteur', 'longitudeCommuneAcheteur'])
+    #Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
+    try:
+        codeCPV = df["codeCPV"]
+        cpvComplet = codeCPV.iloc[:,0]
+        cpvdivision = codeCPV.iloc[:,1]
+        df = df.drop(columns = ["codeCPV"])
+        df["codeCPV"] = cpvComplet
+        df["codeCPV_division"] = cpvdivision
+    except:
+        pass
 
-    df = df[['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', 'referenceCPV', 'dureeMois',
+    #Réorganisation finale 
+    df = df.reindex(columns = ['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', "codeCPV_division", 'referenceCPV', 'dureeMois',
         'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
         'dureeMoisCalculee', 'datePublicationDonnees','montantOriginal', 'montantEstime', 'montantCalcule', 'nbTitulairesSurCeMarche',
         'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
@@ -77,12 +87,12 @@ def manage_column_final(df):
         'idAcheteur', 'verifSirenAcheteur', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
         'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
         'typeIdentifiantEtablissement',
-        'siretEtablissement', 'sirenEtablissement', 'nicEtablissement', 'verifSirenEtablissement', "categorieEtablissement", 'denominationSocialeEtablissement',
+        'siretEtablissement', "verifSiretEtablissement", 'sirenEtablissement', 'nicEtablissement', 'verifSirenEtablissement', "categorieEtablissement", 'denominationSocialeEtablissement',
         'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
         'codeTypeEtablissement', 
         'superficieCommuneEtablissement', 'populationCommuneEtablissement',
         'distanceAcheteurEtablissement', 
-        'geolocCommuneEtablissement']]
+        'geolocCommuneEtablissement'])
     return df
 
 
@@ -105,51 +115,63 @@ def enrichissement_type_entreprise(df):
 
 def suppression_Siret_doublon_colonne(df):
     """Permet la suppression des doublons colonnes siretEtablissement"""
-    Siret = df["siretEtablissement"]
-    Siret = Siret.iloc[:,0]
+    siret = df["siretEtablissement"]
+    siret = siret.iloc[:,0]
     df = df.drop(columns = ["siretEtablissement"])
-    df["siretEtablissement"] = Siret
+    df["siretEtablissement"] = siret
     return df
 
 
 ##### Algorithme de Luhn
 
 def is_luhn_valid(x):
-    """Application de la formule de Luhn à un nombre"""
+    """Application de la formule de Luhn à un nombre
+    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
     try :
         luhn_corr = [0,2,4,6,8,1,3,5,7,9]
         l = [int(i) for i in list(str(x))]
         l2 = [luhn_corr[i] if (index+1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
         if sum(l2) % 10 == 0 :
             return 1
-        return 0
+        elif  str(x)[:9] == "356000000": #SIREN de la Poste
+            if sum(l)%5 == 0 :
+                return True
+        return False 
     except :
-        return 0
+        return False
 
 
 
 def apply_luhn(df):
     # Application sur les siren des acheteurs
-    df['siren1Acheteur'] = df["acheteurId"].str[:9] #Modification acheteur.id = idAcheteur
+    df['siren1Acheteur'] = df["idAcheteur"].str[:9] #Modification acheteur.id = idAcheteur
     df_SA = pd.DataFrame(df['siren1Acheteur'])
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
-    df_SA['verifSirenAcheteur'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
+    df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
 
     # Application sur les siren des établissements
     df['siren2Etablissement'] = df.sirenEtablissement.str[:]
     df_SE = pd.DataFrame(df['siren2Etablissement'])
     df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
-    df_SE['verifSirenEtablissement'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
+    df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
+
+    # Application sur les siret des établissements
+    df['siret2Etablissement'] = df.siretEtablissement.str[:]
+    df_SE2 = pd.DataFrame(df['siret2Etablissement'])
+    df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
+    df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
+
 
     # Merge avec le df principal
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement')
-    del df['siren1Acheteur'], df['siren2Etablissement']
+    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement')
+    del df['siren1Acheteur'], df['siren2Etablissement'], df["siret2Etablissement"]
 
     # On rectifie pour les codes non-siret
-    df.verifSirenEtablissement = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET') , "Non testé",
-        df.verifSirenEtablissement) #A améliorer ?
+    df.siretEtablissementValide = np.where(
+        (df.typeIdentifiantEtablissement != 'SIRET') , "Non valable",
+        df.siretEtablissementValide) #A améliorer ?
     return df
 
 
@@ -571,7 +593,7 @@ def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
-    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'], engine='openpyxl') 
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR']) #, engine='openpyxl') 
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
@@ -665,7 +687,7 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["uid", "uuid", "codePostal", "denominationSociale_y", 'siret'], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "codePostal", "denominationSociale_x", 'siret'], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
@@ -679,7 +701,7 @@ def reorganisation(df):
         'acheteur.nom' : "nomAcheteur",
         'typeIdentifiant' : "typeIdentifiantEtablissement",
         'idTitulaires' : "siretEtablissement",
-        'denominationSociale_x' : "denominationSocialeEtablissement",
+        'denominationSociale_y' : "denominationSocialeEtablissement",
         'nic' : "nicEtablissement",
         'CPV_min' : "codeCPV",
         'codeRegion' : "codeRegionAcheteur",
