@@ -28,7 +28,7 @@ from folium import plugins
 with open("config.json") as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-error_siret_file = conf["error_siret_file_name"]
+#error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
 
 def save(df, nom):
