@@ -119,6 +119,8 @@ def detection_accord_cadre(df):
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "nombreTitulaireSurMarchePresume", "accord-cadrePresume"])
     df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"], right_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"])
     df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(), df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
+    df_to_output["accord-cadrePresume"] = np.where(df_to_output["accord-cadrePresume"].isnull(), "False", df_to_output["accord-cadrePresume"])
+    df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] == "ACCORD-CADRE", "True", df_to_output["accord-cadrePresume"])
     df_to_output["montantCalcule2"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output
 
