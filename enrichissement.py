@@ -58,7 +58,7 @@ def main():
 
     df = manage_column_final(df)
     
-    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
+    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
 
 
 
@@ -117,10 +117,10 @@ def detection_accord_cadre(df):
         L_data_fram += [[index[i][0], index[i][1], index[i][2], index[i][3], nombre_titulaire, str(accord_presume)]]
         #L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "nombreTitulaireSurMarchePresume", "accord-cadrePresume"])
-    
-    data_to_fusion["montantCalcule2"] = data_to_fusion["montantOriginal"]/data_to_fusion["nombreTitulaireSurMarchePresume"]
     df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"], right_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"])
+    print(df_to_output.columns)
     df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(), df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
+    df_to_output["montantCalcule2"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output
 
 def enrichissement_type_entreprise(df):
