@@ -28,7 +28,7 @@ from folium import plugins
 with open("config.json") as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-error_siret_file = conf["error_siret_file_name"]
+#error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
 
 def save(df, nom):
@@ -118,7 +118,6 @@ def detection_accord_cadre(df):
         #L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "nombreTitulaireSurMarchePresume", "accord-cadrePresume"])
     df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"], right_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"])
-    print(df_to_output.columns)
     df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(), df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
     df_to_output["montantCalcule2"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output

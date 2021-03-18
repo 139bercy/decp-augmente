@@ -13,7 +13,7 @@ def main():
     if check_reference_files(conf) :
         path_to_data = conf["path_to_data"]
         decp_file_name = conf["decp_file_name"]
-        error_siret_file_name = conf["error_siret_file_name"]
+        #error_siret_file_name = conf["error_siret_file_name"]
 
         with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
             data = json.load(json_data)
@@ -120,7 +120,7 @@ def manage_montant(df):
     df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
+    df['montantEstime'] = np.where(df['montant'].isnull(), 'True', 'False')
 
     return df
 
@@ -349,7 +349,7 @@ def correct_date(df):
         | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
         | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
 
-    df['dureeMoisEstime'] = np.where(mask, "Oui", "Non")
+    df['dureeMoisEstime'] = np.where(mask, "True", "False")
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
