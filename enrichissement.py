@@ -130,7 +130,7 @@ def getArchiveErrorSIRET():
 def get_enrichissement_insee(dfSIRET, path_to_data):
     # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
 
-    path = os.path.join(path_to_data, conf["stock_etablissement"])
+    path = os.path.join(path_to_data, conf["base_sirene_insee"])
     columns = [
         'siren',
         'nic',
@@ -503,7 +503,7 @@ def enrichissement_acheteur(df):
     dfAcheteurId = dfAcheteurId.astype(str)
 
     # StockEtablissement_utf8
-    chemin = os.path.join(path_to_data, conf["stock_etablissement"])
+    chemin = os.path.join(path_to_data, conf["base_sirene_insee"])
     #chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
     result = pd.DataFrame( columns=['siret', 'codePostalEtablissement',
                                     'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
@@ -565,10 +565,11 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["id", "uid", "uuid", "codePostal"], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "codePostal"], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
+        'id' : "id",
         '_type' : "type",
         'objet' : "objetMarche",
         'lieuExecution.code' : "lieuExecutionCode",
@@ -661,45 +662,39 @@ def enrichissement_geo(df):
 
     return df
 
-def get_df_villes():
-    path = os.path.join(path_to_data, conf["code-insee-postaux-geoflar"])
-    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
-                            usecols=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'])
-    df_villes['ordre'] = 0
-    df_villes2 = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
-                             usecols=['Code commune complet', 'geom_x_y', 'Superficie', 'Population'])
 
-    df_villes2['ordre'] = 1
-    df_villes2.columns = ['geom_x_y', 'Superficie', 'Population', 'CODE INSEE', 'ordre']
-    df_villes = pd.concat([df_villes2, df_villes])
-    # Suppression des doublons
-    df_villes = df_villes.sort_values(by='ordre', ascending=False)
+def get_df_villes():
+    path = os.path.join(path_to_data, conf["base_geoflar"])
+    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
+                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
+
+    # Suppression des codes communes sans point geo
+    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes['Geo Point'].notnull())]
     df_villes.reset_index(inplace=True, drop=True)
-    df_villes = df_villes.drop_duplicates(subset=['CODE INSEE', 'geom_x_y', 'Superficie', 'Population'], keep='last')
-    df_villes = df_villes.drop_duplicates(subset=['CODE INSEE'], keep='last')
-    df_villes = df_villes[(df_villes['CODE INSEE'].notnull()) & (df_villes.geom_x_y.notnull())]
-    df_villes.reset_index(inplace=True, drop=True)
-    # Multiplier population par 1000
-    df_villes.Population = df_villes.Population.astype(float)
-    df_villes.Population = round(df_villes.Population * 1000, 0)
-    # Divise la colonne geom_x_y pour obtenir la latitude et la longitude séparemment
-    # Latitude avant longitude
-    df_villes.geom_x_y = df_villes.geom_x_y.astype(str)
-    df_sep = pd.DataFrame(df_villes.geom_x_y.str.split(',', 1, expand=True))
+
+    # Séparation de la latitude et la longitude depuis les info géo
+    df_villes['Geo Point'] = df_villes['Geo Point'].astype(str)
+    df_sep = pd.DataFrame(df_villes['Geo Point'].str.split(',', 1, expand=True))
     df_sep.columns = ['latitude', 'longitude']
 
+    # Fusion des lat/long dans le df
     df_villes = df_villes.join(df_sep)
-    df_villes.latitude = df_villes.latitude.astype(float)
-    df_villes.longitude = df_villes.longitude.astype(float)
-    df_villes.drop(columns = ["geom_x_y", "ordre"], inplace=True, errors="ignore")
 
-    # Ajout pour les acheteurs
-    df_villes.rename(columns={"CODE INSEE" : 'codeCommune',
-                              "Population": 'population',
-                              "Superficie": 'superficie'},
+    # Suppression des colonnes inutiles
+    df_villes.drop(columns = ["Geo Point"], inplace=True, errors="ignore")
+
+    # Renommer les variables
+    df_villes.rename(columns={"INSEE_COM" : 'codeCommune',
+                              "POPULATION": 'population',
+                              "SUPERFICIE": 'superficie'},
                      inplace=True)
 
+    # Un brin de conversion c'est toujours bien
+    df_villes.population = df_villes.population.astype(float)
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
+    df_villes.latitude = df_villes.latitude.astype(float)
+    df_villes.longitude = df_villes.longitude.astype(float)
+
     return df_villes
 
 def get_distance(row):
