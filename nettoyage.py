@@ -10,38 +10,37 @@ from pandas import json_normalize
 def main():
     with open("config.json") as f:
         conf = json.load(f)
-    if check_reference_files(conf) :
-        path_to_data = conf["path_to_data"]
-        decp_file_name = conf["decp_file_name"]
-        error_siret_file_name = conf["error_siret_file_name"]
+    check_reference_files(conf)
+    path_to_data = conf["path_to_data"]
+    decp_file_name = conf["decp_file_name"]
+    error_siret_file_name = conf["error_siret_file_name"]
 
-        with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-            data = json.load(json_data)
+    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
+        data = json.load(json_data)
 
-        # Applatit les données json en tableau
-        df = json_normalize(data['marches'])
+    # Applatit les données json en tableau
+    df = json_normalize(data['marches'])
 
-        df = manage_titulaires(df)
+    df = manage_titulaires(df)
 
-        df = drop_duplicates(df)
+    df = drop_duplicates(df)
 
-        df = manage_montant(df)
+    df = manage_montant(df)
 
-        df = manage_missing_code(df)
+    df = manage_missing_code(df)
 
-        df = manage_region(df)
+    df = manage_region(df)
 
-        df = manage_date(df)
+    df = manage_date(df)
 
-        #df = data_inputation(df)
+    #df = data_inputation(df)
 
-        df = correct_date(df)
+    df = correct_date(df)
 
-        with open('df_nettoye', 'wb') as df_nettoye:
-            pickle.dump(df, df_nettoye)
+    with open('df_nettoye', 'wb') as df_nettoye:
+        pickle.dump(df, df_nettoye)
 
-        df.to_csv("decp_nettoye.csv")
-    #df = apply_luhn(df)
+    df.to_csv("decp_nettoye.csv")
 
 def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
@@ -54,9 +53,6 @@ def check_reference_files(conf):
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask: 
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
-    return True
-
-
 
 
 def manage_titulaires(df):

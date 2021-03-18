@@ -106,14 +106,14 @@ def enrichissement_type_entreprise(df):
     #Jointure sur le Siret entre df et to_add
     #On vérifie que le code siret n'est qu en un exemplaire dans la base
     try :
-        df = suppression_Siret_doublon_colonne(df)
+        df = suppression_siret_doublon_colonne(df)
     except:
         pass
     df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
     return df        
 
 
-def suppression_Siret_doublon_colonne(df):
+def suppression_siret_doublon_colonne(df):
     """Permet la suppression des doublons colonnes siretEtablissement"""
     siret = df["siretEtablissement"]
     siret = siret.iloc[:,0]
