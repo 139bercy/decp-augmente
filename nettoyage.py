@@ -13,7 +13,7 @@ def main():
     check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
-    error_siret_file_name = conf["error_siret_file_name"]
+    #error_siret_file_name = conf["error_siret_file_name"]
 
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
