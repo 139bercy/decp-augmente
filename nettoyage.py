@@ -37,6 +37,9 @@ def main():
 
     df = correct_date(df)
 
+    # suppression des caractères mal encodés
+    df = replace_char(df)
+
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
 
@@ -354,6 +357,14 @@ def correct_date(df):
 
     # Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
     df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
+
+    return df
+
+##### Fonction pour mettre en qualité le champ objetMarche
+def replace_char(df):
+
+    # Remplacement brutal du caractère (?) par un espace
+    df['objetMarche'] = df['objetMarche'].str.replace ('�', 'XXXXX') 
 
     return df
 
