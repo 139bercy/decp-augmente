@@ -36,6 +36,9 @@ def main():
 
     df = correct_date(df)
 
+    # suppression des caractères mal encodés
+    df = replace_char(df)
+
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
 
@@ -344,6 +347,16 @@ def correct_date(df):
     df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
 
     return df
+
+
+##### Fonction pour mettre en qualité le champ objetMarche
+def replace_char(df):
+
+    # Remplacement brutal du caractère (?) par un espace
+    df['objetMarche'] = df['objetMarche'].str.replace ('�', 'XXXXX') 
+
+    return df
+
 
 ##### Algorithme de Luhn
 def luhn(codeSIREN):
