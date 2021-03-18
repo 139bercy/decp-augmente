@@ -49,8 +49,155 @@ def main():
     df = reorganisation(df)
 
     df = enrichissement_geo(df)
+    
+    df = enrichissement_type_entreprise(df)
 
+    df = apply_luhn(df)
+
+    df = detection_accord_cadre(df)
+
+    df = manage_column_final(df)
+    
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
+
+
+
+def manage_column_final(df): 
+    """Rename de certaines colonne et trie des colonnes"""
+    df = df.rename(columns = {
+                     'montant' : 'montantCalcule',
+                     "natureObjet": "natureObjetMarche",
+                     "categorieEntreprise" : "categorieEtablissement"
+                     })
+    
+    #Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
+    try:
+        codeCPV = df["codeCPV"]
+        cpvComplet = codeCPV.iloc[:,0]
+        cpvdivision = codeCPV.iloc[:,1]
+        df = df.drop(columns = ["codeCPV"])
+        df["codeCPV"] = cpvComplet
+        df["codeCPV_division"] = cpvdivision
+    except:
+        pass
+
+    #Réorganisation finale 
+    df = df.reindex(columns = ['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', "codeCPV_division", 'referenceCPV', 'dureeMois',
+        'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
+        'dureeMoisCalculee', 'datePublicationDonnees','montantOriginal', 'montantEstime', 'montantCalcule', 'montantCalcule2', 'nbTitulairesSurCeMarche',"nombreTitulaireSurMarchePresume",
+        'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
+        'lieuExecutionNom', 'nature', "accord-cadrePresume", 'procedure',
+        'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
+        'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
+        'typeIdentifiantEtablissement',
+        'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
+        'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
+        'codeTypeEtablissement', 
+        'superficieCommuneEtablissement', 'populationCommuneEtablissement',
+        'distanceAcheteurEtablissement', 
+        'geolocCommuneEtablissement'])
+    return df
+
+def detection_accord_cadre(df):
+    """On va chercher à detecter les accord cadres, qu'ils soient declares ou non. 
+    Accord cadre : Plusieurs Etablissements sur un meme marche
+    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois."""
+    #Creation du sub DF necessaire
+    df_intermediaire = df[["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
+    #On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus. 
+    df_group = pd.DataFrame(df_intermediaire.groupby(["objetMarche", "dateNotification", "montantOriginal", "dureeMois"])["siretEtablissement"].unique())
+    #Initialisation du resultat sous forme de liste
+    index = df_group.index
+    L_data_fram = []
+    for i in range(len(df_group)):
+        nombre_titulaire = len(df_group["siretEtablissement"][i])
+        accord_presume = False
+        if nombre_titulaire > 1: 
+                accord_presume = True
+        L_data_fram += [[index[i][0], index[i][1], index[i][2], index[i][3], nombre_titulaire, str(accord_presume)]]
+        #L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
+    data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "nombreTitulaireSurMarchePresume", "accord-cadrePresume"])
+    data_to_fusion["montantCalcule2"] = data_to_fusion["montantOriginal"]/data_to_fusion["nombreTitulaireSurMarchePresume"]
+    return pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"], right_on=["objetMarche", "dateNotification", "montantOriginal", "dureeMois"])
+
+
+def enrichissement_type_entreprise(df):
+    #Recuperation de la base 
+    path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
+    to_add = pd.read_csv(path, usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
+    #On doit creer Siret
+    to_add["NIC"] = to_add.apply(lambda x: ("00000" + str(x["nicSiegeUniteLegale"]))[-5:], axis=1)
+    to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)    
+    #Jointure sur le Siret entre df et to_add
+    #On vérifie que le code siret n'est qu en un exemplaire dans la base
+    try :
+        df = suppression_Siret_doublon_colonne(df)
+    except:
+        pass
+    df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
+    return df        
+
+
+def suppression_Siret_doublon_colonne(df):
+    """Permet la suppression des doublons colonnes siretEtablissement"""
+    siret = df["siretEtablissement"]
+    siret = siret.iloc[:,0]
+    df = df.drop(columns = ["siretEtablissement"])
+    df["siretEtablissement"] = siret
+    return df
+
+
+##### Algorithme de Luhn
+
+def is_luhn_valid(x):
+    """Application de la formule de Luhn à un nombre
+    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
+    try :
+        luhn_corr = [0,2,4,6,8,1,3,5,7,9]
+        l = [int(i) for i in list(str(x))]
+        l2 = [luhn_corr[i] if (index+1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
+        if sum(l2) % 10 == 0 :
+            return True
+        elif  str(x)[:9] == "356000000": #SIREN de la Poste
+            if sum(l)%5 == 0 :
+                return True
+        return False
+    except :
+        return False
+
+
+
+def apply_luhn(df):
+    # Application sur les siren des acheteurs
+    df['siren1Acheteur'] = df["idAcheteur"].str[:9] #Modification acheteur.id = idAcheteur
+    df_SA = pd.DataFrame(df['siren1Acheteur'])
+    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
+    df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
+
+    # Application sur les siren des établissements
+    df['siren2Etablissement'] = df.sirenEtablissement.str[:]
+    df_SE = pd.DataFrame(df['siren2Etablissement'])
+    df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
+    df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
+
+    # Application sur les siret des établissements
+    df['siret2Etablissement'] = df.siretEtablissement.str[:]
+    df_SE2 = pd.DataFrame(df['siret2Etablissement'])
+    df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
+    df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
+
+
+    # Merge avec le df principal
+    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
+    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement')
+    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement')
+    del df['siren1Acheteur'], df['siren2Etablissement'], df["siret2Etablissement"]
+
+    # On rectifie pour les codes non-siret
+    df.siretEtablissementValide = np.where(
+        (df.typeIdentifiantEtablissement != 'SIRET') , "Non valable",
+        df.siretEtablissementValide) #A améliorer ?
+    return df
 
 
 def enrichissement_siret(df):
@@ -471,7 +618,7 @@ def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
-    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR']) 
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
@@ -565,7 +712,7 @@ def reorganisation(df):
     df.codePostal = df.codePostal.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["uid", "uuid", "codePostal"], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "codePostal", "denominationSociale_x", 'siret'], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
@@ -575,18 +722,16 @@ def reorganisation(df):
         'lieuExecution.code' : "lieuExecutionCode",
         'lieuExecution.typeCode' : "lieuExecutionTypeCode",
         'lieuExecution.nom' :  "lieuExecutionNom",
-        'acheteur.id' : "acheteurId",
-        'acheteur.nom' : "acheteurNom",
+        'acheteur.id' : "idAcheteur",
+        'acheteur.nom' : "nomAcheteur",
         'typeIdentifiant' : "typeIdentifiantEtablissement",
         'idTitulaires' : "siretEtablissement",
-        'denominationSociale_x' : "denominationSocialeEtablissement",
+        'denominationSociale_y' : "denominationSocialeEtablissement",
         'nic' : "nicEtablissement",
         'CPV_min' : "codeCPV",
         'codeRegion' : "codeRegionAcheteur",
         'Region': "regionAcheteur",
-        'siret' : "siretEtablissement",
         'siren': "sirenEtablissement" ,
-        'denominationSociale_y' : "denominationSocialeEtablissement",
         'refCodeCPV' : "referenceCPV"
     }
     df.rename(columns=column_mapping, inplace=True)
@@ -611,6 +756,7 @@ def reorganisation(df):
         pickle.dump(df, df_backup2)
 
     return df
+
 
 
 def enrichissement_geo(df):
@@ -974,6 +1120,8 @@ def carte(df):
     folium.TileLayer('OpenStreetMap', overlay=True, show=True, control=False).add_to(c)
     folium.LayerControl(collapsed=False).add_to(c)
     c.save('carte/carteDECP.html')
+
+
 
 
 if __name__ == "__main__":
