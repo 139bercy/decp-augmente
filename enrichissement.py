@@ -51,7 +51,7 @@ def main():
     df = enrichissement_geo(df)
     
     df = enrichissement_type_entreprise(df)
-
+    
     df = apply_luhn(df)
 
     df = detection_accord_cadre(df)
@@ -140,6 +140,7 @@ def enrichissement_type_entreprise(df):
     except:
         pass
     df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
+    df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
     return df        
 
 
