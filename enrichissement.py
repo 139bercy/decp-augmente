@@ -168,13 +168,12 @@ def apply_luhn(df):
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
     del df['siren2Etablissement']
-    
+
     # Application sur les siret des établissements
     df['siret2Etablissement'] = df.siretEtablissement.str[:]
     df_SE2 = pd.DataFrame(df['siret2Etablissement'])
     df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
     df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
-
 
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
@@ -285,12 +284,12 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     chunksize = 1000000
     for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'])
+        resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'], copy=False)
         result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
     
-    enrichissement_insee_siret = pd.merge(dfSIRET, result, how='outer', on=['siret'])
+    enrichissement_insee_siret = pd.merge(dfSIRET, result, how='outer', on=['siret'], copy=False)
     enrichissement_insee_siret.rename(columns={ "siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
     nanSiret = enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()]
@@ -326,7 +325,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     nanSiren.reset_index(inplace=True, drop=True)
     """
 
-    temp_df = pd.merge(nanSiret, result, indicator=True, how="outer", on='siren')
+    temp_df = pd.merge(nanSiret, result, indicator=True, how="outer", on='siren', copy=False)
     nanSiret = temp_df[temp_df['activitePrincipaleEtablissement'].isnull()]
     nanSiret = nanSiret.iloc[:, :3]
     #nanSiren = nanSiren.iloc[:, :3]
@@ -372,7 +371,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
 
     # Récupération des résultats
     nanSiren.reset_index(inplace=True)
-    resultat = pd.merge(nanSiren, df_scrap, on='index')
+    resultat = pd.merge(nanSiren, df_scrap, on='index', copy=False)
     resultatScrap1 = resultat[resultat.rue != ' ']
 
     # Données encore manquantes
@@ -439,7 +438,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
 
     # Récupération des résultats
     dfDS.reset_index(inplace=True)
-    resultat = pd.merge(dfDS, df_scrap2, on='index')
+    resultat = pd.merge(dfDS, df_scrap2, on='index', copy=False)
     resultatScrap2 = resultat[resultat.rue != ' ']
 
     ###############################################################################
@@ -617,8 +616,8 @@ def enrichissement_cpv(df):
     refCPV_min = refCPV_min.drop_duplicates(subset=['CODE'], keep='first')
     refCPV_min.columns = ['CODEmin', 'FR2']
     # Merge avec le df principal
-    df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE")
-    df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin")
+    df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE", copy=False)
+    df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin", copy=False)
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
     df.drop(columns=["FR2", "CODE", "CODEmin"], inplace=True)
@@ -650,7 +649,7 @@ def enrichissement_acheteur(df):
             chemin, chunksize=1000000, sep=',', encoding='utf-8',
             usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret")
+        resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret", copy=False)
         result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
@@ -685,7 +684,7 @@ def enrichissement_acheteur(df):
                                       'codeCommuneAcheteur']
     enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
 
-    df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id')
+    df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
     with open('df_backup_acheteur', 'wb') as df_backup_acheteur:
         pickle.dump(df, df_backup_acheteur)
 
@@ -760,7 +759,7 @@ def enrichissement_geo(df):
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
     df_villes = get_df_villes()
-    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune")
+    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
     df.rename(columns={"superficie" : "superficieCommuneAcheteur",
                "population" : "populationCommuneAcheteur",
                "latitude" : "latitudeCommuneAcheteur",
@@ -768,7 +767,7 @@ def enrichissement_geo(df):
               inplace=True)
     df.drop(columns="codeCommune", inplace=True)
 
-    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune')
+    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune', copy=False)
     df.rename(columns={"superficie" : "superficieCommuneEtablissement",
                "population" : "populationCommuneEtablissement",
                "latitude" : "latitudeCommuneEtablissement",
@@ -966,7 +965,7 @@ def CAH(df):
 
     # On ajoute au dataframe principal
     df = df[['libelleCommuneAcheteur', 'segmentation_CAH']]
-    df_decp = pd.merge(df, df, how='left', on='libelleCommuneAcheteur')
+    df_decp = pd.merge(df, df, how='left', on='libelleCommuneAcheteur', copy=False)
     df_decp.segmentation_CAH = np.where(df_decp.segmentation_CAH.isnull(), 0, df_decp.segmentation_CAH)
     df_decp.segmentation_CAH = df_decp.segmentation_CAH.astype(int)
 
@@ -991,12 +990,12 @@ def carte(df):
     dfDM = df.groupby(['latitudeAcheteur', 'longitudeAcheteur']).distanceAcheteurEtablissement.median().to_frame(
         'distanceMediane').reset_index()
 
-    df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-    df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-    df_carte = pd.merge(df_carte, dfIN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-    df_carte = pd.merge(df_carte, dfSN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-    df_carte = pd.merge(df_carte, dfDM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'])
-    df_carte = pd.merge(df_carte, df, how='left', on=['libelleCommuneAcheteur'])
+    df_carte = pd.merge(df_carte, dfMT, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'], copy=False)
+    df_carte = pd.merge(df_carte, dfMM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'], copy=False)
+    df_carte = pd.merge(df_carte, dfIN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'], copy=False)
+    df_carte = pd.merge(df_carte, dfSN, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'], copy=False)
+    df_carte = pd.merge(df_carte, dfDM, how='left', on=['latitudeAcheteur', 'longitudeAcheteur'], copy=False)
+    df_carte = pd.merge(df_carte, df, how='left', on=['libelleCommuneAcheteur'], copy=False)
 
     df_carte.montantTotal = round(df_carte.montantTotal, 0)
     df_carte.montantMoyen = round(df_carte.montantMoyen, 0)
@@ -1031,7 +1030,7 @@ def carte(df):
     df_Dep = df.groupby(['codeDepartementAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
     df_Dep.columns = ['code', 'montant']
     df_Dep = df_Dep[(df_Dep.code != 'nan')]
-    df_Dep = pd.merge(df_Dep, depPop, how='left', on='code')
+    df_Dep = pd.merge(df_Dep, depPop, how='left', on='code', copy=False)
     df_Dep = df_Dep[df_Dep.population.notnull()]
     df_Dep.montant = round(df_Dep.montant / df_Dep.population, 0).astype(int)
     df_Dep.montant = np.where(df_Dep.montant > 2000, 2000, df_Dep.montant)
