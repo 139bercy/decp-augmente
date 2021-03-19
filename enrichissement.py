@@ -173,9 +173,9 @@ def apply_luhn(df):
 
 
     # Merge avec le df principal
-    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
-    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement')
-    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement')
+    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
+    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
+    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     del df['siren1Acheteur'], df['siren2Etablissement'], df["siret2Etablissement"]
 
     # On rectifie pour les codes non-siret
