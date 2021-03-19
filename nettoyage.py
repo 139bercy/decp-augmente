@@ -311,7 +311,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     del df['conca'], df['montantEstimation']
@@ -323,7 +323,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     # S'il reste encore des valeurs nulles...
