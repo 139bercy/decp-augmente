@@ -100,10 +100,11 @@ def enrichissement_type_entreprise(df):
     #Recuperation de la base 
     path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
 
-    data_chunks = list()
-    chunksize = 1000000
-    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"], low_memory = False):
-        data_chunks.append(gm_chunk)
+    #data_chunks = list()
+    #chunksize = 1000000
+    #for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]):
+    #    data_chunks.append(gm_chunk)
+    #result = result.drop_duplicates(subset=['siret'], keep='first')
     to_add = pd.concat(data_chunks)
 
 
@@ -275,7 +276,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
 
     result = pd.DataFrame(columns=columns)
     chunksize = 1000000
-    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, low_memory = False):
+    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
         resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'])
         result = pd.concat([result, resultTemp], axis=0)
@@ -640,7 +641,7 @@ def enrichissement_acheteur(df):
                                     'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
     for gm_chunk in pd.read_csv(
             chemin, chunksize=1000000, sep=',', encoding='utf-8',
-            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'], low_memory = False):
+            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
         resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret")
         result = pd.concat([result, resultTemp], axis=0)
