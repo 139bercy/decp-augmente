@@ -158,13 +158,17 @@ def apply_luhn(df):
     df_SA = pd.DataFrame(df['siren1Acheteur'])
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
+    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
+    del df['siren1Acheteur']
 
     # Application sur les siren des établissements
     df['siren2Etablissement'] = df.sirenEtablissement.str[:]
     df_SE = pd.DataFrame(df['siren2Etablissement'])
     df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
-
+    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
+    del df['siren2Etablissement']
+    
     # Application sur les siret des établissements
     df['siret2Etablissement'] = df.siretEtablissement.str[:]
     df_SE2 = pd.DataFrame(df['siret2Etablissement'])
@@ -173,10 +177,8 @@ def apply_luhn(df):
 
 
     # Merge avec le df principal
-    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
-    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
-    del df['siren1Acheteur'], df['siren2Etablissement'], df["siret2Etablissement"]
+    del df["siret2Etablissement"]
 
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
