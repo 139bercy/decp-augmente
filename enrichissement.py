@@ -266,13 +266,19 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
         'nomenclatureActivitePrincipaleEtablissement']
 
     result = pd.DataFrame(columns=columns)
-    chunksize = 1000000
-    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
-        gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'])
-        result = pd.concat([result, resultTemp], axis=0)
+    #chunksize = 1000000
+    #for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
+    #    gm_chunk['siret'] = gm_chunk['siret'].astype(str)
+    #    resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'])
+    #    result = pd.concat([result, resultTemp], axis=0)
+    #result = result.drop_duplicates(subset=['siret'], keep='first')
+    result_test = pd.read_csv(path, sep=',', encoding='utf-8', usecols=columns)
+    result_test['siret'] = result_test['siret'].astype(str)
+    resultTemp = pd.merge(dfSIRET['siret'], result_test, on=['siret'])
+    result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
+    
     enrichissement_insee_siret = pd.merge(dfSIRET, result, how='outer', on=['siret'])
     enrichissement_insee_siret.rename(columns={ "siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
