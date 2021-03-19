@@ -105,10 +105,10 @@ def enrichissement_type_entreprise(df):
     #for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]):
     #    data_chunks.append(gm_chunk)
     #result = result.drop_duplicates(subset=['siret'], keep='first')
-    to_add = pd.concat(data_chunks)
+    #to_add = pd.concat(data_chunks)
 
 
-    #to_add = pd.read_csv(path, usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
+    to_add = pd.read_csv(path, usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
     #On doit creer Siret
     to_add["NIC"] = to_add.apply(lambda x: ("00000" + str(x["nicSiegeUniteLegale"]))[-5:], axis=1)
     to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)    
