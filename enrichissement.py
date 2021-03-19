@@ -118,7 +118,8 @@ def enrichissement_type_entreprise(df):
         df = suppression_siret_doublon_colonne(df)
     except:
         pass
-    df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement')
+    df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement', copy=False)
+    del to_add
     return df        
 
 
@@ -197,14 +198,18 @@ def enrichissement_siret(df):
 
     print("enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
+    del archiveErrorSIRET
     print("enrichissement infogreffe fini")
 
     print("Concaténation des dataframes d'enrichissement...")
     dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
+    del enrichissementScrap
+    del enrichissementInsee
     print("Fini")
 
     ########### Ajout au df principal !
-    df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret")
+    df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
+    del dfenrichissement
 
     return df
 
