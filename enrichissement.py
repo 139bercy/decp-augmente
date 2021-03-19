@@ -275,6 +275,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     result_test = pd.read_csv(path, sep=',', encoding='utf-8', usecols=columns)
     result_test['siret'] = result_test['siret'].astype(str)
     resultTemp = pd.merge(dfSIRET['siret'], result_test, on=['siret'])
+    del result_test
     result = pd.concat([result, resultTemp], axis=0)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
