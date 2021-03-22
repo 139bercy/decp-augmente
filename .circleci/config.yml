@@ -1,27 +1,48 @@
 ---
 version: 2
 jobs:
-    build-and-send:
+  get_code:
+    docker:
+      - image: 139bercy/decp-rama
+      steps:
+        - checkout
+        - run:
+            # Récupération du code manuel car soucis avec "- checkout"
+            name: Récupération du projet decp-augmenté
+            command: |
+#              mkdir -p /home/circleci/project
+#              cd /home/circleci/project
+#              git clone https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME.git
+#              cd decp-augmente
+#              if [ "$CIRCLE_BRANCH" != "master" ]; then
+#                git checkout "$CIRCLE_BRANCH" || ( git fetch origin pull/$CIRCLE_PR_NUMBER/head:pull_local && git checkout pull_local )
+#              fi
+              mv config-circleci.json config.json
+
+  install_requirements:
+    docker:
+      - image: 139bercy/decp-rama
+      steps:
+        - run:
+            name: Installation des requirements
+            command: |
+              cd /home/circleci/project/decp-augmente
+              pip3 install -r requirements.txt
+  linter:
+    docker:
+      - image: 139bercy/decp-rama
+    steps:
+      - run:
+          name: Linter
+          command: |
+            pip3 install pylint
+            PYTHON_FILE="$(ls *.py)"
+            pylint $PYTHON_FILE
+
+  build-and-send:
         docker:
             - image: 139bercy/decp-rama
         steps:
-            - run:
-                  # Récupération du code manuel car soucis avec "- checkout"
-                  name: Récupération du projet decp-augmenté
-                  command: |
-                      mkdir -p /home/circleci/project
-                      cd /home/circleci/project
-                      git clone https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME.git
-                      cd decp-augmente
-                      if [ "$CIRCLE_BRANCH" != "master" ]; then
-                        git checkout "$CIRCLE_BRANCH" || ( git fetch origin pull/$CIRCLE_PR_NUMBER/head:pull_local && git checkout pull_local )
-                      fi
-                      mv config-circleci.json config.json
-            - run:
-                  name: Installation des requirements
-                  command: |
-                      cd /home/circleci/project/decp-augmente
-                      pip3 install -r requirements.txt
             - run:
                   name: Récupération des données utiles
                   no_output_timeout: 1h
@@ -55,7 +76,14 @@ workflows:
   version: 2
   main:
     jobs:
-      - build-and-send
+      - get_code
+      - install_requirements:
+        requires:
+          - get_code
+      - build-and-send:
+        requires:
+          - get_code
+          - install_requirements
 
   daily:
     jobs:
