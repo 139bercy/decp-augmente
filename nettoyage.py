@@ -1,9 +1,9 @@
 import json
 import os
-import numpy as np
-import pandas as pd
 import pickle
 
+import numpy as np
+import pandas as pd
 from pandas import json_normalize
 
 
@@ -19,7 +19,53 @@ def main():
         data = json.load(json_data)
 
     # Applatit les données json en tableau
+    # pd.read_json(data['marches'])
+    # df = pd.read_json(json.dumps(data['marches']))
     df = json_normalize(data['marches'])
+
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'uid': 'string',
+        'uuid': 'string',
+        '_type': 'string',
+        'objet': 'string',
+        'codeCPV': 'string',
+        'lieuExecution.code': 'string',
+        'lieuExecution.typeCode': 'string',
+        'lieuExecution.nom': 'string',
+        'dureeMois': 'int64',
+        # TODO définition d'un format de date "généraliste" qui sera capable de gérer les différents formats présents
+        # 'dateNotification': 'datetime64[ns]',
+        # 'datePublicationDonnees': 'datetime64[ns]',
+        'montant': 'float64',
+        'formePrix': 'string',
+        'titulaires': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # 'titulaires.typeIdentifiant': 'string',
+        # 'titulaires.id': 'string',
+        # 'titulaires.denominationSociale': 'string',
+        'modifications': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'modifications.objetModification': 'string',
+        # 'modifications.dateNotificationModification': 'string',
+        # 'modifications.datePublicationDonneesModification': 'string',
+        # 'modifications.montant': 'float64',
+        'nature': 'string',
+        'autoriteConcedante.id': 'string',
+        'autoriteConcedante.nom': 'string',
+        'acheteur.id': 'string',
+        'acheteur.nom': 'string',
+        'donneesExecution': 'string'
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'donneesExecution.datePublicationDonneesExecution': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement.tarifs': 'object',
+        # 'donneesExecution.depensesInvestissement.tarifs.intituleTarif': 'string',
+        # 'donneesExecution.depensesInvestissement.tarifs.tarif': 'float64',
+    }, copy=False)
 
     df = manage_titulaires(df)
 
@@ -96,8 +142,9 @@ def drop_duplicates(df):
     df.reset_index(inplace=True, drop=True)
 
     # Correction afin que ces variables soient représentées pareil
-    df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
-    df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
+    df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
+    df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
+    df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
     return df
 
@@ -203,6 +250,8 @@ def manage_region(df):
     df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
+
+    df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
 
     ###############################################################################

@@ -1,44 +1,67 @@
-import os
-import json
 import csv
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
+import json
+import os
 import pickle
-import time
-import requests
 import urllib
 
-from tqdm import tqdm
-from lxml import html
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.firefox.options import Options
-
-from sklearn.preprocessing import StandardScaler
-from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
-from geopy.distance import distance, Point
-
 import folium
-from folium.plugins import MarkerCluster
-from folium.plugins import HeatMap
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import requests
 from folium import plugins
-
+from folium.plugins import HeatMap
+from folium.plugins import MarkerCluster
+from geopy.distance import distance, Point
+from lxml import html
+from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+from sklearn.preprocessing import StandardScaler
 
 with open("config.json") as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-#error_siret_file = conf["error_siret_file_name"]
+# error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
+
 
 def save(df, nom):
     with open(nom, 'wb') as df_backup:
         pickle.dump(df, df_backup)
 
-def main():
 
+def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
+
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'uid': 'string',
+        'uuid': 'string',
+        '_type': 'string',
+        'objet': 'string',
+        'codeCPV': 'string',
+        'CPV_min': 'string',
+        'lieuExecution.code': 'string',
+        'lieuExecution.typeCode': 'string',
+        'lieuExecution.nom': 'string',
+        'dureeMois': 'int64',
+        'montant': 'float64',
+        'montantOriginal': 'float64',
+        'montantEstime': 'string',
+        'formePrix': 'string',
+        'idTitulaires': 'object',
+        'typeIdentifiant': 'string',
+        'denominationSociale': 'string',
+        'nature': 'string',
+        'acheteur.id': 'string',
+        'acheteur.nom': 'string',
+        'codePostal': 'string',
+        'codeRegion': 'string',
+        'anneeNotification': 'string',
+        'moisNotification': 'string',
+        'dureeMoisEstime': 'string',
+    }, copy=False)
 
     df = enrichissement_siret(df)
 
@@ -49,85 +72,92 @@ def main():
     df = reorganisation(df)
 
     df = enrichissement_geo(df)
-    
+
+    # drop column avec doublon de colonne
+    #
     df = enrichissement_type_entreprise(df)
 
     df = apply_luhn(df)
 
     df = manage_column_final(df)
-    
+
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
 
 
-def manage_column_final(df): 
+def manage_column_final(df):
     """Rename de certaines colonne et trie des colonnes"""
-    df = df.rename(columns = {
-                     'montant' : 'montantCalcule',
-                     "natureObjet": "natureObjetMarche",
-                     "categorieEntreprise" : "categorieEtablissement"
-                     })
-    
-    #Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
+    df = df.rename(columns={
+        'montant': 'montantCalcule',
+        "natureObjet": "natureObjetMarche",
+        "categorieEntreprise": "categorieEtablissement"
+    })
+
+    # Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
     try:
         codeCPV = df["codeCPV"]
-        cpvComplet = codeCPV.iloc[:,0]
-        cpvdivision = codeCPV.iloc[:,1]
-        df = df.drop(columns = ["codeCPV"])
+        cpvComplet = codeCPV.iloc[:, 0]
+        cpvdivision = codeCPV.iloc[:, 1]
+        df = df.drop(columns=["codeCPV"])
         df["codeCPV"] = cpvComplet
         df["codeCPV_division"] = cpvdivision
     except:
         pass
 
-    #Réorganisation finale 
-    df = df.reindex(columns = ['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', "codeCPV_division", 'referenceCPV', 'dureeMois',
-        'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
-        'dureeMoisCalculee', 'datePublicationDonnees','montantOriginal', 'montantEstime', 'montantCalcule', 'nbTitulairesSurCeMarche',
-        'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
-        'lieuExecutionNom', 'nature', 'procedure',
-        'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
-        'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
-        'typeIdentifiantEtablissement',
-        'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
-        'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement', 'codePostalEtablissement',
-        'codeTypeEtablissement', 
-        'superficieCommuneEtablissement', 'populationCommuneEtablissement',
-        'distanceAcheteurEtablissement', 
-        'geolocCommuneEtablissement'])
+    # Réorganisation finale
+    df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', "codeCPV_division",
+                             'referenceCPV', 'dureeMois',
+                             'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
+                             'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal', 'montantEstime',
+                             'montantCalcule', 'nbTitulairesSurCeMarche',
+                             'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
+                             'lieuExecutionNom', 'nature', 'procedure',
+                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
+                             'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
+                             'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
+                             'typeIdentifiantEtablissement',
+                             'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement',
+                             'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
+                             'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
+                             'codePostalEtablissement',
+                             'codeTypeEtablissement',
+                             'superficieCommuneEtablissement', 'populationCommuneEtablissement',
+                             'distanceAcheteurEtablissement',
+                             'geolocCommuneEtablissement'])
     return df
 
 
 def enrichissement_type_entreprise(df):
-    #Recuperation de la base 
+    # Recuperation de la base
     path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
 
-    #data_chunks = list()
-    #chunksize = 1000000
-    #for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]):
+    # data_chunks = list()
+    # chunksize = 1000000
+    # for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]):
     #    data_chunks.append(gm_chunk)
-    #result = result.drop_duplicates(subset=['siret'], keep='first')
-    #to_add = pd.concat(data_chunks)
+    # result = result.drop_duplicates(subset=['siret'], keep='first')
+    # to_add = pd.concat(data_chunks)
 
-
-    to_add = pd.read_csv(path, usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
-    #On doit creer Siret
+    to_add = pd.read_csv(path, usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
+    # On doit creer Siret
     to_add["NIC"] = to_add.apply(lambda x: ("00000" + str(x["nicSiegeUniteLegale"]))[-5:], axis=1)
-    to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)    
-    #Jointure sur le Siret entre df et to_add
-    #On vérifie que le code siret n'est qu en un exemplaire dans la base
-    try :
+    to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)
+    # Jointure sur le Siret entre df et to_add
+    # On vérifie que le code siret n'est qu en un exemplaire dans la base
+    try:
         df = suppression_siret_doublon_colonne(df)
     except:
         pass
-    df = df.merge(to_add[['categorieEntreprise','siretEtablissement']], how = 'left', on = 'siretEtablissement', copy=False)
+    df = df.merge(
+        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
     del to_add
-    return df        
+    return df
 
 
 def suppression_siret_doublon_colonne(df):
     """Permet la suppression des doublons colonnes siretEtablissement"""
     siret = df["siretEtablissement"]
-    siret = siret.iloc[:,0]
-    df = df.drop(columns = ["siretEtablissement"])
+    siret = siret.iloc[:, 0]
+    df = df.drop(columns=["siretEtablissement"])
     df["siretEtablissement"] = siret
     return df
 
@@ -137,24 +167,23 @@ def suppression_siret_doublon_colonne(df):
 def is_luhn_valid(x):
     """Application de la formule de Luhn à un nombre
     Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
-    try :
-        luhn_corr = [0,2,4,6,8,1,3,5,7,9]
+    try:
+        luhn_corr = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]
         l = [int(i) for i in list(str(x))]
-        l2 = [luhn_corr[i] if (index+1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
-        if sum(l2) % 10 == 0 :
+        l2 = [luhn_corr[i] if (index + 1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
+        if sum(l2) % 10 == 0:
             return True
-        elif  str(x)[:9] == "356000000": #SIREN de la Poste
-            if sum(l)%5 == 0 :
+        elif str(x)[:9] == "356000000":  # SIREN de la Poste
+            if sum(l) % 5 == 0:
                 return True
         return False
-    except :
+    except:
         return False
-
 
 
 def apply_luhn(df):
     # Application sur les siren des acheteurs
-    df['siren1Acheteur'] = df["idAcheteur"].str[:9] #Modification acheteur.id = idAcheteur
+    df['siren1Acheteur'] = df["idAcheteur"].str[:9]  # Modification acheteur.id = idAcheteur
     df_SA = pd.DataFrame(df['siren1Acheteur'])
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
@@ -181,8 +210,8 @@ def apply_luhn(df):
 
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET') , "Non valable",
-        df.siretEtablissementValide) #A améliorer ?
+        (df.typeIdentifiantEtablissement != 'SIRET'), "Non valable",
+        df.siretEtablissementValide)  # A améliorer ?
     return df
 
 
@@ -237,7 +266,6 @@ def get_siretdf_from_original_data(df):
 
 
 def getArchiveErrorSIRET():
-
     """
     ######################################################################
     ### On supprime les siret déjà identifié comme faux
@@ -279,21 +307,28 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
         'codeCommuneEtablissement',
         'activitePrincipaleEtablissement',
         'nomenclatureActivitePrincipaleEtablissement']
+    dtypes = {
+        'siret': 'string',
+        'typeVoieEtablissement': 'string',
+        'libelleVoieEtablissement': 'string',
+        'codePostalEtablissement': 'string',
+        'libelleCommuneEtablissement': 'string',
+    }
 
     result = pd.DataFrame(columns=columns)
     chunksize = 1000000
-    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns):
-        gm_chunk['siret'] = gm_chunk['siret'].astype(str)
+    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
         resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'], copy=False)
-        result = pd.concat([result, resultTemp], axis=0)
+        result = pd.concat([result, resultTemp], axis=0, copy=False)
+        del resultTemp
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
-    
     enrichissement_insee_siret = pd.merge(dfSIRET, result, how='outer', on=['siret'], copy=False)
-    enrichissement_insee_siret.rename(columns={ "siren_x": "siren"}, inplace=True)
+    enrichissement_insee_siret.rename(columns={"siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
     nanSiret = enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()]
-    enrichissement_insee_siret = enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
+    enrichissement_insee_siret = enrichissement_insee_siret[
+        enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
     nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale"]]
 
     """
@@ -314,7 +349,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     """
 
     ## Concat des deux resultats
-    enrichissementInsee = enrichissement_insee_siret #pd.concat([enrichissement_insee_siret, enrichissement_insee_siren])
+    enrichissementInsee = enrichissement_insee_siret  # pd.concat([enrichissement_insee_siret, enrichissement_insee_siren])
 
     """
     ## create nanSiren dataframe
@@ -326,9 +361,10 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     """
 
     temp_df = pd.merge(nanSiret, result, indicator=True, how="outer", on='siren', copy=False)
+    del result
     nanSiret = temp_df[temp_df['activitePrincipaleEtablissement'].isnull()]
     nanSiret = nanSiret.iloc[:, :3]
-    #nanSiren = nanSiren.iloc[:, :3]
+    # nanSiren = nanSiren.iloc[:, :3]
     nanSiret.reset_index(inplace=True, drop=True)
 
     return [enrichissementInsee, nanSiret]
@@ -448,13 +484,13 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]
     errorSIRET.columns = ['siret', 'siren', 'denominationSociale']
     errorSIRET.reset_index(inplace=True, drop=True)
-    errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0)
+    errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0, copy=False)
     errorSIRET = errorSIRET.drop_duplicates(subset=['siret', 'siren', 'denominationSociale'], keep='first')
     errorSIRET.to_csv('errorSIRET.csv', sep=';', index=False, header=True, encoding='utf-8')
     ###############################################################################
 
     # On réuni les résultats du scraping
-    enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2])
+    enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2], copy=False)
     return enrichissementScrap
 
 
@@ -551,8 +587,11 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
         'VLGE': 'Village'}
 
     enrichissementInsee['typeVoieEtablissement'].replace(listCorrespondance, inplace=True)
-    enrichissementInsee['rue'] = enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement
-    enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee['activitePrincipaleEtablissement'].str.replace(".", "")
+    enrichissementInsee['rue'] = \
+        (enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement)
+
+    enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee[
+        'activitePrincipaleEtablissement'].str.replace(".", "")
 
     # Gestion bdd scrap
     enrichissementScrap.reset_index(inplace=True, drop=True)
@@ -575,10 +614,10 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 
     # Renomme les colonnes
     enrichissementScrap.rename(columns={
-        'rue' : 'adresseEtablissement',
-        'codeType' : 'codeTypeEtablissement',
-        'codePostal' : 'codePostalEtablissement',
-        'commune' : 'communeEtablissement'
+        'rue': 'adresseEtablissement',
+        'codeType': 'codeTypeEtablissement',
+        'codePostal': 'codePostalEtablissement',
+        'commune': 'communeEtablissement'
     }, inplace=True, errors="ignore")
     enrichissementInsee.rename(columns={
         'libelleCommuneEtablissement': 'communeEtablissement',
@@ -597,7 +636,7 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
         'adresseEtablissement']]
 
     # df final pour enrichir les données des entreprises
-    dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap])
+    dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap], copy=False)
     dfenrichissement = dfenrichissement.astype(str)
     # On s'assure qu'il n'y ai pas de doublons
     dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
@@ -609,7 +648,7 @@ def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
-    refCPV = pd.read_excel(path, usecols=['CODE', 'FR']) 
+    refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
     refCPV_min["CODE"] = refCPV_min.CODE.str[0:8]
@@ -617,13 +656,17 @@ def enrichissement_cpv(df):
     refCPV_min.columns = ['CODEmin', 'FR2']
     # Merge avec le df principal
     df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE", copy=False)
+    del refCPV
     df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin", copy=False)
+    del refCPV_min
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
     df.drop(columns=["FR2", "CODE", "CODEmin"], inplace=True)
 
     with open('df_backup_cpv', 'wb') as df_backup_cpv:
         pickle.dump(df, df_backup_cpv)
+
+    return df
 
 
 def enrichissement_acheteur(df):
@@ -642,15 +685,15 @@ def enrichissement_acheteur(df):
 
     # StockEtablissement_utf8
     chemin = os.path.join(path_to_data, conf["base_sirene_insee"])
-    #chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
-    result = pd.DataFrame( columns=['siret', 'codePostalEtablissement',
-                                    'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
+    # chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
+    result = pd.DataFrame(columns=['siret', 'codePostalEtablissement',
+                                   'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
     for gm_chunk in pd.read_csv(
             chemin, chunksize=1000000, sep=',', encoding='utf-8',
             usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
         resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret", copy=False)
-        result = pd.concat([result, resultTemp], axis=0)
+        result = pd.concat([result, resultTemp], axis=0, copy=False)
     result = result.drop_duplicates(subset=['siret'], keep='first')
 
     """
@@ -685,8 +728,11 @@ def enrichissement_acheteur(df):
     enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
+    del enrichissementAcheteur
     with open('df_backup_acheteur', 'wb') as df_backup_acheteur:
         pickle.dump(df, df_backup_acheteur)
+
+    return df
 
 
 def reorganisation(df):
@@ -707,28 +753,28 @@ def reorganisation(df):
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
-        'id' : "id",
-        '_type' : "type",
-        'objet' : "objetMarche",
-        'lieuExecution.code' : "lieuExecutionCode",
-        'lieuExecution.typeCode' : "lieuExecutionTypeCode",
-        'lieuExecution.nom' :  "lieuExecutionNom",
-        'acheteur.id' : "idAcheteur",
-        'acheteur.nom' : "nomAcheteur",
-        'typeIdentifiant' : "typeIdentifiantEtablissement",
-        'idTitulaires' : "siretEtablissement",
-        'denominationSociale_y' : "denominationSocialeEtablissement",
-        'nic' : "nicEtablissement",
-        'CPV_min' : "codeCPV",
-        'codeRegion' : "codeRegionAcheteur",
+        'id': "id",
+        '_type': "type",
+        'objet': "objetMarche",
+        'lieuExecution.code': "lieuExecutionCode",
+        'lieuExecution.typeCode': "lieuExecutionTypeCode",
+        'lieuExecution.nom': "lieuExecutionNom",
+        'acheteur.id': "idAcheteur",
+        'acheteur.nom': "nomAcheteur",
+        'typeIdentifiant': "typeIdentifiantEtablissement",
+        'idTitulaires': "siretEtablissement",
+        'denominationSociale_y': "denominationSocialeEtablissement",
+        'nic': "nicEtablissement",
+        'CPV_min': "codeCPV",
+        'codeRegion': "codeRegionAcheteur",
         'Region': "regionAcheteur",
-        'siren': "sirenEtablissement" ,
-        'refCodeCPV' : "referenceCPV"
+        'siren': "sirenEtablissement",
+        'refCodeCPV': "referenceCPV"
     }
     df.rename(columns=column_mapping, inplace=True)
 
     # Rectification codePostalAcheteur et codeCommuneAcheteur
-    d = {"." : "", " ": ""}
+    d = {".": "", " ": ""}
     df.codePostalAcheteur = df.codePostalAcheteur.replace(d)
     if len(df.codePostalAcheteur) < 5:
         df.codePostalAcheteur = '0' + df.codePostalAcheteur
@@ -749,7 +795,6 @@ def reorganisation(df):
     return df
 
 
-
 def enrichissement_geo(df):
     with open('df_reorganisation', 'rb') as df_backup_acheteur:
         df = pickle.load(df_backup_acheteur)
@@ -760,18 +805,18 @@ def enrichissement_geo(df):
 
     df_villes = get_df_villes()
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
-    df.rename(columns={"superficie" : "superficieCommuneAcheteur",
-               "population" : "populationCommuneAcheteur",
-               "latitude" : "latitudeCommuneAcheteur",
-               "longitude": "longitudeCommuneAcheteur"},
+    df.rename(columns={"superficie": "superficieCommuneAcheteur",
+                       "population": "populationCommuneAcheteur",
+                       "latitude": "latitudeCommuneAcheteur",
+                       "longitude": "longitudeCommuneAcheteur"},
               inplace=True)
     df.drop(columns="codeCommune", inplace=True)
 
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune', copy=False)
-    df.rename(columns={"superficie" : "superficieCommuneEtablissement",
-               "population" : "populationCommuneEtablissement",
-               "latitude" : "latitudeCommuneEtablissement",
-               "longitude": "longitudeCommuneEtablissement"},
+    df.rename(columns={"superficie": "superficieCommuneEtablissement",
+                       "population": "populationCommuneEtablissement",
+                       "latitude": "latitudeCommuneEtablissement",
+                       "longitude": "longitudeCommuneEtablissement"},
               inplace=True)
     df.drop(columns="codeCommune", inplace=True)
 
@@ -782,9 +827,9 @@ def enrichissement_geo(df):
 
     # Remise en forme des colonnes géo-spatiales
     cols = ["longitudeCommuneAcheteur",
-           "latitudeCommuneAcheteur",
-           "longitudeCommuneEtablissement",
-           "latitudeCommuneEtablissement"]
+            "latitudeCommuneAcheteur",
+            "longitudeCommuneEtablissement",
+            "latitudeCommuneEtablissement"]
 
     df[cols] = df[cols].astype(str)
 
@@ -818,10 +863,10 @@ def get_df_villes():
     df_villes = df_villes.join(df_sep)
 
     # Suppression des colonnes inutiles
-    df_villes.drop(columns = ["Geo Point"], inplace=True, errors="ignore")
+    df_villes.drop(columns=["Geo Point"], inplace=True, errors="ignore")
 
     # Renommer les variables
-    df_villes.rename(columns={"INSEE_COM" : 'codeCommune',
+    df_villes.rename(columns={"INSEE_COM": 'codeCommune',
                               "POPULATION": 'population',
                               "SUPERFICIE": 'superficie'},
                      inplace=True)
@@ -834,6 +879,7 @@ def get_df_villes():
 
     return df_villes
 
+
 def get_distance(row):
     try:
         x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
@@ -842,6 +888,7 @@ def get_distance(row):
         return distance(x, y).km
     except ValueError:
         return None
+
 
 def segmentation(df):
     ###############################################################################
@@ -863,7 +910,7 @@ def segmentation(df):
         X = pd.get_dummies(X)
         data = data.drop(columns=to_bin)
         X = X.fillna(0)
-        return pd.concat([data, X], axis=1)
+        return pd.concat([data, X], axis=1, copy=False)
 
     dfBIN = binateur(dfBIN, dfBIN.columns)
 
@@ -1013,7 +1060,6 @@ def carte(df):
     df_Reg.montant = round(df_Reg.montant / 1000000, 0).astype(int)
     df_Reg.montant = np.where(df_Reg.montant > 10000, 10000, df_Reg.montant)
 
-
     path = os.path.join(path_to_data, conf["departements-francais"])
     depPop = pd.read_csv(path, sep='\t', encoding='utf-8',
                          usecols=['NUMÉRO', 'POPULATION'])
@@ -1067,12 +1113,14 @@ def carte(df):
             icon = folium.features.CustomIcon(
                 'https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png',
                 icon_size=(
-                    max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
+                    max(20, min(40, df_carte.distanceMediane[i] / 2)),
+                    max(20, min(40, df_carte.distanceMediane[i] / 2))))
         elif (df_carte.segmentation_CAH[i] == 3):
             icon = folium.features.CustomIcon(
                 'https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced',
                 icon_size=(
-                    max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
+                    max(20, min(40, df_carte.distanceMediane[i] / 2)),
+                    max(20, min(40, df_carte.distanceMediane[i] / 2))))
         else:
             icon = folium.features.CustomIcon('https://svgsilh.com/svg/157354.svg', icon_size=(
                 max(20, min(40, df_carte.distanceMediane[i] / 2)), max(20, min(40, df_carte.distanceMediane[i] / 2))))
@@ -1113,8 +1161,5 @@ def carte(df):
     c.save('carte/carteDECP.html')
 
 
-
-
 if __name__ == "__main__":
     main()
-
