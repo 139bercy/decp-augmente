@@ -160,6 +160,7 @@ def apply_luhn(df):
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
     del df['siren1Acheteur']
+    del df_SA
 
     # Application sur les siren des établissements
     df['siren2Etablissement'] = df.sirenEtablissement.str[:]
@@ -168,6 +169,7 @@ def apply_luhn(df):
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
     del df['siren2Etablissement']
+    del df_SE
 
     # Application sur les siret des établissements
     df['siret2Etablissement'] = df.siretEtablissement.str[:]
@@ -178,7 +180,8 @@ def apply_luhn(df):
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     del df["siret2Etablissement"]
-
+    del df_SE2
+    
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
         (df.typeIdentifiantEtablissement != 'SIRET') , "Non valable",
