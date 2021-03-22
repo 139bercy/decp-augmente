@@ -51,7 +51,7 @@ def main():
         'montantEstime': 'string',
         'formePrix': 'string',
         'idTitulaires': 'object',
-        'typeIdentifiant': 'string',
+        #'typeIdentifiant': 'string',
         'denominationSociale': 'string',
         'nature': 'string',
         'acheteur.id': 'string',
