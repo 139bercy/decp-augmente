@@ -353,7 +353,7 @@ def correct_date(df):
 def replace_char(df):
 
     # Remplacement brutal du caractère (?) par un espace
-    df['objetMarche'] = df['objetMarche'].str.replace ('�', 'XXXXX') 
+    df['objet'] = df['objet'].str.replace ('�', 'XXXXX') 
 
     return df
 
