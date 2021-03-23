@@ -95,8 +95,8 @@ def manage_column_final(df):
     # Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
     try:
         codeCPV = df["codeCPV"]
-        cpvComplet = codeCPV.iloc[:, 0]
-        cpvdivision = codeCPV.iloc[:, 1]
+        cpvComplet = codeCPV.iloc[:, 1]
+        cpvdivision = codeCPV.iloc[:, 0]
         df = df.drop(columns=["codeCPV"])
         df["codeCPV"] = cpvComplet
         df["codeCPV_division"] = cpvdivision
@@ -104,7 +104,7 @@ def manage_column_final(df):
         pass
 
     # Réorganisation finale
-    df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV', "codeCPV_division",
+    df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV', 'dureeMois',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
                              'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal', 'montantEstime',
@@ -197,6 +197,7 @@ def enrichissement_type_entreprise(df):
     df = df.merge(
         to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False
     )
+    df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
     del to_add
     print('fin enrichissement_type_entreprise\n')
     return df
@@ -688,7 +689,6 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 
     return dfenrichissement
 
-
 def enrichissement_cpv(df):
     ################### Enrichissement avec le code CPV ##################
     # Importation et mise en forme des codes/ref CPV
@@ -701,12 +701,18 @@ def enrichissement_cpv(df):
     refCPV_min.columns = ['CODEmin', 'FR2']
     # Merge avec le df principal
     df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE", copy=False)
-    del refCPV
+    #del refCPV
     df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin", copy=False)
     del refCPV_min
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
     df.drop(columns=["FR2", "CODE", "CODEmin"], inplace=True)
+    df = pd.merge(df, refCPV, how='left', left_on="refCodeCPV", right_on="refCodeCPV", copy=False) 
+    del refCPV
+    #Rename la variable CODE en codeCPV
+    df.rename(columns = {"codeCPV": "codeCPV_Original",
+                "CODE": "codeCPV"}, inplace=True)
+
 
     with open('df_backup_cpv', 'wb') as df_backup_cpv:
         pickle.dump(df, df_backup_cpv)
