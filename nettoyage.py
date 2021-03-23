@@ -150,13 +150,7 @@ def manage_duplicates(df):
 
     return df
 
-
-def manage_amount(df):
-    ################### Identifier les outliers - travail sur les montants
-    df["montant"] = pd.to_numeric(df["montant"])
-    df['montantOriginal'] = df["montant"]
-
-    def is_false_amount(x, threshold=5):
+def is_false_amount(x, threshold=5):
         d = [0]*10
         str_x = str(x).split(".")[0]
         for c in str_x:
@@ -166,6 +160,11 @@ def manage_amount(df):
                 return True
         return False
 
+
+def manage_amount(df):
+    ################### Identifier les outliers - travail sur les montants
+    df["montant"] = pd.to_numeric(df["montant"])
+    df['montantOriginal'] = df["montant"]
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
 
     borne_inf=200.0
