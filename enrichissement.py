@@ -51,7 +51,7 @@ def main():
         'montantEstime': 'string',
         'formePrix': 'string',
         'idTitulaires': 'object',
-        #'typeIdentifiant': 'string',
+        # 'typeIdentifiant': 'string',
         'denominationSociale': 'string',
         'nature': 'string',
         'acheteur.id': 'string',
@@ -127,38 +127,78 @@ def manage_column_final(df):
 
 
 def enrichissement_type_entreprise(df):
+    print('début enrichissement_type_entreprise\n')
+
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'type': 'string',
+        'objetMarche': 'object',
+        'codeCPV': 'string',
+        'lieuExecutionCode': 'string',
+        'lieuExecutionTypeCode': 'string',
+        'lieuExecutionNom': 'string',
+        'dureeMois': 'int64',
+        'montant': 'float64',
+        'montantOriginal': 'float64',
+        'montantEstime': 'string',
+        'formePrix': 'string',
+        'typeIdentifiantEtablissement': 'object',
+        'siretEtablissement': 'string',
+        'denominationSocialeEtablissement': 'string',
+        'natureObjet': 'object',
+        'idAcheteur': 'string',
+        'nomAcheteur': 'string',
+        'codePostalEtablissement': 'string',
+        'codeRegionAcheteur': 'string',
+        'anneeNotification': 'string',
+        'moisNotification': 'string',
+        'dureeMoisEstime': 'string',
+        'procedure': 'string',
+        'nbTitulairesSurCeMarche': 'string',
+        'sirenEtablissement': 'string',
+        'codeTypeEtablissement': 'string',
+        'codeCommuneAcheteur': 'string',
+        'libelleCommuneAcheteur': 'string',
+        'codePostalAcheteur': 'string',
+        'nicEtablissement': 'string',
+        'communeEtablissement': 'string',
+        'adresseEtablissement': 'string',
+    }, copy=False)
+
     # Recuperation de la base
     path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
 
-    # data_chunks = list()
-    # chunksize = 1000000
-    # for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]):
-    #    data_chunks.append(gm_chunk)
-    # result = result.drop_duplicates(subset=['siret'], keep='first')
-    # to_add = pd.concat(data_chunks)
+    to_add = pd.DataFrame(columns=["siren", "categorieEntreprise"])
+    chunksize = 1000000
+    for to_add_chunk in pd.read_csv(
+        path,
+        chunksize=chunksize,
+        usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"],
+        dtype={"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string'}
+    ):
+        # On doit creer Siret
+        to_add_chunk["nicSiegeUniteLegale"] = to_add_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
 
-    to_add = pd.read_csv(path, usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"])
-    # On doit creer Siret
-    to_add["NIC"] = to_add.apply(lambda x: ("00000" + str(x["nicSiegeUniteLegale"]))[-5:], axis=1)
-    to_add["siretEtablissement"] = to_add.apply(lambda x: str(x["siren"]) + str(x["NIC"]), axis=1)
-    # Jointure sur le Siret entre df et to_add
-    # On vérifie que le code siret n'est qu en un exemplaire dans la base
-    try:
-        df = suppression_siret_doublon_colonne(df)
-    except:
-        pass
+        #  À Partir d'ici le siren correspond siretEtablissement
+        #  C'est la même colonne pour optimiser la mémoire
+        to_add_chunk["siren"] = to_add_chunk["siren"].astype(str).str\
+            .cat(to_add_chunk["nicSiegeUniteLegale"].astype(str), sep='')
+
+        # filtrer only existing siret
+        to_add = to_add.append(to_add_chunk[to_add_chunk['siren'].isin(df['siretEtablissement'])])
+        # np.where(lambda x: df['siretEtablissement'] == x['siretEtablissement'], x['categorieEntreprise])
+        # df['categorieEntreprise'][lambda x: df['siretEtablissement'] == x['siretEtablissement']] =
+
+        del to_add_chunk
+
+    to_add.rename(columns={"siren": "siretEtablissement"}, inplace=True)
+    # # Jointure sur le Siret entre df et to_add
     df = df.merge(
-        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
+        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False
+    )
     del to_add
-    return df
-
-
-def suppression_siret_doublon_colonne(df):
-    """Permet la suppression des doublons colonnes siretEtablissement"""
-    siret = df["siretEtablissement"]
-    siret = siret.iloc[:, 0]
-    df = df.drop(columns=["siretEtablissement"])
-    df["siretEtablissement"] = siret
+    print('fin enrichissement_type_entreprise\n')
     return df
 
 
@@ -210,11 +250,13 @@ def apply_luhn(df):
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     del df["siret2Etablissement"]
     del df_SE2
-    
+
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET'), "Non valable",
-        df.siretEtablissementValide)  # A améliorer ?
+        (df.typeIdentifiantEtablissement != 'SIRET'),
+        "Non valable",
+        df.siretEtablissementValide
+    )  # A améliorer ?
     return df
 
 
