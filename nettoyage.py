@@ -151,6 +151,9 @@ def manage_duplicates(df):
     return df
 
 def is_false_amount(x, threshold=5):
+    """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999. 
+    Ces montants seront considérés comme faux"""
+    try: #le try/except permet de prendre en compte les lignes ou le montant n'est pas renseigné. Dans ce cas, le montant sera considéré comme faux. 
         d = [0]*10
         str_x = str(x).split(".")[0]
         for c in str_x:
@@ -158,6 +161,8 @@ def is_false_amount(x, threshold=5):
         for counter in d[1:]:
             if counter > threshold:
                 return True
+        return False
+    except:
         return False
 
 
