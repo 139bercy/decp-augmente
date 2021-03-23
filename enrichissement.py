@@ -48,7 +48,7 @@ def main():
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        'montantEstime': 'string',
+        #'montantEstime': 'string',
         'formePrix': 'string',
         'idTitulaires': 'object',
         # 'typeIdentifiant': 'string',
@@ -110,7 +110,7 @@ def detection_accord_cadre(df):
     #synchronisation avec la colonne nature qui donne si c est oui ou non un accord cadre declaré
     df_to_output["nature"] = np.where(df_to_output["nature"].isnull(), "NC", df_to_output["nature"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE", df_to_output["accord-cadrePresume"], "True")
-    df_to_output["montantCalcule"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
+    df_to_output["montantCalcule"] = df_to_output["montant"]/df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output      
 
 def manage_column_final(df):
@@ -136,7 +136,7 @@ def manage_column_final(df):
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV', 'dureeMois',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
-                             'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal', 'montantEstime',
+                             'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal',
                              'montantCalcule', 'nombreTitulaireSurMarchePresume',
                              'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
                              'lieuExecutionNom', 'nature', 'procedure',
@@ -169,7 +169,7 @@ def enrichissement_type_entreprise(df):
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        'montantEstime': 'string',
+        #'montantEstime': 'string',
         'formePrix': 'string',
         'typeIdentifiantEtablissement': 'object',
         'siretEtablissement': 'string',
