@@ -184,7 +184,7 @@ def manage_amount(df):
     df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
+    df['montantEstime'] = np.where(df['montant'].isnull(), 'True', 'False')
 
     return df
 
