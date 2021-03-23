@@ -20,9 +20,7 @@ from sklearn.preprocessing import StandardScaler
 with open("config.json") as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-
 # error_siret_file = conf["error_siret_file_name"]
-
 siren_len = 9
 
 
@@ -154,7 +152,6 @@ def manage_column_final(df):
                              'distanceAcheteurEtablissement',
                              'geolocCommuneEtablissement'])
     return df
-
 
 def enrichissement_type_entreprise(df):
     print('début enrichissement_type_entreprise\n')
@@ -289,7 +286,6 @@ def apply_luhn(df):
         df.siretEtablissementValide
     )  # A améliorer ?
     return df
-#########################################################
 
 def enrichissement_siret(df):
     ######## Enrichissement des données via les codes siret/siren ########
@@ -851,7 +847,6 @@ def reorganisation(df):
         'Region': "regionAcheteur",
         'siren': "sirenEtablissement",
         'refCodeCPV': "referenceCPV"
-
     }
     df.rename(columns=column_mapping, inplace=True)
 
