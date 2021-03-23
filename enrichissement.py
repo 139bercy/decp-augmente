@@ -79,6 +79,8 @@ def main():
 
     df = apply_luhn(df)
 
+    df = enrichissement_departement(df) #il y a des na ans departements
+
     df = manage_column_final(df)
 
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
@@ -111,18 +113,59 @@ def manage_column_final(df):
                              'montantCalcule', 'nbTitulairesSurCeMarche',
                              'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
                              'lieuExecutionNom', 'nature', 'procedure',
-                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
-                             'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
+                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'libelleRegionAcheteur', 'libelleDepartementAcheteur', 
+                             'departementAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
                              'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
                              'typeIdentifiantEtablissement',
                              'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement',
-                             'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
+                             'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement', 'libelleRegionEtablissement', 
+                             'libelleDepartementEtablissement', 'departementEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codePostalEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
                              'distanceAcheteurEtablissement',
                              'geolocCommuneEtablissement'])
+    return df
+
+  
+
+
+#Enrichir avec le departement des acheteur et des etablissements. Base departement francais.
+def extraction_code_postal(code_postal):
+    """renvoie le code postal en prenant en compte les Drom
+    code_postal est un str"""
+    try:
+        code = code_postal[:2]
+        if code == "97" or code == "98":
+            code = code_postal[:3]
+        return code
+    except:
+        return "00"
+
+#Enrichir avec le departement des acheteur et des etablissements. Base departement francais.
+def enrichissement_departement(df):
+    path = os.path.join(path_to_data,conf["departements-francais"])
+    departement = pd.read_csv(path, sep = "\t")
+    sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
+    #codePostalAcheteur pour le departement de l acheteur
+    #codePostalEtablissement pou l'Etablissement
+    #Creation de deux variables récupérant le numéro du departement
+    df["departementAcheteur"] = df.apply(lambda x: extraction_code_postal(x["codePostalAcheteur"]), axis=1)
+    df["departementEtablissement"] = df.codePostalEtablissement.str[:2]
+    #Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
+    df = pd.merge(df, sub_departement, how="left", left_on = "departementAcheteur", right_on="NUMÉRO", copy = False)
+    df = df.rename(columns = {
+                     'NOM': "libelleDepartementAcheteur",
+                     'REGION' : "libelleRegionAcheteur"
+                     })
+    df = df.drop(["NUMÉRO"], axis = 1)
+    df = pd.merge(df, sub_departement, how="left", left_on = "departementEtablissement", right_on="NUMÉRO", copy = False)
+    df = df.rename(columns = {
+                     'NOM': "libelleDepartementEtablissement",
+                     'REGION' : "libelleRegionEtablissement"
+                     })
+    df = df.drop(["NUMÉRO"], axis = 1)
     return df
 
 
