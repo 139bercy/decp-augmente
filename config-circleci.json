@@ -2,9 +2,9 @@
 	"path_to_project" : "/home/circleci/project/decp-augmente",
 	"path_to_data" : "data",
 	"decp_file_name" : "decp.json",
-	"error_siret_file_name" : "errorSIRET.csv",
-	"stock_etablissement" : "StockEtablissement_utf8.csv",
-	"cpv_2008_ver_2013" : "cpv_2008_ver_2013.xlsx",
-	"code-insee-postaux-geoflar" : "code-insee-postaux-geoflar.csv", 
+	"base_sirene_insee" : "StockEtablissement_utf8.csv",
+	"base_ajout_type_entreprise" : "StockUniteLegale_utf8.csv",
+	"cpv_2008_ver_2013" : "cpv_2008_ver_2013.xlsx",  
+	"base_geoflar" : "geoflar-communes-2015.csv", 
 	"departements-francais" : "departements-francais.csv"
 }

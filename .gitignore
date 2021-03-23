@@ -10,3 +10,9 @@ config.json
 
 # PYTHON
 __pycache__
+test.py
+
+df_backup_acheteur
+df_backup_cpv
+df_nettoye
+df_reorganisation

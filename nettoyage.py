@@ -1,24 +1,71 @@
 import json
 import os
-import numpy as np
-import pandas as pd
 import pickle
 
+import numpy as np
+import pandas as pd
 from pandas import json_normalize
 
 
 def main():
     with open("config.json") as f:
         conf = json.load(f)
+    check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
-    error_siret_file_name = conf["error_siret_file_name"]
+    #error_siret_file_name = conf["error_siret_file_name"]
 
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
     # Applatit les données json en tableau
+    # pd.read_json(data['marches'])
+    # df = pd.read_json(json.dumps(data['marches']))
     df = json_normalize(data['marches'])
+
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'uid': 'string',
+        'uuid': 'string',
+        '_type': 'string',
+        'objet': 'string',
+        'codeCPV': 'string',
+        'lieuExecution.code': 'string',
+        'lieuExecution.typeCode': 'string',
+        'lieuExecution.nom': 'string',
+        'dureeMois': 'int64',
+        # TODO définition d'un format de date "généraliste" qui sera capable de gérer les différents formats présents
+        # 'dateNotification': 'datetime64[ns]',
+        # 'datePublicationDonnees': 'datetime64[ns]',
+        'montant': 'float64',
+        'formePrix': 'string',
+        'titulaires': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # 'titulaires.typeIdentifiant': 'string',
+        # 'titulaires.id': 'string',
+        # 'titulaires.denominationSociale': 'string',
+        'modifications': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'modifications.objetModification': 'string',
+        # 'modifications.dateNotificationModification': 'string',
+        # 'modifications.datePublicationDonneesModification': 'string',
+        # 'modifications.montant': 'float64',
+        'nature': 'string',
+        'autoriteConcedante.id': 'string',
+        'autoriteConcedante.nom': 'string',
+        'acheteur.id': 'string',
+        'acheteur.nom': 'string',
+        'donneesExecution': 'string'
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'donneesExecution.datePublicationDonneesExecution': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement.tarifs': 'object',
+        # 'donneesExecution.depensesInvestissement.tarifs.intituleTarif': 'string',
+        # 'donneesExecution.depensesInvestissement.tarifs.tarif': 'float64',
+    }, copy=False)
 
     df = manage_titulaires(df)
 
@@ -36,11 +83,25 @@ def main():
 
     df = correct_date(df)
 
+    # suppression des caractères mal encodés
+    df = replace_char(df)
+
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
 
     df.to_csv("decp_nettoye.csv")
-    #df = apply_luhn(df)
+
+def check_reference_files(conf):
+    """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
+        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
+    path_to_data = conf["path_to_data"]
+    L_key_useless = ["path_to_project", "path_to_data"]
+    path = os.path.join(os.getcwd(), path_to_data)
+    for key in list(conf.keys()):
+        if key not in L_key_useless:
+            mask = os.path.exists(os.path.join(path, conf[key]))
+            if not mask: 
+                raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
 
 
 def manage_titulaires(df):
@@ -81,8 +142,9 @@ def manage_duplicates(df):
     df.reset_index(inplace=True, drop=True)
 
     # Correction afin que ces variables soient représentées pareil
-    df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
-    df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
+    df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
+    df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
+    df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
     # détection des accords cadres avec de multiples titulaires
 
@@ -152,6 +214,10 @@ def manage_missing_code(df):
     ######## Gestion code CPV
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
+    df["natureObjet"] = "Fournitures"
+    df.loc[df["CPV_min"] == '45','natureObjet'] = 'Travaux'
+    df.loc[df["CPV_min"] > '45', 'natureObjet'] = 'Services'
+
 
     # Mise en forme des données vides
     df.denominationSociale = np.where(
@@ -198,6 +264,8 @@ def manage_region(df):
     df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
+
+    df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
 
     ###############################################################################
@@ -306,7 +374,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     del df['conca'], df['montantEstimation']
@@ -318,7 +386,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     # S'il reste encore des valeurs nulles...
@@ -355,50 +423,16 @@ def correct_date(df):
 
     return df
 
-##### Algorithme de Luhn
-def luhn(codeSIREN):
-    try:
-        chiffres = pd.DataFrame(map(int, list(str(codeSIREN))), columns=['siren'])
-        chiffres['parite'] = [1, 2, 1, 2, 1, 2, 1, 2, 1]
-        chiffres['multiplication'] = chiffres.siren * chiffres.parite
-        for i in range(len(chiffres)):
-            chiffres.multiplication[i] = sum([int(c) for c in str(chiffres.multiplication[i])])
-        resultat = chiffres.multiplication.sum()
-        if (resultat % 10) == 0:
-            resultat = 0  # code BON
-        else:
-            resultat = 1  # code FAUX
-    except:
-        resultat = 1  # code FAUX
-        pass
-    return resultat
+##### Fonction pour mettre en qualité le champ objetMarche
+def replace_char(df):
 
-
-def apply_luhn(df):
-    # Application sur les siren des acheteurs
-    df['siren1Acheteur'] = df["acheteur.id"].str[:9]
-    df_SA = pd.DataFrame(df['siren1Acheteur'])
-    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
-    df_SA['verifSirenAcheteur'] = df_SA['siren1Acheteur'].apply(luhn)
-
-    # Application sur les siren des établissements
-    df['siren2Etablissement'] = df.sirenEtablissement.str[:9]
-    df_SE = pd.DataFrame(df['siren2Etablissement'])
-    df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
-    df_SE['verifSirenEtablissement'] = df_SE['siren2Etablissement'].apply(luhn)
-
-    # Merge avec le df principal
-    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur')
-    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement')
-    del df['siren1Acheteur'], df['siren2Etablissement']
-
-    # On rectifie pour les codes non-siret
-    df.verifSirenEtablissement = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET') | (df.typeIdentifiantEtablissement.isnull()), 0,
-        df.verifSirenEtablissement)
+    # Remplacement brutal du caractère (?) par un espace
+    df['objet'] = df['objet'].str.replace ('�', 'XXXXX') 
 
     return df
 
 
 if __name__ == "__main__":
     main()
+
+
