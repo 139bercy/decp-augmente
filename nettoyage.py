@@ -10,18 +10,10 @@ from pandas import json_normalize
 def main():
     with open("config.json") as f:
         conf = json.load(f)
-<<<<<<< HEAD
-
-=======
->>>>>>> master
     check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
     #error_siret_file_name = conf["error_siret_file_name"]
-<<<<<<< HEAD
-=======
-
->>>>>>> master
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
@@ -97,21 +89,6 @@ def main():
         pickle.dump(df, df_nettoye)
 
     df.to_csv("decp_nettoye.csv")
-<<<<<<< HEAD
-=======
-
-def check_reference_files(conf):
-    """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
-        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
-    path_to_data = conf["path_to_data"]
-    L_key_useless = ["path_to_project", "path_to_data"]
-    path = os.path.join(os.getcwd(), path_to_data)
-    for key in list(conf.keys()):
-        if key not in L_key_useless:
-            mask = os.path.exists(os.path.join(path, conf[key]))
-            if not mask: 
-                raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
->>>>>>> master
 
 
 def check_reference_files(conf):

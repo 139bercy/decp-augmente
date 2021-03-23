@@ -108,14 +108,15 @@ def detection_accord_cadre(df):
     df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(), df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["accord-cadrePresume"].isnull(), "False", df_to_output["accord-cadrePresume"])
     #synchronisation avec la colonne nature qui donne si c est oui ou non un accord cadre declaré
-    df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] == "ACCORD-CADRE", "True", df_to_output["accord-cadrePresume"])
-    df_to_output["montantCalcule2"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
+    df_to_output["nature"] = np.where(df_to_output["nature"].isnull(), "NC", df_to_output["nature"])
+    df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE", df_to_output["accord-cadrePresume"], "True")
+    df_to_output["montantCalcule"] = df_to_output["montantOriginal"]/df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output      
 
 def manage_column_final(df):
     """Rename de certaines colonne et trie des colonnes"""
     df = df.rename(columns={
-        'montant': 'montantCalcule',
+        #'montant': 'montantCalcule',
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
@@ -136,7 +137,7 @@ def manage_column_final(df):
                              'referenceCPV', 'dureeMois',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
                              'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal', 'montantEstime',
-                             'montantCalcule', 'nbTitulairesSurCeMarche',
+                             'montantCalcule', 'nombreTitulaireSurMarchePresume',
                              'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
                              'lieuExecutionNom', 'nature', 'procedure',
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
@@ -182,7 +183,7 @@ def enrichissement_type_entreprise(df):
         'moisNotification': 'string',
         'dureeMoisEstime': 'string',
         'procedure': 'string',
-        'nbTitulairesSurCeMarche': 'string',
+        'nbTitulairesSurCeMarche': 'float64',
         'sirenEtablissement': 'string',
         'codeTypeEtablissement': 'string',
         'codeCommuneAcheteur': 'string',
