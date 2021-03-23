@@ -1,47 +1,96 @@
 import json
 import os
-import numpy as np
-import pandas as pd
 import pickle
 
+import numpy as np
+import pandas as pd
 from pandas import json_normalize
 
 
 def main():
     with open("config.json") as f:
         conf = json.load(f)
-    if check_reference_files(conf) :
-        path_to_data = conf["path_to_data"]
-        decp_file_name = conf["decp_file_name"]
-        #error_siret_file_name = conf["error_siret_file_name"]
 
-        with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-            data = json.load(json_data)
+    check_reference_files(conf)
+    path_to_data = conf["path_to_data"]
+    decp_file_name = conf["decp_file_name"]
+    #error_siret_file_name = conf["error_siret_file_name"]
+    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
+        data = json.load(json_data)
 
-        # Applatit les données json en tableau
-        df = json_normalize(data['marches'])
+    # Applatit les données json en tableau
+    # pd.read_json(data['marches'])
+    # df = pd.read_json(json.dumps(data['marches']))
+    df = json_normalize(data['marches'])
 
-        df = manage_titulaires(df)
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'uid': 'string',
+        'uuid': 'string',
+        '_type': 'string',
+        'objet': 'string',
+        'codeCPV': 'string',
+        'lieuExecution.code': 'string',
+        'lieuExecution.typeCode': 'string',
+        'lieuExecution.nom': 'string',
+        'dureeMois': 'int64',
+        # TODO définition d'un format de date "généraliste" qui sera capable de gérer les différents formats présents
+        # 'dateNotification': 'datetime64[ns]',
+        # 'datePublicationDonnees': 'datetime64[ns]',
+        'montant': 'float64',
+        'formePrix': 'string',
+        'titulaires': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # 'titulaires.typeIdentifiant': 'string',
+        # 'titulaires.id': 'string',
+        # 'titulaires.denominationSociale': 'string',
+        'modifications': 'object',
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'modifications.objetModification': 'string',
+        # 'modifications.dateNotificationModification': 'string',
+        # 'modifications.datePublicationDonneesModification': 'string',
+        # 'modifications.montant': 'float64',
+        'nature': 'string',
+        'autoriteConcedante.id': 'string',
+        'autoriteConcedante.nom': 'string',
+        'acheteur.id': 'string',
+        'acheteur.nom': 'string',
+        'donneesExecution': 'string'
+        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
+        # Risque de duplication car c'est un tableau
+        # 'donneesExecution.datePublicationDonneesExecution': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement': 'datetime64[ns]',
+        # 'donneesExecution.depensesInvestissement.tarifs': 'object',
+        # 'donneesExecution.depensesInvestissement.tarifs.intituleTarif': 'string',
+        # 'donneesExecution.depensesInvestissement.tarifs.tarif': 'float64',
+    }, copy=False)
 
-        df = drop_duplicates(df)
+    df = manage_titulaires(df)
 
-        df = manage_montant(df)
+    df = drop_duplicates(df)
 
-        df = manage_missing_code(df)
+    df = manage_montant(df)
 
-        df = manage_region(df)
+    df = manage_missing_code(df)
 
-        df = manage_date(df)
+    df = manage_region(df)
 
-        #df = data_inputation(df)
+    df = manage_date(df)
 
-        df = correct_date(df)
+    #df = data_inputation(df)
 
-        with open('df_nettoye', 'wb') as df_nettoye:
-            pickle.dump(df, df_nettoye)
+    df = correct_date(df)
 
-        df.to_csv("decp_nettoye.csv")
-    #df = apply_luhn(df)
+    # suppression des caractères mal encodés
+    df = replace_char(df)
+
+    with open('df_nettoye', 'wb') as df_nettoye:
+        pickle.dump(df, df_nettoye)
+
+    df.to_csv("decp_nettoye.csv")
+
 
 def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
@@ -54,10 +103,6 @@ def check_reference_files(conf):
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask: 
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
-    return True
-
-
-
 
 def manage_titulaires(df):
 
@@ -97,8 +142,9 @@ def drop_duplicates(df):
     df.reset_index(inplace=True, drop=True)
 
     # Correction afin que ces variables soient représentées pareil
-    df['formePrix'] = np.where(df['formePrix'] == 'Ferme, actualisable', 'Ferme et actualisable', df['formePrix'])
-    df['procedure'] = np.where(df['procedure'] == 'Appel d’offres restreint', "Appel d'offres restreint", df['procedure'])
+    df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
+    df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
+    df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
     return df
 
@@ -204,6 +250,8 @@ def manage_region(df):
     df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
+
+    df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
 
     ###############################################################################
@@ -312,7 +360,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     del df['conca'], df['montantEstimation']
@@ -324,7 +372,7 @@ def data_inputation(df):
     medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
     medianeRegFP.reset_index(level=0, inplace=True)
     medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca')
+    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
     # Remplacement des valeurs manquantes par la médiane du groupe
     df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
     # S'il reste encore des valeurs nulles...
@@ -361,6 +409,16 @@ def correct_date(df):
 
     return df
 
+##### Fonction pour mettre en qualité le champ objetMarche
+def replace_char(df):
+
+    # Remplacement brutal du caractère (?) par un espace
+    df['objet'] = df['objet'].str.replace ('�', 'XXXXX') 
+
+    return df
+
 
 if __name__ == "__main__":
     main()
+
+
