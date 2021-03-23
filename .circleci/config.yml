@@ -1,93 +1,112 @@
 ---
 version: 2
 jobs:
-  get_code:
-    docker:
-      - image: 139bercy/decp-rama
-      steps:
-        - checkout
-        - run:
-            # Récupération du code manuel car soucis avec "- checkout"
-            name: Récupération du projet decp-augmenté
-            command: |
-#              mkdir -p /home/circleci/project
-#              cd /home/circleci/project
-#              git clone https://github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME.git
-#              cd decp-augmente
-#              if [ "$CIRCLE_BRANCH" != "master" ]; then
-#                git checkout "$CIRCLE_BRANCH" || ( git fetch origin pull/$CIRCLE_PR_NUMBER/head:pull_local && git checkout pull_local )
-#              fi
-              mv config-circleci.json config.json
-
   install_requirements:
     docker:
       - image: 139bercy/decp-rama
-      steps:
-        - run:
-            name: Installation des requirements
-            command: |
-              cd /home/circleci/project/decp-augmente
-              pip3 install -r requirements.txt
+    steps:
+      - checkout
+      - run: mv config-circleci.json config.json
+      - run:
+          name: Installation des requirements
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r requirements.txt
+      - save_cache:
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+          paths:
+            - "venv"
+            - "config.json"
+
   linter:
     docker:
       - image: 139bercy/decp-rama
     steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies
       - run:
           name: Linter
           command: |
-            pip3 install pylint
+            . venv/bin/activate
+            pip install pylint
             PYTHON_FILE="$(ls *.py)"
             pylint $PYTHON_FILE
 
-  build-and-send:
-        docker:
-            - image: 139bercy/decp-rama
-        steps:
-            - run:
-                  name: Récupération des données utiles
-                  no_output_timeout: 1h
-                  command: |
-                       cd /home/circleci/project/decp-augmente
-                       mkdir data && cd data
-                       wget 'https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O geoflar-communes-2015.csv
-                       #wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
-                       wget https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip
-                       unzip cpv_2008_xls.zip
-                       wget https://www.regions-et-departements.fr/fichiers/departements-francais.csv -O departements-francais.csv
-                       wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
-                       unzip StockEtablissement_utf8.zip
-                       wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip
-                       unzip StockUniteLegale_utf8.zip
-                       wget https://www.data.gouv.fr/fr/datasets/r/16962018-5c31-4296-9454-5998585496d2 -O decp.json
-                       ls
-            - run:
-                  name: Traitement des données
-                  no_output_timeout: 2h
-                  command: |
-                       cd /home/circleci/project/decp-augmente
-                       python3 main.py
-            - run:
-                  name: Transfert des données vers data.economie
-                  command: |
-                       cd /home/circleci/project/decp-augmente
-                       lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
+  compute:
+    docker:
+      - image: 139bercy/decp-rama
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies
+      - run:
+          name: Récupération des données utiles
+          no_output_timeout: 1h
+          command: |
+            cd /home/circleci/project/decp-augmente
+            mkdir data && cd data
+            wget 'https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O geoflar-communes-2015.csv
+            #wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
+            wget https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip
+            unzip cpv_2008_xls.zip
+            wget https://www.regions-et-departements.fr/fichiers/departements-francais.csv -O departements-francais.csv
+            wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
+            unzip StockEtablissement_utf8.zip
+            wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip
+            unzip StockUniteLegale_utf8.zip
+            wget https://www.data.gouv.fr/fr/datasets/r/16962018-5c31-4296-9454-5998585496d2 -O decp.json
+            ls
+      - run:
+          name: Traitement des données
+          no_output_timeout: 2h
+          command: |
+            . venv/bin/activate
+            python main.py
+      - save_cache:
+         key: data-{{ .Branch }}
+         paths:
+           - "decp_nettoye.csv"
+           - "decp_augmente.csv"
+
+  send:
+    docker:
+      - image: 139bercy/decp-rama
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - data-{{ .Branch }}
+            - data
+      - run:
+          name: Transfert des données vers data.economie
+          command: |
+            cd /home/circleci/project/decp-augmente
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
 
 workflows:
   version: 2
   main:
     jobs:
-      - get_code
-      - install_requirements:
-        requires:
-          - get_code
-      - build-and-send:
-        requires:
-          - get_code
-          - install_requirements
+      - install_requirements
+      - compute:
+          requires:
+            - install_requirements
 
   daily:
     jobs:
-      - build-and-send
+      - install_requirements
+      - compute:
+          requires:
+            - install_requirements
+      - send:
+          requires:
+            - compute
     triggers:
       - schedule:
           cron: 0 6 * * 2,3,4,5,6

@@ -3,10 +3,14 @@ data/
 *.csv
 *.jq
 config.json
+df_*
 
 # Fichier Mac
 .DS_Store
 *.icloud
+
+# Fichier de configuration pour pycharm
+.idea/
 
 # PYTHON
 __pycache__
@@ -18,5 +22,7 @@ df_backup_cpv
 df_nettoye
 df_reorganisation
 
+<<<<<<< HEAD
 #Config vscode
 .vscode
+venv/

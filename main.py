@@ -3,7 +3,7 @@ import enrichissement
 
 
 def main():
-    # nettoyage.main()
+    nettoyage.main()
     enrichissement.main()
 
 
