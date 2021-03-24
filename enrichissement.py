@@ -163,7 +163,7 @@ def manage_column_final(df):
                              'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal',
                              'montantCalcule', 'nombreTitulaireSurMarchePresume',
                              'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
-                             'lieuExecutionNom', 'nature', "accord-cadrePresume" 'procedure',
+                             'lieuExecutionNom', 'nature', "accord-cadrePresume", 'procedure',
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'libelleRegionAcheteur', 'libelleDepartementAcheteur', 
                              'departementAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
                              'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
