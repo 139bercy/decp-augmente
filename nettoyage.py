@@ -411,7 +411,7 @@ def correct_date(df):
             | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
             | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
 
-    df['dureeMoisEstime'] = np.where(mask, "True", "False")
+    df['dureeMoisEstimee'] = np.where(mask, "True", "False")
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])

@@ -60,7 +60,7 @@ def main():
         'codeRegion': 'string',
         'anneeNotification': 'string',
         'moisNotification': 'string',
-        'dureeMoisEstime': 'string',
+        'dureeMoisEstimee': 'string',
     }, copy=False)
 
     df = enrichissement_siret(df)
@@ -159,7 +159,7 @@ def manage_column_final(df):
     # Réorganisation finale
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
-                             'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstime', 'dureeMoisCalculee',
+                             'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
                              'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom',
                              'nature', "accord-cadrePresume", 'procedure',
@@ -245,7 +245,7 @@ def enrichissement_type_entreprise(df):
         'codeRegionAcheteur': 'string',
         'anneeNotification': 'string',
         'moisNotification': 'string',
-        'dureeMoisEstime': 'string',
+        'dureeMoisEstimee': 'string',
         'procedure': 'string',
         'nbTitulairesSurCeMarche': 'int64',
         'sirenEtablissement': 'string',
