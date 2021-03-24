@@ -168,7 +168,7 @@ def manage_column_final(df):
                              'codeRegionAcheteur', 'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
-                             
+
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
                              'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
@@ -1031,7 +1031,7 @@ def get_distance(row):
     except ValueError:
         return None
 
-# A partir d'ici on ne se sert de plus rien 
+# A partir d'ici on ne se sert de plus rien
 def segmentation(df):
     ###############################################################################
     # ########################### Segmentation de marché ##########################
