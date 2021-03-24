@@ -129,9 +129,6 @@ def manage_column_final(df):
     return df
 
   
-
-
-#Enrichir avec le departement des acheteur et des etablissements. Base departement francais.
 def extraction_code_postal(code_postal):
     """renvoie le code postal en prenant en compte les Drom
     code_postal est un str"""
@@ -140,20 +137,21 @@ def extraction_code_postal(code_postal):
         if code == "97" or code == "98":
             code = code_postal[:3]
         return code
-    except:
+    except IndexError:
         return "00"
 
-#Enrichir avec le departement des acheteur et des etablissements. Base departement francais.
+
 def enrichissement_departement(df):
+    """Ajout des variables région et departement dans decp"""
     path = os.path.join(path_to_data,conf["departements-francais"])
     departement = pd.read_csv(path, sep = "\t")
     sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
-    #codePostalAcheteur pour le departement de l acheteur
-    #codePostalEtablissement pou l'Etablissement
-    #Creation de deux variables récupérant le numéro du departement
-    df["departementAcheteur"] = df.apply(lambda x: extraction_code_postal(x["codePostalAcheteur"]), axis=1)
-    df["departementEtablissement"] = df.codePostalEtablissement.str[:2]
-    #Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
+    # codePostalAcheteur pour le departement de l acheteur
+    # codePostalEtablissement pou l'Etablissement
+    # Creation de deux variables récupérant le numéro du departement
+    df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_code_postal)
+    df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_code_postal)
+    # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
     df = pd.merge(df, sub_departement, how="left", left_on = "departementAcheteur", right_on="NUMÉRO", copy = False)
     df = df.rename(columns = {
                      'NOM': "libelleDepartementAcheteur",
