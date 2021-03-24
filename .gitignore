@@ -16,3 +16,6 @@ df_backup_acheteur
 df_backup_cpv
 df_nettoye
 df_reorganisation
+
+#config vscode
+.vscode

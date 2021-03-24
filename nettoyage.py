@@ -14,7 +14,6 @@ def main():
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
     #error_siret_file_name = conf["error_siret_file_name"]
-
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
@@ -69,9 +68,9 @@ def main():
 
     df = manage_titulaires(df)
 
-    df = drop_duplicates(df)
+    df = manage_duplicates(df)
 
-    df = manage_montant(df)
+    df = manage_amount(df)
 
     df = manage_missing_code(df)
 
@@ -91,6 +90,7 @@ def main():
 
     df.to_csv("decp_nettoye.csv")
 
+
 def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
         StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
@@ -102,7 +102,6 @@ def check_reference_files(conf):
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask: 
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
-
 
 def manage_titulaires(df):
 
@@ -131,7 +130,7 @@ def manage_titulaires(df):
     return df
 
 
-def drop_duplicates(df):
+def manage_duplicates(df):
     df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
                                'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
@@ -146,28 +145,41 @@ def drop_duplicates(df):
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
+    # détection des accords cadres avec de multiples titulaires
+
     return df
 
 
-def manage_montant(df):
-    ################### Identifier les outliers - travail sur les montants
+def is_false_amount(x, threshold=5):
+    """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999. 
+    Ces montants seront considérés comme faux"""
+    d = [0] * 10
+    str_x = str(x).split(".")[0]
+    for c in str_x:
+        d[int(c)] += 1
+    for counter in d[1:]:
+        if counter > threshold:
+            return True
+    return False
+
+
+def manage_amount(df):
+    # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
+    df['montant'].fillna(0, inplace=True)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
 
-    montant_borne_inf = 200.0
-    montant_borne_sup = 9.99e8
-    df['montant'] = np.where(df['montant'] <= montant_borne_inf, 0, df['montant'])
-    df['montant'] = np.where(df['montant'] >= montant_borne_sup, 0, df['montant'])
-
-    # On applique au df la division
-    df["montant"] = df["montant"] / df["nbTitulairesSurCeMarche"]
+    borne_inf = 200.0
+    borne_sup = 9.99e8
+    df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
+    df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
 
     # Nettoyage colonnes
-    df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
+    # df['montant'].fillna(0, inplace=True)
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
-
+    df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     return df
 
 
@@ -397,7 +409,7 @@ def correct_date(df):
         | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
         | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
 
-    df['dureeMoisEstime'] = np.where(mask, "Oui", "Non")
+    df['dureeMoisEstime'] = np.where(mask, "True", "False")
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
@@ -420,5 +432,4 @@ def replace_char(df):
 
 if __name__ == "__main__":
     main()
-
 
