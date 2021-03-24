@@ -48,7 +48,7 @@ def main():
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        'montantEstime': 'string',
+        # 'montantEstime': 'string',
         'formePrix': 'string',
         'idTitulaires': 'object',
         # 'typeIdentifiant': 'string',
@@ -73,21 +73,74 @@ def main():
 
     df = enrichissement_geo(df)
 
-    # drop column avec doublon de colonne
-    #
     df = enrichissement_type_entreprise(df)
 
     df = apply_luhn(df)
 
+    df = enrichissement_departement(df)  # il y a des na dans departements
+
+    df = detection_accord_cadre(df)
+
     df = manage_column_final(df)
 
-    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC)
+    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+
+
+def detection_accord_cadre(df):
+    """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
+    Accord cadre : Plusieurs Etablissements sur un meme marche
+    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois."""
+    # Creation du sub DF necessaire
+    df_intermediaire = df[["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
+    # On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus.
+    df_group = pd.DataFrame(df_intermediaire.groupby(["objetMarche",
+                                                      "dateNotification",
+                                                      "montantOriginal",
+                                                      "dureeMois"])
+                            ["siretEtablissement"].unique())
+    # Initialisation du resultat sous forme de liste
+    index = df_group.index
+    L_data_fram = []
+    for i in range(len(df_group)):
+        nombre_titulaire = len(df_group["siretEtablissement"][i])
+        accord_presume = False
+        if nombre_titulaire > 1:
+            accord_presume = True
+        L_data_fram += [[index[i][0], index[i][1], index[i][2], index[i][3], nombre_titulaire, str(accord_presume)]]
+        # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
+    data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
+                                                        "dateNotification",
+                                                        "montantOriginal",
+                                                        "dureeMois",
+                                                        "nombreTitulaireSurMarchePresume",
+                                                        "accord-cadrePresume"])
+
+    df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche",
+                                                                     "dateNotification",
+                                                                     "montantOriginal",
+                                                                     "dureeMois"],
+                            right_on=["objetMarche",
+                                      "dateNotification",
+                                      "montantOriginal",
+                                      "dureeMois"])
+    # Si l'une des 4 clefs à une valeur nulle alors nombreTitulaireSurMarchePresume, cadrePresume, montantCalcule2 alors le tout sera vide. Coreection en dessous
+    df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(),
+                                                               df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
+    df_to_output["accord-cadrePresume"] = np.where(df_to_output["accord-cadrePresume"].isnull(),
+                                                   "False", df_to_output["accord-cadrePresume"])
+    # synchronisation avec la colonne nature qui donne si c est oui ou non un accord cadre declaré
+    df_to_output["nature"] = np.where(df_to_output["nature"].isnull(),
+                                      "NC", df_to_output["nature"])
+    df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE",
+                                                   df_to_output["accord-cadrePresume"], "True")
+    df_to_output["montantCalcule"] = df_to_output["montant"] / df_to_output["nombreTitulaireSurMarchePresume"]
+    return df_to_output
 
 
 def manage_column_final(df):
     """Rename de certaines colonne et trie des colonnes"""
     df = df.rename(columns={
-        'montant': 'montantCalcule',
+        # 'montant': 'montantCalcule',
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
@@ -105,24 +158,63 @@ def manage_column_final(df):
 
     # Réorganisation finale
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
-                             'referenceCPV', 'dureeMois',
-                             'dateNotification', 'anneeNotification', 'moisNotification', 'dureeMoisEstime',
-                             'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal', 'montantEstime',
-                             'montantCalcule', 'nbTitulairesSurCeMarche',
-                             'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
-                             'lieuExecutionNom', 'nature', 'procedure',
-                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'regionAcheteur',
-                             'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
-                             'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
-                             'typeIdentifiantEtablissement',
-                             'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement',
-                             'sirenEtablissementValide', "categorieEtablissement", 'denominationSocialeEtablissement',
+                             'referenceCPV',
+                             'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstime', 'dureeMoisCalculee',
+                             'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
+                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom',
+                             'nature', "accord-cadrePresume", 'procedure',
+
+                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
+                             'codeRegionAcheteur', 'libelleRegionAcheteur',
+                             'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
+                             'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
+                             
+                             'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
+                             "categorieEtablissement", 'denominationSocialeEtablissement',
+                             'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
-                             'codePostalEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
                              'distanceAcheteurEtablissement',
                              'geolocCommuneEtablissement'])
+    return df
+
+
+def extraction_departement_from_code_postal(code_postal):
+    """renvoie le code postal en prenant en compte les Drom
+    code_postal est un str"""
+    try:
+        code = code_postal[:2]
+        if code == "97" or code == "98":
+            code = code_postal[:3]
+        return code
+    except IndexError:
+        return "00"
+
+
+def enrichissement_departement(df):
+    """Ajout des variables région et departement dans decp"""
+    path = os.path.join(path_to_data, conf["departements-francais"])
+    departement = pd.read_csv(path, sep="\t")
+    sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
+    # codePostalAcheteur pour le departement de l acheteur
+    # codePostalEtablissement pou l'Etablissement
+    # Creation de deux variables récupérant le numéro du departement
+    df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
+    df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
+    # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
+    df = pd.merge(df, sub_departement, how="left", left_on="departementAcheteur", right_on="NUMÉRO", copy=False)
+    df = df.rename(columns={
+                   'NOM': "libelleDepartementAcheteur",
+                   'REGION': "libelleRegionAcheteur"
+                   })
+    df = df.drop(["NUMÉRO"], axis=1)
+    df = pd.merge(df, sub_departement, how="left", left_on="departementEtablissement", right_on="NUMÉRO", copy=False)
+    df = df.rename(columns={
+                   'NOM': "libelleDepartementEtablissement",
+                   'REGION': "libelleRegionEtablissement"
+                   })
+    df = df.drop(["NUMÉRO"], axis=1)
     return df
 
 
@@ -141,7 +233,7 @@ def enrichissement_type_entreprise(df):
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        'montantEstime': 'string',
+        # 'montantEstime': 'string',
         'formePrix': 'string',
         'typeIdentifiantEtablissement': 'object',
         'siretEtablissement': 'string',
@@ -155,7 +247,7 @@ def enrichissement_type_entreprise(df):
         'moisNotification': 'string',
         'dureeMoisEstime': 'string',
         'procedure': 'string',
-        'nbTitulairesSurCeMarche': 'string',
+        'nbTitulairesSurCeMarche': 'int64',
         'sirenEtablissement': 'string',
         'codeTypeEtablissement': 'string',
         'codeCommuneAcheteur': 'string',
@@ -268,12 +360,13 @@ def enrichissement_siret(df):
 
     archiveErrorSIRET = getArchiveErrorSIRET()
 
-    print("enrichissement insee en cours...")
+    print("Enrichissement insee en cours...")
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
-    print("enrichissement insee fini")
+    print("Enrichissement insee fini")
 
-    print("enrichissement infogreffe en cours...")
+    print("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
+
     del archiveErrorSIRET
     print("enrichissement infogreffe fini")
 
@@ -286,7 +379,6 @@ def enrichissement_siret(df):
     # Ajout au df principal !
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
     del dfenrichissement
-
     return df
 
 

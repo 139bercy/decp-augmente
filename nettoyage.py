@@ -14,7 +14,6 @@ def main():
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
     # error_siret_file_name = conf["error_siret_file_name"]
-
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
@@ -69,9 +68,9 @@ def main():
 
     df = manage_titulaires(df)
 
-    df = drop_duplicates(df)
+    df = manage_duplicates(df)
 
-    df = manage_montant(df)
+    df = manage_amount(df)
 
     df = manage_missing_code(df)
 
@@ -132,7 +131,7 @@ def manage_titulaires(df):
     return df
 
 
-def drop_duplicates(df):
+def manage_duplicates(df):
     df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
                                'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
@@ -147,28 +146,41 @@ def drop_duplicates(df):
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
+    # détection des accords cadres avec de multiples titulaires
+
     return df
 
 
-def manage_montant(df):
+def is_false_amount(x, threshold=5):
+    """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999.
+    Ces montants seront considérés comme faux"""
+    d = [0] * 10
+    str_x = str(x).split(".")[0]
+    for c in str_x:
+        d[int(c)] += 1
+    for counter in d[1:]:
+        if counter > threshold:
+            return True
+    return False
+
+
+def manage_amount(df):
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
+    df['montant'].fillna(0, inplace=True)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
 
-    montant_borne_inf = 200.0
-    montant_borne_sup = 9.99e8
-    df['montant'] = np.where(df['montant'] <= montant_borne_inf, 0, df['montant'])
-    df['montant'] = np.where(df['montant'] >= montant_borne_sup, 0, df['montant'])
-
-    # On applique au df la division
-    df["montant"] = df["montant"] / df["nbTitulairesSurCeMarche"]
+    borne_inf = 200.0
+    borne_sup = 9.99e8
+    df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
+    df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
 
     # Nettoyage colonnes
-    df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
+    # df['montant'].fillna(0, inplace=True)
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'].isnull(), 'Oui', 'Non')
-
+    df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     return df
 
 
@@ -245,7 +257,7 @@ def manage_region(df):
     # Vérification si c'est bien un code postal
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
-               + [str(i) for i in list(np.arange(10, 96, 1))]
+              + [str(i) for i in list(np.arange(10, 96, 1))]
 
     df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
