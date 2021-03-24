@@ -159,7 +159,7 @@ def manage_montant(df):
     df['montant'] = np.where(df['montant'] >= montant_borne_sup, 0, df['montant'])
 
     # Nettoyage colonnes
-    df['montant'] = np.where(df['montant'].isnull(), 0, df['montant'])
+    df['montant'] = df['montant'].fillna(0, inplace=True)
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     #df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
