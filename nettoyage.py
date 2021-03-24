@@ -150,35 +150,34 @@ def manage_duplicates(df):
 
     return df
 
+
 def is_false_amount(x, threshold=5):
     """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999. 
     Ces montants seront considérés comme faux"""
-    try: #le try/except permet de prendre en compte les lignes ou le montant n'est pas renseigné. Dans ce cas, le montant sera considéré comme faux. 
-        d = [0]*10
-        str_x = str(x).split(".")[0]
-        for c in str_x:
-            d[int(c)] += 1
-        for counter in d[1:]:
-            if counter > threshold:
-                return True
-        return False
-    except:
-        return False
+    d = [0] * 10
+    str_x = str(x).split(".")[0]
+    for c in str_x:
+        d[int(c)] += 1
+    for counter in d[1:]:
+        if counter > threshold:
+            return True
+    return False
 
 
 def manage_amount(df):
-    ################### Identifier les outliers - travail sur les montants
+    # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
+    df['montant'].fillna(0, inplace=True)
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
 
-    borne_inf=200.0
-    borne_sup=9.99e8
+    borne_inf = 200.0
+    borne_sup = 9.99e8
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
 
     # Nettoyage colonnes
-    #df['montant'] = np.where(df['montant'] == 0, np.NaN, df['montant'])
+    # df['montant'].fillna(0, inplace=True)
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
