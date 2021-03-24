@@ -77,13 +77,9 @@ def main():
     
     df = apply_luhn(df)
 
-<<<<<<< HEAD
     df = enrichissement_departement(df) #il y a des na ans departements
 
-    df = manage_column_final(df)
-=======
     df = detection_accord_cadre(df)
->>>>>>> master
 
     df = manage_column_final(df)
     
@@ -108,8 +104,8 @@ def detection_accord_cadre(df):
     for i in range(len(df_group)):
         nombre_titulaire = len(df_group["siretEtablissement"][i])
         accord_presume = False
-        if nombre_titulaire > 1: 
-                accord_presume = True
+        if nombre_titulaire > 1:
+            accord_presume = True
         L_data_fram += [[index[i][0], index[i][1], index[i][2], index[i][3], nombre_titulaire, str(accord_presume)]]
         # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
@@ -167,7 +163,7 @@ def manage_column_final(df):
                              'dureeMoisCalculee', 'datePublicationDonnees', 'montantOriginal',
                              'montantCalcule', 'nombreTitulaireSurMarchePresume',
                              'formePrix', 'lieuExecutionCode', 'lieuExecutionTypeCode',
-                             'lieuExecutionNom', 'nature', 'procedure',
+                             'lieuExecutionNom', 'nature', "accord-cadrePresume" 'procedure',
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur', 'codeRegionAcheteur', 'libelleRegionAcheteur', 'libelleDepartementAcheteur', 
                              'departementAcheteur', 'codePostalAcheteur', 'libelleCommuneAcheteur', 'codeCommuneAcheteur',
                              'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
