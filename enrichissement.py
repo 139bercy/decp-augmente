@@ -1031,7 +1031,7 @@ def get_distance(row):
     except ValueError:
         return None
 
-
+# A partir d'ici on ne se sert de plus rien 
 def segmentation(df):
     ###############################################################################
     # ########################### Segmentation de marché ##########################
