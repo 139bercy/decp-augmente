@@ -203,19 +203,19 @@ def enrichissement_type_entreprise(df):
     return df
 
 
-##### Algorithme de Luhn
+# Algorithme de Luhn
 
 def is_luhn_valid(x):
     """Application de la formule de Luhn à un nombre
     Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
     try:
         luhn_corr = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]
-        l = [int(i) for i in list(str(x))]
-        l2 = [luhn_corr[i] if (index + 1) % 2 == 0 else i for index, i in enumerate(l[::-1])]
+        list_number_in_x = [int(i) for i in list(str(x))]
+        l2 = [luhn_corr[i] if (index + 1) % 2 == 0 else i for index, i in enumerate(list_number_in_x[::-1])]
         if sum(l2) % 10 == 0:
             return True
         elif str(x)[:9] == "356000000":  # SIREN de la Poste
-            if sum(l) % 5 == 0:
+            if sum(list_number_in_x) % 5 == 0:
                 return True
         return False
     except:
@@ -262,7 +262,7 @@ def apply_luhn(df):
 
 
 def enrichissement_siret(df):
-    ######## Enrichissement des données via les codes siret/siren ########
+    # Enrichissement des données via les codes siret/siren #
 
     dfSIRET = get_siretdf_from_original_data(df)
 
@@ -283,7 +283,7 @@ def enrichissement_siret(df):
     del enrichissementInsee
     print("Fini")
 
-    ########### Ajout au df principal !
+    # Ajout au df principal !
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
     del dfenrichissement
 
@@ -291,7 +291,7 @@ def enrichissement_siret(df):
 
 
 def get_siretdf_from_original_data(df):
-    ### Utilisation d'un dataframe intermediaire pour traiter les Siret unique
+    # Utilisation d'un dataframe intermediaire pour traiter les Siret unique
 
     dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
     dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
@@ -394,7 +394,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
     enrichissement_insee_siren.columns = myList
     """
 
-    ## Concat des deux resultats
+    # Concat des deux resultats
     enrichissementInsee = enrichissement_insee_siret  # pd.concat([enrichissement_insee_siret, enrichissement_insee_siren])
 
     """
@@ -417,7 +417,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
 
 
 def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
-    ####### Enrichissement des données restantes
+    # Enrichissement des données restantes
 
     # ....... Solution complémentaire pour ceux non-identifié dans la BDD
     columns = [
@@ -524,7 +524,7 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     resultatScrap2 = resultat[resultat.rue != ' ']
 
     ###############################################################################
-    ### Enregistrement des entreprises n'ayant aucune correspondance
+    # Enregistrement des entreprises n'ayant aucune correspondance
     errorSIRET = resultat[
         (resultat.siret_y == '') | (resultat.siret_y == '') | (resultat.siret_y == ' ') | (resultat.siret_y.isnull())]
     errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]
@@ -585,7 +585,7 @@ def get_scrap_dataframe(index, code):
 
 
 def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
-    ############ Arrangement des colonnes
+    # Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
     listCorrespondance = {
@@ -689,8 +689,9 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 
     return dfenrichissement
 
+
 def enrichissement_cpv(df):
-    ################### Enrichissement avec le code CPV ##################
+    # Enrichissement avec le code CPV #
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
     refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
@@ -701,19 +702,17 @@ def enrichissement_cpv(df):
     refCPV_min.columns = ['CODEmin', 'FR2']
     # Merge avec le df principal
     df = pd.merge(df, refCPV, how='left', left_on="codeCPV", right_on="CODE", copy=False)
-    #del refCPV
+    # del refCPV
     df = pd.merge(df, refCPV_min, how='left', left_on="codeCPV", right_on="CODEmin", copy=False)
     del refCPV_min
     # Garde uniquement la colonne utile / qui regroupe les nouvelles infos
     df.refCodeCPV = np.where(df.refCodeCPV.isnull(), df.FR2, df.refCodeCPV)
     df.drop(columns=["FR2", "CODE", "CODEmin"], inplace=True)
-    df = pd.merge(df, refCPV, how='left', left_on="refCodeCPV", right_on="refCodeCPV", copy=False) 
+    df = pd.merge(df, refCPV, how='left', left_on="refCodeCPV", right_on="refCodeCPV", copy=False)
     del refCPV
-    #Rename la variable CODE en codeCPV
-    df.rename(columns = {"codeCPV": "codeCPV_Original",
-                "CODE": "codeCPV"}, inplace=True)
-
-
+    # Rename la variable CODE en codeCPV
+    df.rename(columns={"codeCPV": "codeCPV_Original",
+              "CODE": "codeCPV"}, inplace=True)
     with open('df_backup_cpv', 'wb') as df_backup_cpv:
         pickle.dump(df, df_backup_cpv)
 
@@ -721,9 +720,9 @@ def enrichissement_cpv(df):
 
 
 def enrichissement_acheteur(df):
-    ############## Enrichissement des données des acheteurs ##############
-    ######## Enrichissement des données via les codes siret/siren ########
-    ### Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
+    # Enrichissement des données des acheteurs #
+    # Enrichissement des données via les codes siret/siren #
+    # Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
 
     with open('df_backup_cpv', 'rb') as df_backup_cpv:
         df = pickle.load(df_backup_cpv)
@@ -835,8 +834,8 @@ def reorganisation(df):
         df.codeCommuneAcheteur = '0' + df.codeCommuneAcheteur
 
     # Petites corrections sur lieuExecutionTypeCode et nature
-    l = ["lieuExecutionTypeCode", "nature"]
-    for column in l:
+    list_to_correct = ["lieuExecutionTypeCode", "nature"]
+    for column in list_to_correct:
         df[column] = df[column].str.upper()
         df[column] = df[column].str.replace("É", "E")
 
@@ -850,7 +849,7 @@ def enrichissement_geo(df):
     with open('df_reorganisation', 'rb') as df_backup_acheteur:
         df = pickle.load(df_backup_acheteur)
 
-    ######## Enrichissement latitude & longitude avec adresse la ville
+    # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
@@ -871,7 +870,7 @@ def enrichissement_geo(df):
               inplace=True)
     df.drop(columns="codeCommune", inplace=True)
 
-    ########### Calcul de la distance entre l'acheteur et l'etablissement
+    # Calcul de la distance entre l'acheteur et l'etablissement
     df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
     # Taux d'enrichissement
     # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
@@ -943,7 +942,7 @@ def get_distance(row):
 
 def segmentation(df):
     ###############################################################################
-    ############################ Segmentation de marché ###########################
+    # ########################### Segmentation de marché ##########################
     ###############################################################################
     # ... Créer une bdd par villes (acheteur/client)
     dfBIN = df[['type', 'nature', 'procedure', 'lieuExecutionTypeCode']]
@@ -1015,6 +1014,7 @@ def segmentation(df):
 
     # ... Mettre les valeurs sur une même unité de mesure
     df_nom = pd.DataFrame(df.libelleCommuneAcheteur)
+    # Les deux variables du dessous ne sont jamais utilisées?#
     scaler = StandardScaler()
     scaled_df = scaler.fit_transform(df)
 
@@ -1024,9 +1024,9 @@ def segmentation(df):
 
 
 def CAH(df):
-    ###############################################################################
-    ### Application de l'algorithme de classification ascendante hiérarchique - CAH
-    ############ Avec les données normalisée
+    #############################################################################
+    # Application de l'algorithme de classification ascendante hiérarchique - CAH
+    # Avec les données normalisée
     # Générer la matrice des liens
     Z = linkage(df, method='ward', metric='euclidean')
     # Dendrogramme
@@ -1035,7 +1035,7 @@ def CAH(df):
     plt.show()
     # Récupération des classes
     groupes_cah = pd.DataFrame(fcluster(Z, t=65, criterion='distance'), columns=['segmentation_CAH'])
-    ### Ajout au df
+    # Ajout au df
     df = df.join(groupes_cah)
 
     # On créé une 4e catégorie avec toutes les valeurs seules
@@ -1070,7 +1070,7 @@ def CAH(df):
 
 def carte(df):
     ###############################################################################
-    ############........ CARTE DES MARCHES PAR VILLE
+    # ........ CARTE DES MARCHES PAR VILLE
     df_carte = df[['latitudeAcheteur', 'longitudeAcheteur', 'libelleCommuneAcheteur']]
     df_carte = df_carte[df_carte['latitudeAcheteur'] != 'nan']
     df_carte = df_carte[df_carte['longitudeAcheteur'] != 'nan']
@@ -1103,7 +1103,7 @@ def carte(df):
     df_carte.distanceMediane = np.where(df_carte.distanceMediane.isnull(), 0, df_carte.distanceMediane)
 
     ###############################################################################
-    ### Carte des DECP
+    # Carte des DECP
     geojson = json.loads(urllib.request.urlopen('https://france-geojson.gregoiredavid.fr/repo/regions.geojson').read())
     df_Reg = df.groupby(['codeRegionAcheteur']).montant.sum().to_frame('montantMoyen').reset_index()
     df_Reg.columns = ['code', 'montant']
@@ -1135,24 +1135,23 @@ def carte(df):
     dfHM = df[['latitudeAcheteur', 'longitudeAcheteur']]
     dfHM = dfHM[(dfHM.latitudeAcheteur != 'nan') | (dfHM.longitudeAcheteur != 'nan')]
 
-    ### Mise en forme
+    # Mise en forme
     c = folium.Map(location=[47, 2.0], zoom_start=6, control_scale=True)
     plugins.MiniMap(toggle_display=True).add_to(c)
 
     mapMarker = folium.Marker([44, -4], icon=folium.features.CustomIcon(
         'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Information_icon.svg/1000px-Information_icon.svg.png',
         icon_size=(20, 20)),
-                              popup=folium.Popup('<b>Indicateur de distance</b></br></br>' +
-                                                 '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=8 height=8/>' + ' ' +
-                                                 '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=14 height=14/>' + ' ' +
-                                                 '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Distance moyenne</br>entre acheteurs et entreprises' + '</br></br>' +
-
-                                                 '<b>Ségmentation des acheteurs </b></br></br>' +
-                                                 '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Petit' + '</br>' +
-                                                 '<img src="https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png"  width=20 height=20/> : Moyen' + '</br>' +
-                                                 '<img src="https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced"  width=20 height=20/> : Grand' + '</br>' +
-                                                 '<img src="https://svgsilh.com/svg/157354.svg"  width=20 height=20/> : Hors-segmentation',
-                                                 max_width=320, show=True), overlay=False).add_to(c)
+        popup=folium.Popup('<b>Indicateur de distance</b></br></br>'
+                           + '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=8 height=8/>' + ' '
+                           + '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=14 height=14/>' + ' '
+                           + '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Distance moyenne</br>entre acheteurs et entreprises' + '</br></br>'
+                           + '<b>Ségmentation des acheteurs </b></br></br>'
+                           + '<img src="https://icon-library.com/images/map-pin-icon/map-pin-icon-17.jpg"  width=20 height=20/> : Petit' + '</br>'
+                           + '<img src="https://cdn1.iconfinder.com/data/icons/vibrancie-map/30/map_001-location-pin-marker-place-512.png"  width=20 height=20/> : Moyen' + '</br>'
+                           + '<img src="https://cdn.cnt-tech.io/api/v1/tenants/dd1f88aa-e3e2-450c-9fa9-a03ea59a6bf0/domains/57a9d53a-fe30-4b6f-a4de-d624bd25134b/buckets/8f139e2f-9e74-4be3-9d30-d8f180f02fbb/statics/56/56d48498-d2bf-45f8-846e-6c9869919ced"  width=20 height=20/> : Grand' + '</br>'
+                           + '<img src="https://svgsilh.com/svg/157354.svg"  width=20 height=20/> : Hors-segmentation',
+                           max_width=320, show=True), overlay=False).add_to(c)
 
     marker_cluster = MarkerCluster(name='DECP par communes').add_to(c)
     for i in range(len(df_carte)):
@@ -1181,11 +1180,9 @@ def carte(df):
                       popup=folium.Popup('<b><center>' + df_carte.libelleCommuneAcheteur[i] + '</center></b></br>'
                                          + '<b>' + df_carte.nbMarches[i].astype(str) + '</b> marchés '
                                          + 'pour un montant moyen de <b>' + round(df_carte.montantMoyen[i] / 1000,
-                                                                                  0).astype(int).astype(
-                          str) + ' mille euros</b> '
+                                                                                  0).astype(int).astype(str) + ' mille euros</b> '
                                          + "</br>avec <b>" + df_carte.nbEntreprises[i].astype(str) + ' entreprises</b> '
-                                         + "à une distance médiane de <b>" + df_carte.distanceMediane[i].astype(
-                          int).astype(str) + ' km</b> ',
+                                         + "à une distance médiane de <b>" + df_carte.distanceMediane[i].astype(int).astype(str) + ' km</b> ',
                                          max_width=320, min_width=200),
                       tooltip=folium.Tooltip(df_carte.libelleCommuneAcheteur[i]), clustered_marker=True).add_to(
             marker_cluster)

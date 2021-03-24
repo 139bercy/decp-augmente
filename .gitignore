@@ -12,7 +12,11 @@ config.json
 __pycache__
 test.py
 
+# Fichier intermédiaire
 df_backup_acheteur
 df_backup_cpv
 df_nettoye
 df_reorganisation
+
+#Config Vscode
+.vscode

@@ -13,7 +13,7 @@ def main():
     check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
-    #error_siret_file_name = conf["error_siret_file_name"]
+    # error_siret_file_name = conf["error_siret_file_name"]
 
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
@@ -79,7 +79,7 @@ def main():
 
     df = manage_date(df)
 
-    #df = data_inputation(df)
+    # df = data_inputation(df)
 
     df = correct_date(df)
 
@@ -91,8 +91,9 @@ def main():
 
     df.to_csv("decp_nettoye.csv")
 
+
 def check_reference_files(conf):
-    """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.  
+    """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.
         StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
     L_key_useless = ["path_to_project", "path_to_data"]
@@ -100,7 +101,7 @@ def check_reference_files(conf):
     for key in list(conf.keys()):
         if key not in L_key_useless:
             mask = os.path.exists(os.path.join(path, conf[key]))
-            if not mask: 
+            if not mask:
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
 
 
@@ -111,7 +112,7 @@ def manage_titulaires(df):
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
-    donneesInutiles = ['dateSignature', 'dateDebutExecution',  'valeurGlobale', 'donneesExecution', 'concessionnaires',
+    donneesInutiles = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
                        'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom']
     df.drop(columns=donneesInutiles, inplace=True)
 
@@ -121,11 +122,11 @@ def manage_titulaires(df):
     df = df[df['titulaires'] != '0']
 
     # Création d'une colonne nbTitulairesSurCeMarche
-    df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x : len(x))
+    df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))
 
     df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']],
                               keys=df.index).reset_index(level=1, drop=True)
-    df_titulaires.rename(columns={"id":  "idTitulaires"}, inplace=True)
+    df_titulaires.rename(columns={"id": "idTitulaires"}, inplace=True)
     df = df.drop('titulaires', axis=1).join(df_titulaires).reset_index(drop=True)
 
     return df
@@ -150,7 +151,7 @@ def drop_duplicates(df):
 
 
 def manage_montant(df):
-    ################### Identifier les outliers - travail sur les montants
+    # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
 
@@ -189,21 +190,20 @@ def manage_missing_code(df):
     df.idTitulaires[mask].replace(caracteres_speciaux_dict, inplace=True)
     df.idTitulaires = np.where(df.idTitulaires == '', np.NaN, df.idTitulaires)
 
-    ########  Récupération code NIC
+    # Récupération code NIC
     df.idTitulaires = df.idTitulaires.astype(str)
     df['nic'] = df["idTitulaires"].str[-5:]
 
-    #df.loc[~df["nic"].str.isdigit()] = np.NaN
+    # df.loc[~df["nic"].str.isdigit()] = np.NaN
     df.nic = np.where(~df["nic"].str.isdigit(), np.NaN, df.nic)
     df['nic'] = df.nic.astype(str)
 
-    ######## Gestion code CPV
+    # Gestion code CPV
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
     df["natureObjet"] = "Fournitures"
-    df.loc[df["CPV_min"] == '45','natureObjet'] = 'Travaux'
+    df.loc[df["CPV_min"] == '45', 'natureObjet'] = 'Travaux'
     df.loc[df["CPV_min"] > '45', 'natureObjet'] = 'Services'
-
 
     # Mise en forme des données vides
     df.denominationSociale = np.where(
@@ -214,7 +214,7 @@ def manage_missing_code(df):
 
 
 def manage_region(df):
-    ################### Régions / Départements ##################
+    # Régions / Départements #
     # Création de la colonne pour distinguer les départements
     df['codePostal'] = df['lieuExecution.code'].str[:3]
     listCorrespondance = {
@@ -245,7 +245,7 @@ def manage_region(df):
     # Vérification si c'est bien un code postal
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
-              + [str(i) for i in list(np.arange(10, 96, 1))]
+               + [str(i) for i in list(np.arange(10, 96, 1))]
 
     df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
 
@@ -326,7 +326,7 @@ def manage_region(df):
 
 
 def manage_date(df):
-    ################### Date / Temps ##################
+    # Date / Temps #
     # ..............Travail sur les variables de type date
     df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
     df.dateNotification = df.dateNotification.str[0:10]
@@ -345,6 +345,7 @@ def manage_date(df):
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
 
     return df
+
 
 def data_inputation(df):
     # Utilisation de la méthode 5 pour estimer les valeurs manquantes
@@ -385,40 +386,36 @@ def data_inputation(df):
 
     return df
 
+
 def correct_date(df):
     # On cherche les éventuelles erreurs mois -> jours
     mask = ((df['montant'] == df['dureeMois'])
-        | (df['montant'] / df['dureeMois'] < 100)
-        | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
-        | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
-        | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
-        | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-        | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
+            | (df['montant'] / df['dureeMois'] < 100)
+            | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
+            | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
+            | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
+            | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
+            | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
+            | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
+            | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
 
-    df['dureeMoisEstime'] = np.where(mask, "Oui", "Non")
+    df['dureeMoisEstime'] = np.where(mask, "True", "False")
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
     # Comme certaines valeurs atteignent zero, on remplace par un mois
-    df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] == 0, 1, df['dureeMoisCalculee'])
-
-    # Au cas ils restent encore des données aberrantes, on les remplace par un mois -> A CHALLENGER
-    df['dureeMoisCalculee'] = np.where( mask, 1, df.dureeMoisCalculee)
+    df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])  # Il y a une valeur négative
 
     return df
 
-##### Fonction pour mettre en qualité le champ objetMarche
-def replace_char(df):
 
+def replace_char(df):
+    """Fonction pour mettre en qualité le champ objetMarche"""
     # Remplacement brutal du caractère (?) par un espace
-    df['objet'] = df['objet'].str.replace ('�', 'XXXXX') 
+    df['objet'] = df['objet'].str.replace('�', 'XXXXX')
 
     return df
 
 
 if __name__ == "__main__":
     main()
-
-
