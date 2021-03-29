@@ -99,7 +99,7 @@ class TestNetoyageMethods(unittest.TestCase):
         # On vérifie la taille
         self.assertEqual(df_attendu.shape[0], df_output.shape[0])
         self.assertEqual(df_attendu.shape[1], df_output.shape[1])
-    
+
     def test_manage_missing_code(self):
         df_test = pd.DataFrame([
                                ['AETYHGF', np.nan, 'SIRET', "123456789", "Fournitures", "Coucou"],
@@ -115,6 +115,8 @@ class TestNetoyageMethods(unittest.TestCase):
         for column in df_attendu:
             df_attendu[column] == df_output[column]
 
+    def test_manage_region(self):
+        pass
 
 
 if __name__ == '__main__':
