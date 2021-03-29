@@ -17,9 +17,6 @@ def main():
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-    # Applatit les données json en tableau
-    # pd.read_json(data['marches'])
-    # df = pd.read_json(json.dumps(data['marches']))
     df = json_normalize(data['marches'])
 
     df = df.astype({
@@ -78,8 +75,6 @@ def main():
 
     df = manage_date(df)
 
-    # df = data_inputation(df)
-
     df = correct_date(df)
 
     # suppression des caractères mal encodés
@@ -117,12 +112,13 @@ def manage_titulaires(df):
 
     # Récupération des données titulaires
     df["titulaires"].fillna('0', inplace=True)
-    dfO = df[df['titulaires'] == '0']
+    # dfO = df[df['titulaires'] == '0']
     df = df[df['titulaires'] != '0']
 
     # Création d'une colonne nbTitulairesSurCeMarche
-    df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))
+    df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))  # si len(x) = 2 il y a deux titulaires, on creer 2 lignes, 1 par titulaire.
 
+    # On cherche à transformer la colonne titulaires (liste de 3 valeurs) en 3 colonnes distinctes.
     df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']],
                               keys=df.index).reset_index(level=1, drop=True)
     df_titulaires.rename(columns={"id": "idTitulaires"}, inplace=True)
@@ -145,8 +141,6 @@ def manage_duplicates(df):
     df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
-
-    # détection des accords cadres avec de multiples titulaires
 
     return df
 
@@ -180,7 +174,7 @@ def manage_amount(df):
     # df['montant'].fillna(0, inplace=True)
 
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
+    # df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     return df
 
 
@@ -355,46 +349,6 @@ def manage_date(df):
     # On récupère le mois de notification
     df['moisNotification'] = df.dateNotification.str[5:7]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
-
-    return df
-
-
-def data_inputation(df):
-    # Utilisation de la méthode 5 pour estimer les valeurs manquantes
-    df['Region'] = df['Region'].astype(str)
-    df['formePrix'] = df['formePrix'].astype(str)
-    df['codeCPV'] = df['codeCPV'].astype(str)
-
-    df['moisNotification'] = df['moisNotification'].astype(str)
-    df['anneeNotification'] = df['anneeNotification'].astype(str)
-    df['conca'] = df['formePrix'] + df['Region'] + df['codeCPV']
-
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    del df['conca'], df['montantEstimation']
-
-    # On recommence avec une plus petite stratification
-    df['conca'] = df['formePrix'] + df['Region']
-    df.reset_index(level=0, inplace=True)
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    # S'il reste encore des valeurs nulles...
-    df['montant'] = np.where(df['montant'].isnull(), df['montant'].median(), df['montant'])
-    del df['conca'], df['montantEstimation'], df['index']
-    del medianeRegFP
-
-    # Colonne par marché
-    df['montantTotalMarché'] = df["montant"] * df["nbTitulairesSurCeMarche"]
 
     return df
 
