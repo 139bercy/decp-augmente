@@ -56,8 +56,8 @@ def main():
         'nature': 'string',
         'acheteur.id': 'string',
         'acheteur.nom': 'string',
-        'codePostal': 'string',
-        'codeRegion': 'string',
+        'codeDepartementExecution': 'string',
+        'codeRegionExecution': 'string',
         'anneeNotification': 'string',
         'moisNotification': 'string',
         'dureeMoisEstimee': 'string',
@@ -156,16 +156,16 @@ def manage_column_final(df):
     except:
         pass
 
-    # Réorganisation finale
+    # Réorganisation finale 'codeRegionAcheteur'
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
-                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom',
+                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution",
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'codeRegionAcheteur', 'libelleRegionAcheteur',
+                             'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
@@ -198,7 +198,7 @@ def enrichissement_departement(df):
     departement = pd.read_csv(path, sep="\t")
     sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
     # codePostalAcheteur pour le departement de l acheteur
-    # codePostalEtablissement pou l'Etablissement
+    # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
     df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
     df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
@@ -242,7 +242,7 @@ def enrichissement_type_entreprise(df):
         'idAcheteur': 'string',
         'nomAcheteur': 'string',
         'codePostalEtablissement': 'string',
-        'codeRegionAcheteur': 'string',
+        # 'codeRegionAcheteur': 'string',
         'anneeNotification': 'string',
         'moisNotification': 'string',
         'dureeMoisEstimee': 'string',
@@ -888,10 +888,10 @@ def reorganisation(df):
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(str).str[:5]
 
     df.anneeNotification = df.anneeNotification.astype(str)
-    df.codePostal = df.codePostal.astype(str)
+    df.codeDepartementExecution = df.codeDepartementExecution.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
-    df.drop(columns=["uid", "uuid", "codePostal", "denominationSociale_x", 'siret'], inplace=True, errors="ignore")
+    df.drop(columns=["uid", "uuid", "denominationSociale_x", 'siret'], inplace=True, errors="ignore")
 
     # Réorganisation des colonnes et de leur nom
     column_mapping = {
@@ -908,7 +908,6 @@ def reorganisation(df):
         'denominationSociale_y': "denominationSocialeEtablissement",
         'nic': "nicEtablissement",
         'CPV_min': "codeCPV",
-        'codeRegion': "codeRegionAcheteur",
         'Region': "regionAcheteur",
         'siren': "sirenEtablissement",
         'refCodeCPV': "referenceCPV"
