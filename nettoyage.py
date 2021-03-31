@@ -117,7 +117,6 @@ def manage_titulaires(df):
 
     # Récupération des données titulaires
     df["titulaires"].fillna('0', inplace=True)
-    dfO = df[df['titulaires'] == '0']
     df = df[df['titulaires'] != '0']
 
     # Création d'une colonne nbTitulairesSurCeMarche
@@ -395,7 +394,6 @@ def data_inputation(df):
 
     # Colonne par marché
     df['montantTotalMarché'] = df["montant"] * df["nbTitulairesSurCeMarche"]
-
     return df
 
 
