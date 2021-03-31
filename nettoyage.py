@@ -383,7 +383,7 @@ def correct_date(df):
 def data_inputation(df):
     """Permet une estimation de la dureeMois (pour les duree évidemment fausse) grace au contenu de la commande (codeCPV)"""
     df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
-    # On fait un groupby sur l'objet du marché + dureeMoisCalculee
+    # On fait un groupby sur la division des cpv afin d'obtenir toutes les duree par division 
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
     # On cherche à obtenir la médiane par division de CPV
     df_group.columns = ["CPV_min", "listeDureeMois"]
