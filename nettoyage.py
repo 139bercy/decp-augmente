@@ -78,9 +78,9 @@ def main():
 
     df = manage_date(df)
 
-    # df = data_inputation(df)
-
     df = correct_date(df)
+
+    df = data_inputation(df)
 
     # suppression des caractères mal encodés
     df = replace_char(df)
@@ -359,46 +359,6 @@ def manage_date(df):
     return df
 
 
-def data_inputation(df):
-    # Utilisation de la méthode 5 pour estimer les valeurs manquantes
-    df['Region'] = df['Region'].astype(str)
-    df['formePrix'] = df['formePrix'].astype(str)
-    df['codeCPV'] = df['codeCPV'].astype(str)
-
-    df['moisNotification'] = df['moisNotification'].astype(str)
-    df['anneeNotification'] = df['anneeNotification'].astype(str)
-    df['conca'] = df['formePrix'] + df['Region'] + df['codeCPV']
-
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    del df['conca'], df['montantEstimation']
-
-    # On recommence avec une plus petite stratification
-    df['conca'] = df['formePrix'] + df['Region']
-    df.reset_index(level=0, inplace=True)
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    # S'il reste encore des valeurs nulles...
-    df['montant'] = np.where(df['montant'].isnull(), df['montant'].median(), df['montant'])
-    del df['conca'], df['montantEstimation'], df['index']
-    del medianeRegFP
-
-    # Colonne par marché
-    df['montantTotalMarché'] = df["montant"] * df["nbTitulairesSurCeMarche"]
-
-    return df
-
-
 def correct_date(df):
     # On cherche les éventuelles erreurs mois -> jours
     mask = ((df['montant'] == df['dureeMois'])
@@ -420,6 +380,23 @@ def correct_date(df):
 
     return df
 
+
+def data_inputation(df):
+    """Permet une estimation de la dureeMois (pour les duree évidemment fausse) grace au contenu de la commande (codeCPV)"""
+    # On récupère les colonnes qui nous intéressent : dureeMois, dureeMoisEstimee, dureeMoisCalculee, codeCPV_division, objetMarche (PK), montant
+    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
+    # On fait un groupby sur la PK + dureeMoisCalculee
+    df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
+    # Si dureeMoisCalculee > 120 (10 ans)
+    duree_a_modifie = np.where(df_intermediaire["dureeMoisCalculee"] > 120, -1, df_intermediaire["dureeMoisCalculee"])
+    for i in range(len(duree_a_modifie)):
+        if duree_a_modifie[i] == -1:
+            code_cpv = df_intermediaire.CPV_min[0]
+            indice_to_median = np.where(df_group[0] == str(code_cpv))[0][0]
+            median = np.median(df_group[1][indice_to_median])
+            duree_a_modifie[i] = median
+    df["dureeMoisCalculee"] = duree_a_modifie
+    return df
 
 def replace_char(df):
     """Fonction pour mettre en qualité le champ objetMarche"""

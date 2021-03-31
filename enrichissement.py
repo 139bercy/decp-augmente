@@ -144,18 +144,6 @@ def manage_column_final(df):
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
-
-    # Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
-    try:
-        codeCPV = df["codeCPV"]
-        cpvComplet = codeCPV.iloc[:, 1]
-        cpvdivision = codeCPV.iloc[:, 0]
-        df = df.drop(columns=["codeCPV"])
-        df["codeCPV"] = cpvComplet
-        df["codeCPV_division"] = cpvdivision
-    except:
-        pass
-
     # Réorganisation finale
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
@@ -907,7 +895,7 @@ def reorganisation(df):
         'idTitulaires': "siretEtablissement",
         'denominationSociale_y': "denominationSocialeEtablissement",
         'nic': "nicEtablissement",
-        'CPV_min': "codeCPV",
+        'CPV_min': "codeCPV_division",
         'codeRegion': "codeRegionAcheteur",
         'Region': "regionAcheteur",
         'siren': "sirenEtablissement",
