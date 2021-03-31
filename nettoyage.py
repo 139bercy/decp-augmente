@@ -117,7 +117,6 @@ def manage_titulaires(df):
 
     # Récupération des données titulaires
     df["titulaires"].fillna('0', inplace=True)
-    dfO = df[df['titulaires'] == '0']
     df = df[df['titulaires'] != '0']
 
     # Création d'une colonne nbTitulairesSurCeMarche
@@ -228,16 +227,16 @@ def manage_missing_code(df):
 def manage_region(df):
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
-    df['codePostal'] = df['lieuExecution.code'].str[:3]
+    df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
     listCorrespondance = {
         '976': 'YT',
         '974': 'RE',
         '972': 'MQ',
         '971': 'GP',
         '973': 'GF'}
-    df['codePostal'].replace(listCorrespondance, inplace=True)
+    df['codeDepartementExecution'].replace(listCorrespondance, inplace=True)
 
-    df['codePostal'] = df['codePostal'].str[:2]
+    df['codeDepartementExecution'] = df['codeDepartementExecution'].str[:2]
 
     listCorrespondance2 = {
         'YT': '976',
@@ -252,23 +251,23 @@ def manage_region(df):
         'MF': '978',
         'PM': '975',
         'BL': '977'}
-    df['codePostal'].replace(listCorrespondance2, inplace=True)
+    df['codeDepartementExecution'].replace(listCorrespondance2, inplace=True)
 
     # Vérification si c'est bien un code postal
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
-              + [str(i) for i in list(np.arange(10, 96, 1))]
+        + [str(i) for i in list(np.arange(10, 96, 1))]
 
-    df['codePostal'] = np.where(~df['codePostal'].isin(listeCP), np.NaN, df['codePostal'])
+    df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(listeCP), np.NaN, df['codeDepartementExecution'])
 
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
 
     df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
-    df['codePostal'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codePostal'])
+    df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codeDepartementExecution'])
 
     ###############################################################################
     # Création de la colonne pour distinguer les régions
-    df['codeRegion'] = df['codePostal'].astype(str)
+    df['codeRegionExecution'] = df['codeDepartementExecution'].astype(str)
     # Définition des codes des régions en fonctions des codes de départements
     listCorrespondance = {
         '84': ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74'],
@@ -295,19 +294,19 @@ def manage_region(df):
     # Inversion du dict
     listCorrespondanceI = {value: str(key) for key, values in listCorrespondance.items() for value in values}
 
-    df['codeRegion'].replace(listCorrespondanceI, inplace=True)
+    df['codeRegionExecution'].replace(listCorrespondanceI, inplace=True)
 
     # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
-    df['codeRegion'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegion'])
-    df['codeRegion'] = df['codeRegion'].astype(str)
+    df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
+    df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
     # Vérification des codes région
     listeReg = ['84', '27', '53', '24', '94', '44', '32', '11', '28', '75', '76',
                 '52', '93', '01', '02', '03', '04', '06', '98']  # 98 = collectivité d'outre mer
 
-    df['codeRegion'] = np.where(~df['codeRegion'].isin(listeReg), np.NaN, df['codeRegion'])
+    df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
 
     # Identification du nom des régions
-    df['Region'] = df['codeRegion'].astype(str)
+    df['libelleRegionExecution'] = df['codeRegionExecution'].astype(str)
     correspondance_dict = {
         '84': 'Auvergne-Rhône-Alpes',
         '27': 'Bourgogne-Franche-Comté',
@@ -329,10 +328,10 @@ def manage_region(df):
         '06': 'Mayotte',
         '98': 'Collectivité d\'outre mer'}
 
-    df['Region'].replace(correspondance_dict, inplace=True)
+    df['libelleRegionExecution'].replace(correspondance_dict, inplace=True)
     # del chemin, chemindata, dfO, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
-    df['codePostal'] = df['codePostal'].astype(str)
-    df['codeRegion'] = df['codeRegion'].astype(str)
+    df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
+    df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
 
     return df
 
@@ -383,20 +382,26 @@ def correct_date(df):
 
 def data_inputation(df):
     """Permet une estimation de la dureeMois (pour les duree évidemment fausse) grace au contenu de la commande (codeCPV)"""
-    # On récupère les colonnes qui nous intéressent : dureeMois, dureeMoisEstimee, dureeMoisCalculee, codeCPV_division, objetMarche (PK), montant
     df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
-    # On fait un groupby sur la PK + dureeMoisCalculee
+    # On fait un groupby sur l'objet du marché + dureeMoisCalculee
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
-    # Si dureeMoisCalculee > 120 (10 ans)
-    duree_a_modifie = np.where(df_intermediaire["dureeMoisCalculee"] > 120, -1, df_intermediaire["dureeMoisCalculee"])
-    for i in range(len(duree_a_modifie)):
-        if duree_a_modifie[i] == -1:
-            code_cpv = df_intermediaire.CPV_min[0]
-            indice_to_median = np.where(df_group[0] == str(code_cpv))[0][0]
-            median = np.median(df_group[1][indice_to_median])
-            duree_a_modifie[i] = median
-    df["dureeMoisCalculee"] = duree_a_modifie
+    # On cherche à obtenir la médiane par division de CPV
+    df_group.columns = ["CPV_min", "listeDureeMois"]
+    df_group["mediane_dureeMois_CPV"] = df_group.listeDureeMois.apply(np.median)
+    # La liste des duree exacte est inutile: on supprime
+    df_group.drop("listeDureeMois", axis=1, inplace=True)
+    # On ajoute provisoirement la colonne mediane_dureeMois
+    df = pd.merge(df, df_group, how="left", left_on="CPV_min", right_on="CPV_min", copy=False)
+    # 120 = 10 ans. duree arbitraire jugée trop longue.
+    # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV
+    mask = ((df.dureeMoisCalculee > 120) & (df.CPV_min != '45'))
+    df.dureeMoisCalculee = np.where(mask, df.mediane_dureeMois_CPV, df.dureeMoisCalculee)
+    # On modifie au passage la colonne dureeMoisEstimee
+    df['dureeMoisEstimee'] = np.where(mask, "True", df.dureeMoisEstimee)
+    # La mediane n'est pas utile dans le df final: on supprime
+    df.drop("mediane_dureeMois_CPV", axis=1, inplace=True)
     return df
+
 
 def replace_char(df):
     """Fonction pour mettre en qualité le champ objetMarche"""
