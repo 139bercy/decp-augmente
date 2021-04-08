@@ -381,9 +381,9 @@ def correct_date(df):
 
 
 def data_inputation(df):
-    """Permet une estimation de la dureeMois (pour les duree évidemment fausse) grace au contenu de la commande (codeCPV)"""
+    """Permet une estimation de la dureeMois (pour les durees évidemment fausses) grace au contenu de la commande (codeCPV)"""
     df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
-    # On fait un groupby sur la division des cpv afin d'obtenir toutes les duree par division 
+    # On fait un groupby sur la division des cpv (CPV_min) afin d'obtenir toutes les durees par division
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
     # On cherche à obtenir la médiane par division de CPV
     df_group.columns = ["CPV_min", "listeDureeMois"]
@@ -393,7 +393,7 @@ def data_inputation(df):
     # On ajoute provisoirement la colonne mediane_dureeMois
     df = pd.merge(df, df_group, how="left", left_on="CPV_min", right_on="CPV_min", copy=False)
     # 120 = 10 ans. duree arbitraire jugée trop longue.
-    # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV
+    # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV_min == 45.
     mask = ((df.dureeMoisCalculee > 120) & (df.CPV_min != '45'))
     df.dureeMoisCalculee = np.where(mask, df.mediane_dureeMois_CPV, df.dureeMoisCalculee)
     # On modifie au passage la colonne dureeMoisEstimee
