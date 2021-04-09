@@ -110,7 +110,8 @@ def subset_dataframe_dec_jan(df):
 def detection_accord_cadre_without_date(df):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
-    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois."""
+    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois.
+    On fera le choix de ne pas considérer la date exacte de notification, mais le df passé en entrée correspondra aux données d'une plage précise: 1 an, 2mois ..."""
     # Creation du sub DF necessaire
     df_intermediaire = df[["objetMarche", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
     # On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus.
@@ -158,13 +159,13 @@ def concat_liste_df(liste_dataframe):
     """Concatene une liste de dataframe en un seul"""
     df_final = liste_dataframe[0]
     for i in range(len(liste_dataframe) - 1):
-        df_final = pd.concat([df_final, liste_dataframe[i+1]])
+        df_final = pd.concat([df_final, liste_dataframe[i + 1]])
     return df_final
 
 
 def detection_accord_cadre(df):
-    """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date 
-    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord. 
+    """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
+    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
     On compare les deux nombres de titulaires et on conserve le plus immportant """
     # Création des différents dataframe
     dataframe_annee = subset_dataframe_annee(df)
