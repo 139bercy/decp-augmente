@@ -85,7 +85,7 @@ jobs:
             . venv/bin/activate
             python main.py
       - save_cache:
-         key: data-out-{{ .Branch }}
+         key: data-out-{{ .Branch }}-{{ checksum "date" }}
          paths:
            - "decp_nettoye.csv"
            - "decp_augmente.csv"
@@ -95,9 +95,10 @@ jobs:
       - image: 139bercy/decp-rama
     steps:
       - checkout
+      - run: date +%F > date
       - restore_cache:
           keys:
-            - data-out-{{ .Branch }}
+            - data-out-{{ .Branch }}-{{ checksum "date" }}
       - run:
           name: Transfert des données vers data.economie
           command: |
