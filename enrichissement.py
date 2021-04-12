@@ -76,12 +76,6 @@ def main():
 
     df = manage_column_final(df)
 
-    df = df.astype({'codeCommuneAcheteur': 'string',
-                    'codePostalAcheteur': 'string',
-                    'codeCommuneEtablissement': 'string',
-                    'codePostalEtablissement': 'string'
-                    })
-
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
 
 
@@ -790,7 +784,9 @@ def reorganisation(df):
 
 def fix_codegeo(code):
     """Code doit etre un code commune/postal"""
-    if "." in code[:5] :
+    if len(code) < 5:
+        code = "0" + code
+    if "." in code[:5]:
         return "0" + code[:4]
     return code[:5]
 
@@ -800,8 +796,8 @@ def enrichissement_geo(df):
         df = pickle.load(df_backup_acheteur)
 
     # Enrichissement latitude & longitude avec adresse la ville
-    #df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
-    #df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
+    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
+    df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
     df_villes = get_df_villes()
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
