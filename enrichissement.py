@@ -76,6 +76,12 @@ def main():
 
     df = manage_column_final(df)
 
+    df = df.astype({'codeCommuneAcheteur': 'string',
+                    'codePostalAcheteur': 'string',
+                    'codeCommuneEtablissement': 'string',
+                    'codePostalEtablissement': 'string'
+                    })
+
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
 
 
@@ -190,6 +196,9 @@ def enrichissement_departement(df):
     path = os.path.join(path_to_data, conf["departements-francais"])
     departement = pd.read_csv(path, sep="\t")
     sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
+    # On vérifie que les premiers départements soit correctement codé sur deux chiffres:
+    for i in range(9):
+        sub_departement.NUMÉRO.iloc[i] = ("0" + str(sub_departement.NUMÉRO.loc[i]))[:2]
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
@@ -763,15 +772,10 @@ def reorganisation(df):
     df.rename(columns=column_mapping, inplace=True)
 
     # Rectification codePostalAcheteur et codeCommuneAcheteur
-    d = {".": "", " ": ""}
-    df.codePostalAcheteur = df.codePostalAcheteur.replace(d)
-    if len(df.codePostalAcheteur) < 5:
-        df.codePostalAcheteur = '0' + df.codePostalAcheteur
-
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.replace(d)
-    if len(df.codeCommuneAcheteur) < 5:
-        df.codeCommuneAcheteur = '0' + df.codeCommuneAcheteur
-
+    df["codePostalAcheteur"] = df["codePostalAcheteur"].apply(fix_codegeo)
+    df["codeCommuneAcheteur"] = df["codeCommuneAcheteur"].apply(fix_codegeo)
+    df["codePostalEtablissement"] = df["codePostalEtablissement"].apply(fix_codegeo)
+    df["codeCommuneEtablissement"] = df["codeCommuneEtablissement"].apply(fix_codegeo)
     # Petites corrections sur lieuExecutionTypeCode et nature
     list_to_correct = ["lieuExecutionTypeCode", "nature"]
     for column in list_to_correct:
@@ -784,13 +788,20 @@ def reorganisation(df):
     return df
 
 
+def fix_codegeo(code):
+    """Code doit etre un code commune/postal"""
+    if "." in code[:5] :
+        return "0" + code[:4]
+    return code[:5]
+
+
 def enrichissement_geo(df):
     with open('df_reorganisation', 'rb') as df_backup_acheteur:
         df = pickle.load(df_backup_acheteur)
 
     # Enrichissement latitude & longitude avec adresse la ville
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
-    df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
+    #df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
+    #df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
 
     df_villes = get_df_villes()
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
