@@ -336,6 +336,8 @@ def manage_date(df):
     # ..............Travail sur les variables de type date
     df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
     df.dateNotification = df.dateNotification.str[0:10]
+    # Dans l'éventualité ou une dateNotification n'est pas remplie
+    df.dateNotification = np.where(df.dateNotification == '', np.NaN, df.dateNotification)
     # On récupère l'année de notification
     df['anneeNotification'] = df.dateNotification.str[0:4]
     df['anneeNotification'] = df['anneeNotification'].astype(float)

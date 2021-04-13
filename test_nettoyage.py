@@ -113,10 +113,57 @@ class TestNetoyageMethods(unittest.TestCase):
                                   columns=['id', 'codeCPV', 'typeIdentifiant', 'idTitulaires', 'natureObjet', 'denominationSociale', 'nic', "CPV_min"])
         df_output = nettoyage.manage_missing_code(df_test)
         for column in df_attendu:
-            df_attendu[column] == df_output[column]
+            col_booleenne = (df_attendu[column] == df_output[column]) | (df_attendu[column].isnull() & df_output[column].isnull())
+            self.assertEqual(sum(col_booleenne), len(df_attendu))
 
     def test_manage_region(self):
         pass
+
+    def test_manage_date(self):
+        # aaaa-mm-jj
+        df_test = pd.DataFrame([
+            ["1996-12-04", "2000-01-01"],
+            ["1946-12-04", "2120-08-30"],
+            ["2101-03-31", "1940-09-20"],
+            ["", ""]],
+            index=[0, 1, 2, 3],
+            columns=["datePublicationDonnees", "dateNotification"])
+        df_attendu = pd.DataFrame([
+            ["1996-12-04", "2000-01-01", "2000", "01"],
+            ["1946-12-04", np.NaN, str(np.NaN), np.NaN],
+            ["2101-03-31", np.nan, str(np.NaN), np.nan],
+            [np.nan, np.nan, str(np.NaN), np.nan]],
+            index=[0, 1, 2, 3],
+            columns=["datePublicationDonnees", "dateNotification", "anneeNotification", "moisNotification"])
+        df_output = nettoyage.manage_date(df_test)
+        for column in df_attendu:
+            col_booleenne = (df_attendu[column] == df_output[column]) | (df_attendu[column].isnull() & df_output[column].isnull())
+            self.assertEqual(sum(col_booleenne), len(df_attendu))
+            # df_attendu[column] == df_output[column]
+            # col_nan = df_attendu[column].isnull() == df_output[column].isnull()
+            # col_finale = col_booleen
+
+    def test_correct_date(self):
+        df_test = pd.DataFrame([
+            [1000000, 48],
+            [12, 100],
+            [345, 360],
+            [3000000, 123],
+            [1, 1]],
+            index=[0, 1, 2, 3, 4],
+            columns=["montant", "dureeMois"])
+        df_attendu = pd.DataFrame([
+            [1000000, 48, str(False), 48.0],
+            [12, 100, str(True), 3.0],
+            [345, 360, str(True), 12.0],
+            [3000000, 123, str(False), 123.0],
+            [1, 1, str(True), 1.0]],
+            index=[0, 1, 2, 3, 4],
+            columns=["montant", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee"])
+        df_output = nettoyage.correct_date(df_test)
+        for column in df_attendu:
+            col_booleenne = df_attendu[column] == df_output[column]
+            self.assertEqual(sum(col_booleenne), len(df_attendu))
 
 
 if __name__ == '__main__':
