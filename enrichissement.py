@@ -80,18 +80,7 @@ def main():
 
 # Detection accord-cadre
 
-
-def subset_dataframe_annee(df):
-    """En entrée: Dataframe avec une colonne anneeNotification
-    En sortie: une liste de dataframe <- subset de df sur l'annee"""
-    liste_dataframe = []
-    for annee in np.unique(df.anneeNotification):
-        dataframe_annee = df[df.anneeNotification == annee]
-        liste_dataframe += [pd.DataFrame(dataframe_annee)]
-    return liste_dataframe
-
-
-def subset_dataframe_dec_jan(df):
+def subset_liste_dataframe_dec_jan(df):
     """En entrée: Dataframe avec une colonne anneeNotification
     En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
     df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
@@ -155,21 +144,13 @@ def detection_accord_cadre_without_date(df):
     return df_to_output
 
 
-def concat_liste_df(liste_dataframe):
-    """Concatene une liste de dataframe en un seul"""
-    df_final = liste_dataframe[0]
-    for i in range(len(liste_dataframe) - 1):
-        df_final = pd.concat([df_final, liste_dataframe[i + 1]])
-    return df_final
-
-
 def detection_accord_cadre(df):
     """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
     Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
     On compare les deux nombres de titulaires et on conserve le plus immportant """
-    # Création des différents dataframe
-    dataframe_annee = subset_dataframe_annee(df)
-    dataframe_mois = subset_dataframe_dec_jan(df)
+    # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
+    dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
+    dataframe_mois = subset_liste_dataframe_dec_jan(df)
     # On detecte les accord-cadre sur les différents dataframe ci dessus
     for i in range(len(dataframe_annee)):
         dataframe_annee[i] = detection_accord_cadre_without_date(dataframe_annee[i])
@@ -180,9 +161,9 @@ def detection_accord_cadre(df):
             dataframe_mois[i]["nombreTitulaireSurMarchePresume"] = ""
             dataframe_mois[i]["accord-cadrePresume"] = ""
     # On passe du format liste de dataframe à un seul dataframe
-    dataframe_annee = concat_liste_df(dataframe_annee)
+    dataframe_annee = pd.concat(dataframe_annee)
     dataframe_annee = dataframe_annee.sort_index(axis=0)
-    dataframe_mois = concat_liste_df(dataframe_mois)
+    dataframe_mois = pd.concat(dataframe_mois)
     dataframe_mois = dataframe_mois.sort_index(axis=0)
     # On peut ne boucler que sur les marchés présent dans dataframe_mois.
     sub_datamois = dataframe_mois[dataframe_mois.nombreTitulaireSurMarchePresume > 1]
