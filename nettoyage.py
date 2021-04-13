@@ -93,7 +93,7 @@ def main():
 
 def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.
-        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
+        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
     L_key_useless = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_to_data)
