@@ -137,24 +137,12 @@ def manage_column_final(df):
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
-
-    # Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
-    try:
-        codeCPV = df["codeCPV"]
-        cpvComplet = codeCPV.iloc[:, 1]
-        cpvdivision = codeCPV.iloc[:, 0]
-        df = df.drop(columns=["codeCPV"])
-        df["codeCPV"] = cpvComplet
-        df["codeCPV_division"] = cpvdivision
-    except:
-        pass
-
     # Réorganisation finale 'codeRegionAcheteur'
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
-                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution",
+                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution", "libelleRegionExecution",
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
@@ -755,8 +743,7 @@ def reorganisation(df):
         'idTitulaires': "siretEtablissement",
         'denominationSociale_y': "denominationSocialeEtablissement",
         'nic': "nicEtablissement",
-        'CPV_min': "codeCPV",
-        'Region': "regionAcheteur",
+        'CPV_min': "codeCPV_division",
         'siren': "sirenEtablissement",
         'refCodeCPV': "referenceCPV"
     }
