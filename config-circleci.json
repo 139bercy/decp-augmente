@@ -6,5 +6,6 @@
 	"base_ajout_type_entreprise" : "StockUniteLegale_utf8.csv",
 	"cpv_2008_ver_2013" : "cpv_2008_ver_2013.xlsx",  
 	"base_geoflar" : "geoflar-communes-2015.csv", 
-	"departements-francais" : "departements-francais.csv"
+	"departements-francais" : "departement2020.csv",
+	"region-fr" : "region2020.csv"
 }

@@ -158,13 +158,13 @@ def manage_column_final(df):
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'libelleRegionAcheteur',
+                             'codeRegionAcheteur','libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
+                             'codeRegionEtablissement','libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -185,32 +185,45 @@ def extraction_departement_from_code_postal(code_postal):
         return "00"
 
 
+def jointure_base_departement_region():
+    path_dep = os.path.join(path_to_data, conf["departements-francais"])
+    departement = pd.read_csv(path_dep, sep=",")
+    sub_departement = departement[['dep', 'reg', 'libelle']]
+    path_reg = os.path.join(path_to_data, conf["region-fr"])
+    region = pd.read_csv(path_reg, sep=",")
+    sub_reg = region[["reg", "libelle"]]
+    sub_reg.columns = ["reg", "libelle_reg"]
+    df_dep_reg = pd.merge(sub_departement, sub_reg, how="left", left_on="reg", right_on="reg", copy=False)
+    df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
+    return df_dep_reg
+
+
 def enrichissement_departement(df):
     """Ajout des variables région et departement dans decp"""
-    path = os.path.join(path_to_data, conf["departements-francais"])
-    departement = pd.read_csv(path, sep="\t")
-    sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
+    df_dep_reg = jointure_base_departement_region()
     # On vérifie que les premiers départements soit correctement codé sur deux chiffres:
     for i in range(9):
-        sub_departement.NUMÉRO.iloc[i] = ("0" + str(sub_departement.NUMÉRO.loc[i]))[:2]
+        df_dep_reg.code_departement.iloc[i] = ("0" + str(df_dep_reg.code_departement.loc[i]))[:2]
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
     df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
     df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
     # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
-    df = pd.merge(df, sub_departement, how="left", left_on="departementAcheteur", right_on="NUMÉRO", copy=False)
+    df = pd.merge(df, df_dep_reg, how="left", left_on="departementAcheteur", right_on="code_departement", copy=False)
     df = df.rename(columns={
-                   'NOM': "libelleDepartementAcheteur",
-                   'REGION': "libelleRegionAcheteur"
+                   'Nom': "libelleDepartementAcheteur",
+                   'Region': "libelleRegionAcheteur",
+                   'code_region': "codeRegionAcheteur"
                    })
-    df = df.drop(["NUMÉRO"], axis=1)
-    df = pd.merge(df, sub_departement, how="left", left_on="departementEtablissement", right_on="NUMÉRO", copy=False)
+    df = df.drop(["code_departement"], axis=1)
+    df = pd.merge(df, df_dep_reg, how="left", left_on="departementEtablissement", right_on="code_departement", copy=False)
     df = df.rename(columns={
-                   'NOM': "libelleDepartementEtablissement",
-                   'REGION': "libelleRegionEtablissement"
+                   'Nom': "libelleDepartementEtablissement",
+                   'Region': "libelleRegionEtablissement",
+                   'code_region': "codeRegionEtablissement"
                    })
-    df = df.drop(["NUMÉRO"], axis=1)
+    df = df.drop(["code_departement"], axis=1)
     return df
 
 
