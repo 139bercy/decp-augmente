@@ -115,21 +115,29 @@ workflows:
       - compute:
           requires:
             - install_requirements
+  daily-data:
+    jobs:
+      - get_data
+    triggers:
+      - schedule:
+          cron: 0 4 * * 1-6
+          filters:
+            branches:
+              only:
+                - master
 
   daily-prod:
     jobs:
       - install_requirements
-      - get_data
       - compute:
           requires:
             - install_requirements
-            - get_data
       - send:
           requires:
             - compute
     triggers:
       - schedule:
-          cron: 0 6 * * 1-5
+          cron: 0 6 * * 2-6
           filters:
             branches:
               only:
