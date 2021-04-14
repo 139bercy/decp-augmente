@@ -177,10 +177,12 @@ def jointure_base_departement_region():
     path_dep = os.path.join(path_to_data, conf["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",")
     sub_departement = departement[['dep', 'reg', 'libelle']]
+    sub_departement.reg = sub_departement.reg.astype(str)
     path_reg = os.path.join(path_to_data, conf["region-fr"])
     region = pd.read_csv(path_reg, sep=",")
     sub_reg = region[["reg", "libelle"]]
     sub_reg.columns = ["reg", "libelle_reg"]
+    sub_reg.reg = sub_reg.reg.astype(str)
     df_dep_reg = pd.merge(sub_departement, sub_reg, how="left", left_on="reg", right_on="reg", copy=False)
     df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
     return df_dep_reg
@@ -189,15 +191,13 @@ def jointure_base_departement_region():
 def enrichissement_departement(df):
     """Ajout des variables région et departement dans decp"""
     df_dep_reg = jointure_base_departement_region()
-    # On vérifie que les premiers départements soit correctement codé sur deux chiffres:
-    for i in range(9):
-        df_dep_reg.code_departement.iloc[i] = ("0" + str(df_dep_reg.code_departement.loc[i]))[:2]
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
     df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
     df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
     # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
+    df_dep_reg.code_departement = df_dep_reg.code_departement.astype(str)
     df = pd.merge(df, df_dep_reg, how="left", left_on="departementAcheteur", right_on="code_departement", copy=False)
     df = df.rename(columns={
                    'Nom': "libelleDepartementAcheteur",
@@ -784,7 +784,7 @@ def reorganisation(df):
 
 def fix_codegeo(code):
     """Code doit etre un code commune/postal"""
-    if len(code) < 5:
+    if len(code) == 4:
         code = "0" + code
     if "." in code[:5]:
         return "0" + code[:4]
