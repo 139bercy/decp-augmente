@@ -99,7 +99,7 @@ def check_reference_files(conf):
     path = os.path.join(os.getcwd(), path_to_data)
     for key in list(conf.keys()):
         if key not in L_key_useless:
-            print(key)
+            print(conf[key])
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask:
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
