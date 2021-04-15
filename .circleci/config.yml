@@ -8,7 +8,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
             - dependencies-master-{{ checksum "requirements.txt"}}
       - run: mv config-circleci.json config.json
       - run:
@@ -18,7 +18,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
           paths:
             - "venv"
             - "config.json"
@@ -30,7 +30,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
       - run:
           name: Linter
           command: |
@@ -75,7 +75,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
             - dependencies
       - run: date +%F > date
       - restore_cache:
