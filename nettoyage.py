@@ -2,52 +2,23 @@ import json
 import os
 import pickle
 import logging
-import sys
+import logging.handlers
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
-import logging.config
 
-
-
-
-"""
-# Définition du logger
-# création de l'objet logger qui va nous servir à écrire dans les logs
-logger = logging.getLogger()
-# on met le niveau du logger à DEBUG, comme ça il écrit tout
+logger = logging.getLogger("main.nettoyage")
 logger.setLevel(logging.DEBUG)
-# création d'un formateur qui va ajouter le temps, le niveau
-# de chaque message quand on écrira un message dans le log
-formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
-# création d'un handler qui va rediriger une écriture du log vers
-# un fichier en mode 'append', avec 1 backup et une taille max de 1Mo
-file_handler = RotatingFileHandler('activity.log', 'w', 1000000, 1)
-# on lui met le niveau sur Info, on lui dit qu'il doit utiliser le formateur
-# créé précédement et on ajoute ce handler au logger
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-# création d'un second handler qui va rediriger chaque écriture de log
-# sur la console
-stream_handler = logging.StreamHandler(sys.stdout)
-stream_handler.setLevel(logging.INFO)
-logger.addHandler(stream_handler)
-"""
-logging.config.fileConfig('logging.conf')
-# create logger
-logger2 = logging.getLogger('nettoyage.py')
 
 
 def main():
-
     with open("config.json") as f:
         conf = json.load(f)
     check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
     # error_siret_file_name = conf["error_siret_file_name"]
-    logger2.info("Ouverture du fichier decp.json")
+    logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
@@ -99,40 +70,40 @@ def main():
         # 'donneesExecution.depensesInvestissement.tarifs.intituleTarif': 'string',
         # 'donneesExecution.depensesInvestissement.tarifs.tarif': 'float64',
     }, copy=False)
-    logger2.info("Début du traitement: Gestion des titulaires")
+    logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Suppression des doublons")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Suppression des doublons")
     df = manage_duplicates(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Déection et correction des montants aberrants")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Déection et correction des montants aberrants")
     df = manage_amount(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Gestion des Id null")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Gestion des Id null")
     df = manage_missing_code(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
     df = manage_region(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
     df = manage_date(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Correction de la variable dureeMois.")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Correction de la variable dureeMois.")
     df = correct_date(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du tritement: Imputation de la variable dureeMois")
+    logger.info("Fin du traitement")
+    logger.info("Début du tritement: Imputation de la variable dureeMois")
     df = data_inputation(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Début du traitement: Remplacement des caractères mal converti")
+    logger.info("Fin du traitement")
+    logger.info("Début du traitement: Remplacement des caractères mal converti")
     # suppression des caractères mal encodés
     df = replace_char(df)
-    logger2.info("Fin du traitement")
-    logger2.info("Creation csv intermédiaire: decp_nettoye.csv")
+    logger.info("Fin du traitement")
+    logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
 
     df.to_csv("decp_nettoye.csv")
-    logger2.info("Ecriture du csv terminé")
+    logger.info("Ecriture du csv terminé")
 
 
 def check_reference_files(conf):
@@ -143,19 +114,19 @@ def check_reference_files(conf):
     path = os.path.join(os.getcwd(), path_to_data)
     for key in list(conf.keys()):
         if key not in L_key_useless:
-            logger2.info('Test du fichier {}'.format(conf[key]))
+            logger.info('Test du fichier {}'.format(conf[key]))
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask:
-                logger2.error("Le fichier {} n'existe pas".format(conf[key]))
+                logger.error("Le fichier {} n'existe pas".format(conf[key]))
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
 
 
 def manage_titulaires(df):
     # Ecriture dans les logs
-    logger2.info("Nombre de marché sans titulaires: {}. Remplacé par la valeur du concessionnaire".format(sum(df["titulaires"].isnull())))
-    logger2.info("Nombre de marché sans montant: {}. Remplacé par la valeur globale".format(sum(df["montant"].isnull())))
-    logger2.info("Nombre de marché sans identifiant acheteur: {}. Remplacé par l'identifiatn de l'autorité Concedante".format(sum(df["acheteur.id"].isnull())))
-    logger2.info("Nombre de marché sans nom d'acheteur: {}. Remplacé par le nom de l'autorité Concédante".format(sum(df["acheteur.nom"].isnull())))
+    logger.info("Nombre de marché sans titulaires: {}. Remplacé par la valeur du concessionnaire".format(sum(df["titulaires"].isnull())))
+    logger.info("Nombre de marché sans montant: {}. Remplacé par la valeur globale".format(sum(df["montant"].isnull())))
+    logger.info("Nombre de marché sans identifiant acheteur: {}. Remplacé par l'identifiatn de l'autorité Concedante".format(sum(df["acheteur.id"].isnull())))
+    logger.info("Nombre de marché sans nom d'acheteur: {}. Remplacé par le nom de l'autorité Concédante".format(sum(df["acheteur.nom"].isnull())))
 
     # Gestion différences concessionnaires / titulaires
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
@@ -194,7 +165,7 @@ def manage_duplicates(df):
     nb_ligne_apres_suppresion = len(df)
 
     # Ecriture dans les logs
-    logger2.info("Nombre de ligne doublons supprimées: {}".format(nb_ligne_avant_suppression-nb_ligne_apres_suppresion))
+    logger.info("Nombre de ligne doublons supprimées: {}".format(nb_ligne_avant_suppression-nb_ligne_apres_suppresion))
 
     # Correction afin que ces variables soient représentées pareil
     df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
@@ -228,33 +199,33 @@ def manage_amount(df):
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
     
-    logger2.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0]-nb_montant_egal_zero))
+    logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0]-nb_montant_egal_zero))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     borne_inf = 200.0
     borne_sup = 9.99e8
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
-    logger2.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_inf))
+    logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_inf))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
-    logger2.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_sup))
+    logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_sup))
     
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     # Ecriture dans la log
-    logger2.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
+    logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
     return df
 
 
 def manage_missing_code(df):
     # Ecriture dans les logs
-    logger2.info("Nombre d'identifiant manquants et remplacés: {}".format(sum(df["id"].isnull())))
-    logger2.info("Nombre de code CPV manquants et remplacés: {}".format(sum(df["codeCPV"].isnull())))
+    logger.info("Nombre d'identifiant manquants et remplacés: {}".format(sum(df["id"].isnull())))
+    logger.info("Nombre de code CPV manquants et remplacés: {}".format(sum(df["codeCPV"].isnull())))
 
     df.id = np.where(df["id"].isnull(), '0000000000000000', df.id)
     df.codeCPV = np.where(df["codeCPV"].isnull(), '00000000', df.codeCPV)
 
     # Nettoyage des codes idTitulaires
-    logger2.info("Nettoyage des idTitualires")
+    logger.info("Nettoyage des idTitualires")
     caracteres_speciaux_dict = {
         "\\t": "",
         "-": "",
@@ -268,10 +239,10 @@ def manage_missing_code(df):
     df.idTitulaires[mask].replace(caracteres_speciaux_dict, inplace=True)
     df.idTitulaires = np.where(df.idTitulaires == '', np.NaN, df.idTitulaires)
     # Ecriture dans les logs
-    logger2.info("Nombre d'identifiant titualire ou un traitement sur les caractères spéciaux a été fait: {}".format(sum(mask)))
+    logger.info("Nombre d'identifiant titualire ou un traitement sur les caractères spéciaux a été fait: {}".format(sum(mask)))
 
     # Récupération code NIC
-    logger2.info("Récupération du code NIC")
+    logger.info("Récupération du code NIC")
     df.idTitulaires = df.idTitulaires.astype(str)
     df['nic'] = df["idTitulaires"].str[-5:]
 
@@ -280,7 +251,7 @@ def manage_missing_code(df):
     df['nic'] = df.nic.astype(str)
 
     # Gestion code CPV
-    logger2.info("Récupération de la division du code CPV.")
+    logger.info("Récupération de la division du code CPV.")
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
     df["natureObjet"] = "Fournitures"
@@ -288,7 +259,7 @@ def manage_missing_code(df):
     df.loc[df["CPV_min"] > '45', 'natureObjet'] = 'Services'
 
     # Mise en forme des données vides
-    logger2.info("Mise en forme des données vides de la colonne denominationSociale")
+    logger.info("Mise en forme des données vides de la colonne denominationSociale")
     df.denominationSociale = np.where(
         (df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'),
         np.NaN, df.denominationSociale)
@@ -299,7 +270,7 @@ def manage_missing_code(df):
 def manage_region(df):
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
-    logger2.info("Création de la colonne département Execution")
+    logger.info("Création de la colonne département Execution")
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
     listCorrespondance = {
         '976': 'YT',
@@ -340,7 +311,7 @@ def manage_region(df):
 
     ###############################################################################
     # Création de la colonne pour distinguer les régions
-    logger2.info("Création de la colonne contenant les codes des regions d'execution")
+    logger.info("Création de la colonne contenant les codes des regions d'execution")
     df['codeRegionExecution'] = df['codeDepartementExecution'].astype(str)
     # Définition des codes des régions en fonctions des codes de départements
     listCorrespondance = {
@@ -380,7 +351,7 @@ def manage_region(df):
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
 
     # Identification du nom des régions
-    logger2.info("Creation de la colonne contenant le libbelé des regions d'execution")
+    logger.info("Creation de la colonne contenant le libbelé des regions d'execution")
     df['libelleRegionExecution'] = df['codeRegionExecution'].astype(str)
     correspondance_dict = {
         '84': 'Auvergne-Rhône-Alpes',
@@ -417,7 +388,7 @@ def manage_date(df):
     df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
     df.dateNotification = df.dateNotification.str[0:10]
     # On récupère l'année de notification
-    logger2.info("Récupération de l'année")
+    logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
@@ -425,14 +396,14 @@ def manage_date(df):
     df['dateNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['dateNotification'])
     df['anneeNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['anneeNotification'])
     df['anneeNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['anneeNotification'])
-    logger2.info("Au total, {} marchés avaient une année érronée".format(sum(df["anneeNotification"].isna())))
+    logger.info("Au total, {} marchés avaient une année érronée".format(sum(df["anneeNotification"].isna())))
     df['anneeNotification'] = df.anneeNotification.astype(str).str[:4]
 
     # On récupère le mois de notification
-    logger2.info("Récupération du mois")
+    logger.info("Récupération du mois")
     df['moisNotification'] = df.dateNotification.str[5:7]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
-    logger2.info("Au total, {} marchés n'ont pas de date de publication des données connue".format(sum(df["datePublicationDonnees"].isna())))
+    logger.info("Au total, {} marchés n'ont pas de date de publication des données connue".format(sum(df["datePublicationDonnees"].isna())))
 
     return df
 
@@ -455,7 +426,7 @@ def correct_date(df):
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
     # Comme certaines valeurs atteignent zero, on remplace par un mois
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])  # Il y a une valeur négative
-    logger2.info("Au total, {} duree de marché en mois ont été jugées rentrées en jour et non en mois.".format(sum(mask)))
+    logger.info("Au total, {} duree de marché en mois ont été jugées rentrées en jour et non en mois.".format(sum(mask)))
 
     return df
 
@@ -475,7 +446,7 @@ def data_inputation(df):
     # 120 = 10 ans. duree arbitraire jugée trop longue.
     # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV_min == 45.
     mask = ((df.dureeMoisCalculee > 120) & (df.CPV_min != '45'))
-    logger2.info("Au total, {} duree en mois sont encore supérieures à 120 (et les marchés ne concernent pas le monde des travaux)".format(sum(mask)))
+    logger.info("Au total, {} duree en mois sont encore supérieures à 120 (et les marchés ne concernent pas le monde des travaux)".format(sum(mask)))
     df.dureeMoisCalculee = np.where(mask, df.mediane_dureeMois_CPV, df.dureeMoisCalculee)
     # On modifie au passage la colonne dureeMoisEstimee
     df['dureeMoisEstimee'] = np.where(mask, "True", df.dureeMoisEstimee)
