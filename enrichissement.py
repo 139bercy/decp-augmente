@@ -188,34 +188,22 @@ def manage_column_final(df):
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
-
-    # Il y a deux colonnes codeCPV contenant des informations différentes, on va donc les renommer.
-    try:
-        codeCPV = df["codeCPV"]
-        cpvComplet = codeCPV.iloc[:, 1]
-        cpvdivision = codeCPV.iloc[:, 0]
-        df = df.drop(columns=["codeCPV"])
-        df["codeCPV"] = cpvComplet
-        df["codeCPV_division"] = cpvdivision
-    except:
-        pass
-
     # Réorganisation finale 'codeRegionAcheteur'
     df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
-                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution",
+                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution", "libelleRegionExecution",
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'libelleRegionAcheteur',
+                             'codeRegionAcheteur','libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
+                             'codeRegionEtablissement','libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -236,29 +224,45 @@ def extraction_departement_from_code_postal(code_postal):
         return "00"
 
 
+def jointure_base_departement_region():
+    path_dep = os.path.join(path_to_data, conf["departements-francais"])
+    departement = pd.read_csv(path_dep, sep=",")
+    sub_departement = departement[['dep', 'reg', 'libelle']]
+    sub_departement.reg = sub_departement.reg.astype(str)
+    path_reg = os.path.join(path_to_data, conf["region-fr"])
+    region = pd.read_csv(path_reg, sep=",")
+    sub_reg = region[["reg", "libelle"]]
+    sub_reg.columns = ["reg", "libelle_reg"]
+    sub_reg.reg = sub_reg.reg.astype(str)
+    df_dep_reg = pd.merge(sub_departement, sub_reg, how="left", left_on="reg", right_on="reg", copy=False)
+    df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
+    return df_dep_reg
+
+
 def enrichissement_departement(df):
     """Ajout des variables région et departement dans decp"""
-    path = os.path.join(path_to_data, conf["departements-francais"])
-    departement = pd.read_csv(path, sep="\t")
-    sub_departement = departement[['NUMÉRO', 'NOM', 'REGION']]
+    df_dep_reg = jointure_base_departement_region()
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
     df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
     df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
     # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
-    df = pd.merge(df, sub_departement, how="left", left_on="departementAcheteur", right_on="NUMÉRO", copy=False)
+    df_dep_reg.code_departement = df_dep_reg.code_departement.astype(str)
+    df = pd.merge(df, df_dep_reg, how="left", left_on="departementAcheteur", right_on="code_departement", copy=False)
     df = df.rename(columns={
-                   'NOM': "libelleDepartementAcheteur",
-                   'REGION': "libelleRegionAcheteur"
+                   'Nom': "libelleDepartementAcheteur",
+                   'Region': "libelleRegionAcheteur",
+                   'code_region': "codeRegionAcheteur"
                    })
-    df = df.drop(["NUMÉRO"], axis=1)
-    df = pd.merge(df, sub_departement, how="left", left_on="departementEtablissement", right_on="NUMÉRO", copy=False)
+    df = df.drop(["code_departement"], axis=1)
+    df = pd.merge(df, df_dep_reg, how="left", left_on="departementEtablissement", right_on="code_departement", copy=False)
     df = df.rename(columns={
-                   'NOM': "libelleDepartementEtablissement",
-                   'REGION': "libelleRegionEtablissement"
+                   'Nom': "libelleDepartementEtablissement",
+                   'Region': "libelleRegionEtablissement",
+                   'code_region': "codeRegionEtablissement"
                    })
-    df = df.drop(["NUMÉRO"], axis=1)
+    df = df.drop(["code_departement"], axis=1)
     return df
 
 
@@ -806,23 +810,17 @@ def reorganisation(df):
         'idTitulaires': "siretEtablissement",
         'denominationSociale_y': "denominationSocialeEtablissement",
         'nic': "nicEtablissement",
-        'CPV_min': "codeCPV",
-        'Region': "regionAcheteur",
+        'CPV_min': "codeCPV_division",
         'siren': "sirenEtablissement",
         'refCodeCPV': "referenceCPV"
     }
     df.rename(columns=column_mapping, inplace=True)
 
     # Rectification codePostalAcheteur et codeCommuneAcheteur
-    d = {".": "", " ": ""}
-    df.codePostalAcheteur = df.codePostalAcheteur.replace(d)
-    if len(df.codePostalAcheteur) < 5:
-        df.codePostalAcheteur = '0' + df.codePostalAcheteur
-
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.replace(d)
-    if len(df.codeCommuneAcheteur) < 5:
-        df.codeCommuneAcheteur = '0' + df.codeCommuneAcheteur
-
+    df["codePostalAcheteur"] = df["codePostalAcheteur"].apply(fix_codegeo)
+    df["codeCommuneAcheteur"] = df["codeCommuneAcheteur"].apply(fix_codegeo)
+    df["codePostalEtablissement"] = df["codePostalEtablissement"].apply(fix_codegeo)
+    df["codeCommuneEtablissement"] = df["codeCommuneEtablissement"].apply(fix_codegeo)
     # Petites corrections sur lieuExecutionTypeCode et nature
     list_to_correct = ["lieuExecutionTypeCode", "nature"]
     for column in list_to_correct:
@@ -833,6 +831,15 @@ def reorganisation(df):
         pickle.dump(df, df_backup2)
 
     return df
+
+
+def fix_codegeo(code):
+    """Code doit etre un code commune/postal"""
+    if len(code) == 4:
+        code = "0" + code
+    if "." in code[:5]:
+        return "0" + code[:4]
+    return code[:5]
 
 
 def enrichissement_geo(df):

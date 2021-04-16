@@ -78,9 +78,9 @@ def main():
 
     df = manage_date(df)
 
-    # df = data_inputation(df)
-
     df = correct_date(df)
+
+    df = data_inputation(df)
 
     # suppression des caractères mal encodés
     df = replace_char(df)
@@ -93,12 +93,13 @@ def main():
 
 def check_reference_files(conf):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.
-        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", "departements-francais.csv, StockUniteLegale_utf8.csv"""
+        StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
     L_key_useless = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_to_data)
     for key in list(conf.keys()):
         if key not in L_key_useless:
+            print(conf[key])
             mask = os.path.exists(os.path.join(path, conf[key]))
             if not mask:
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
@@ -256,7 +257,7 @@ def manage_region(df):
     # Vérification si c'est bien un code postal
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
-              + [str(i) for i in list(np.arange(10, 96, 1))]
+        + [str(i) for i in list(np.arange(10, 96, 1))]
 
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(listeCP), np.NaN, df['codeDepartementExecution'])
 
@@ -306,7 +307,7 @@ def manage_region(df):
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
 
     # Identification du nom des régions
-    df['Region'] = df['codeRegionExecution'].astype(str)
+    df['libelleRegionExecution'] = df['codeRegionExecution'].astype(str)
     correspondance_dict = {
         '84': 'Auvergne-Rhône-Alpes',
         '27': 'Bourgogne-Franche-Comté',
@@ -328,7 +329,7 @@ def manage_region(df):
         '06': 'Mayotte',
         '98': 'Collectivité d\'outre mer'}
 
-    df['Region'].replace(correspondance_dict, inplace=True)
+    df['libelleRegionExecution'].replace(correspondance_dict, inplace=True)
     # del chemin, chemindata, dfO, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
@@ -358,45 +359,6 @@ def manage_date(df):
     return df
 
 
-def data_inputation(df):
-    # Utilisation de la méthode 5 pour estimer les valeurs manquantes
-    df['Region'] = df['Region'].astype(str)
-    df['formePrix'] = df['formePrix'].astype(str)
-    df['codeCPV'] = df['codeCPV'].astype(str)
-
-    df['moisNotification'] = df['moisNotification'].astype(str)
-    df['anneeNotification'] = df['anneeNotification'].astype(str)
-    df['conca'] = df['formePrix'] + df['Region'] + df['codeCPV']
-
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    del df['conca'], df['montantEstimation']
-
-    # On recommence avec une plus petite stratification
-    df['conca'] = df['formePrix'] + df['Region']
-    df.reset_index(level=0, inplace=True)
-    # Calcul de la médiane par stratification
-    medianeRegFP = pd.DataFrame(df.groupby('conca')['montant'].median())
-    medianeRegFP.reset_index(level=0, inplace=True)
-    medianeRegFP.columns = ['conca', 'montantEstimation']
-    df = pd.merge(df, medianeRegFP, on='conca', copy=False)
-    # Remplacement des valeurs manquantes par la médiane du groupe
-    df['montant'] = np.where(df['montant'].isnull(), df['montantEstimation'], df['montant'])
-    # S'il reste encore des valeurs nulles...
-    df['montant'] = np.where(df['montant'].isnull(), df['montant'].median(), df['montant'])
-    del df['conca'], df['montantEstimation'], df['index']
-    del medianeRegFP
-
-    # Colonne par marché
-    df['montantTotalMarché'] = df["montant"] * df["nbTitulairesSurCeMarche"]
-    return df
-
-
 def correct_date(df):
     # On cherche les éventuelles erreurs mois -> jours
     mask = ((df['montant'] == df['dureeMois'])
@@ -416,6 +378,29 @@ def correct_date(df):
     # Comme certaines valeurs atteignent zero, on remplace par un mois
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])  # Il y a une valeur négative
 
+    return df
+
+
+def data_inputation(df):
+    """Permet une estimation de la dureeMois (pour les durees évidemment fausses) grace au contenu de la commande (codeCPV)"""
+    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
+    # On fait un groupby sur la division des cpv (CPV_min) afin d'obtenir toutes les durees par division
+    df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
+    # On cherche à obtenir la médiane par division de CPV
+    df_group.columns = ["CPV_min", "listeDureeMois"]
+    df_group["mediane_dureeMois_CPV"] = df_group.listeDureeMois.apply(np.median)
+    # La liste des duree exacte est inutile: on supprime
+    df_group.drop("listeDureeMois", axis=1, inplace=True)
+    # On ajoute provisoirement la colonne mediane_dureeMois
+    df = pd.merge(df, df_group, how="left", left_on="CPV_min", right_on="CPV_min", copy=False)
+    # 120 = 10 ans. duree arbitraire jugée trop longue.
+    # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV_min == 45.
+    mask = ((df.dureeMoisCalculee > 120) & (df.CPV_min != '45'))
+    df.dureeMoisCalculee = np.where(mask, df.mediane_dureeMois_CPV, df.dureeMoisCalculee)
+    # On modifie au passage la colonne dureeMoisEstimee
+    df['dureeMoisEstimee'] = np.where(mask, "True", df.dureeMoisEstimee)
+    # La mediane n'est pas utile dans le df final: on supprime
+    df.drop("mediane_dureeMois_CPV", axis=1, inplace=True)
     return df
 
 
