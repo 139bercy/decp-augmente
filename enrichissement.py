@@ -78,16 +78,34 @@ def main():
 
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
 
+# Detection accord-cadre
 
-def detection_accord_cadre(df):
+
+def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
+    """En entrée: Dataframe avec une colonne anneeNotification
+    En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
+    df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
+    liste_dataframe = []
+    # On remplace les annee nulle par 0 pour que la boucle ne plante pas. Sur ces années on ne fait pas ce traitement.
+    df2.anneeNotification = np.where(df2.anneeNotification == 'nan', '0', df2.anneeNotification)
+    df2.moisNotification = np.where(df2.moisNotification.isna(), '0', df2.moisNotification)
+    for annee in np.unique(df2.anneeNotification):  
+        sub1 = df2[(df2["anneeNotification"] == annee) & (df2["moisNotification"] == "12")]
+        sub2 = df2[(df2.anneeNotification == str(int(annee)+1)) & (df2.moisNotification == '01')]
+        df_sub = pd.concat([sub1, sub2])
+        liste_dataframe += [df_sub]
+    return liste_dataframe
+
+
+def detection_accord_cadre_without_date(df):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
-    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois."""
+    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois.
+    On fera le choix de ne pas considérer la date exacte de notification, mais le df passé en entrée correspondra aux données d'une plage précise: 1 an, 2mois ..."""
     # Creation du sub DF necessaire
-    df_intermediaire = df[["objetMarche", "dateNotification", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
+    df_intermediaire = df[["objetMarche", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
     # On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df_intermediaire.groupby(["objetMarche",
-                                                      "dateNotification",
                                                       "montantOriginal",
                                                       "dureeMois"])
                             ["siretEtablissement"].unique())
@@ -99,21 +117,18 @@ def detection_accord_cadre(df):
         accord_presume = False
         if nombre_titulaire > 1:
             accord_presume = True
-        L_data_fram += [[index[i][0], index[i][1], index[i][2], index[i][3], nombre_titulaire, str(accord_presume)]]
+        L_data_fram += [[index[i][0], index[i][1], index[i][2], nombre_titulaire, str(accord_presume)]]
         # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
-                                                        "dateNotification",
                                                         "montantOriginal",
                                                         "dureeMois",
                                                         "nombreTitulaireSurMarchePresume",
                                                         "accord-cadrePresume"])
 
     df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche",
-                                                                     "dateNotification",
                                                                      "montantOriginal",
                                                                      "dureeMois"],
                             right_on=["objetMarche",
-                                      "dateNotification",
                                       "montantOriginal",
                                       "dureeMois"])
     # Si l'une des 4 clefs à une valeur nulle alors nombreTitulaireSurMarchePresume, cadrePresume, montantCalcule2 alors le tout sera vide. Coreection en dessous
@@ -126,8 +141,44 @@ def detection_accord_cadre(df):
                                       "NC", df_to_output["nature"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE",
                                                    df_to_output["accord-cadrePresume"], "True")
-    df_to_output["montantCalcule"] = df_to_output["montant"] / df_to_output["nombreTitulaireSurMarchePresume"]
+    # df_to_output["montantCalcule"] = df_to_output["montant"] / df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output
+
+
+def detection_accord_cadre(df):
+    """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
+    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
+    On compare les deux nombres de titulaires et on conserve le plus immportant """
+    # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
+    dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
+    dataframe_mois = subset_liste_dataframe_dec_jan(df)
+    # On detecte les accord-cadre sur les différents dataframe ci dessus
+    for i in range(len(dataframe_annee)):
+        dataframe_annee[i] = detection_accord_cadre_without_date(dataframe_annee[i])
+        # Certains Df_mois sont vides d'ou la disjonction de cas
+        if len(dataframe_mois[i]) > 0:
+            dataframe_mois[i] = detection_accord_cadre_without_date(dataframe_mois[i])
+        else:
+            dataframe_mois[i]["nombreTitulaireSurMarchePresume"] = ""
+            dataframe_mois[i]["accord-cadrePresume"] = ""
+    # On passe du format liste de dataframe à un seul dataframe
+    dataframe_annee = pd.concat(dataframe_annee)
+    dataframe_annee = dataframe_annee.sort_index(axis=0)
+    dataframe_mois = pd.concat(dataframe_mois)
+    dataframe_mois = dataframe_mois.sort_index(axis=0)
+    # On peut ne boucler que sur les marchés présent dans dataframe_mois.
+    sub_datamois = dataframe_mois[dataframe_mois.nombreTitulaireSurMarchePresume > 1]
+    # On boucle sur l'id pour identifier de façon sure les marchés. objet n'est pas unique.
+    for identifiant in sub_datamois.id.unique():
+        titulaire_annee = max(dataframe_annee[dataframe_annee.id == identifiant]["nombreTitulaireSurMarchePresume"])
+        titulaire_mois = max(dataframe_mois[dataframe_mois.id == identifiant]["nombreTitulaireSurMarchePresume"])
+        # On localise les lignes concernées par l'identifiant et on remplace par le maximum du nombre de titulaire
+        dataframe_annee.loc[dataframe_annee.id == identifiant, "nombreTitulaireSurMarchePresume"] = max(titulaire_annee, titulaire_mois)
+    # Actualisation de la colonne booléenne
+    dataframe_annee.loc[dataframe_annee.nombreTitulaireSurMarchePresume > 1, "accord-cadrePresume"] = True
+    # Calcul de la colonne montantCalcule
+    dataframe_annee["montantCalcule"] = dataframe_annee["montant"] / dataframe_annee["nombreTitulaireSurMarchePresume"]
+    return dataframe_annee.reset_index(drop=True)
 
 
 def manage_column_final(df):
