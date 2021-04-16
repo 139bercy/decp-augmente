@@ -165,7 +165,7 @@ def manage_duplicates(df):
     nb_ligne_apres_suppresion = len(df)
 
     # Ecriture dans les logs
-    logger.info("Nombre de ligne doublons supprimées: {}".format(nb_ligne_avant_suppression-nb_ligne_apres_suppresion))
+    logger.info("Nombre de ligne doublons supprimées: {}".format(nb_ligne_avant_suppression - nb_ligne_apres_suppresion))
 
     # Correction afin que ces variables soient représentées pareil
     df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
@@ -198,17 +198,17 @@ def manage_amount(df):
     # variable témoin pour les logs
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
-    
-    logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0]-nb_montant_egal_zero))
+
+    logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0] - nb_montant_egal_zero))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     borne_inf = 200.0
     borne_sup = 9.99e8
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
-    logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_inf))
+    logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_inf))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
-    logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0]-nb_montant_egal_zero, borne_sup))
-    
+    logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
+
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     # Ecriture dans la log

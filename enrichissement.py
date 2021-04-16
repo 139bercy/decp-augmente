@@ -161,13 +161,13 @@ def manage_column_final(df):
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'codeRegionAcheteur','libelleRegionAcheteur',
+                             'codeRegionAcheteur', 'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'codeRegionEtablissement','libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
+                             'codeRegionEtablissement', 'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -335,7 +335,7 @@ def apply_luhn(df):
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
-    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df)-sum(df.sirenAcheteurValide)))
+    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide)))
     del df['siren1Acheteur']
     del df_SA
 
@@ -345,7 +345,7 @@ def apply_luhn(df):
     df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
-    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df)-sum(df.sirenEtablissementValide)))
+    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide)))
     del df['siren2Etablissement']
     del df_SE
 
@@ -357,7 +357,7 @@ def apply_luhn(df):
 
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
-    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df)-sum(df.siretEtablissementValide)))
+    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
     del df["siret2Etablissement"]
     del df_SE2
 
