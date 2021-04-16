@@ -205,7 +205,9 @@ def jointure_base_departement_region():
 
 def enrichissement_departement(df):
     """Ajout des variables région et departement dans decp"""
+    logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
     df_dep_reg = jointure_base_departement_region()
+    logger.info("Fin de la jointure")
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
@@ -231,7 +233,7 @@ def enrichissement_departement(df):
 
 
 def enrichissement_type_entreprise(df):
-    print('début enrichissement_type_entreprise\n')
+    logger.info('début enrichissement_type_entreprise\n')
 
     df = df.astype({
         'id': 'string',
@@ -303,7 +305,7 @@ def enrichissement_type_entreprise(df):
     )
     df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
     del to_add
-    print('fin enrichissement_type_entreprise\n')
+    logger.info('fin enrichissement_type_entreprise\n')
     return df
 
 
@@ -333,6 +335,7 @@ def apply_luhn(df):
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
+    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df)-sum(df.sirenAcheteurValide)))
     del df['siren1Acheteur']
     del df_SA
 
@@ -342,6 +345,7 @@ def apply_luhn(df):
     df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
+    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df)-sum(df.sirenEtablissementValide)))
     del df['siren2Etablissement']
     del df_SE
 
@@ -353,6 +357,7 @@ def apply_luhn(df):
 
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
+    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df)-sum(df.siretEtablissementValide)))
     del df["siret2Etablissement"]
     del df_SE2
 
@@ -372,21 +377,21 @@ def enrichissement_siret(df):
 
     archiveErrorSIRET = getArchiveErrorSIRET()
 
-    print("Enrichissement insee en cours...")
+    logger.info("Enrichissement insee en cours...")
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
-    print("Enrichissement insee fini")
+    logger.info("Enrichissement insee fini")
 
-    print("Enrichissement infogreffe en cours...")
+    logger.info("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
 
     del archiveErrorSIRET
-    print("enrichissement infogreffe fini")
+    logger.info("enrichissement infogreffe fini")
 
-    print("Concaténation des dataframes d'enrichissement...")
+    logger.info("Concaténation des dataframes d'enrichissement...")
     dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
     del enrichissementScrap
     del enrichissementInsee
-    print("Fini")
+    logger.info("Fini")
 
     # Ajout au df principal !
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
@@ -417,7 +422,7 @@ def get_siretdf_from_original_data(df):
 
 def getArchiveErrorSIRET():
     archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
-    print('Aucune archive d\'erreur')
+    logger.info('Aucune archive d\'erreur')
     return archiveErrorSIRET
 
 

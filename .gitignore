@@ -22,7 +22,9 @@ df_backup_cpv
 df_nettoye
 df_reorganisation
 
-<<<<<<< HEAD
 #Config vscode
 .vscode
 venv/
+
+#Suppresion des logs
+*.log

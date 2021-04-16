@@ -1,79 +1,95 @@
-2021-04-16 10:48:05,354 - main                 - INFO     - Début du script de nettoyage
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier decp.json
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier StockEtablissement_utf8.csv
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier StockUniteLegale_utf8.csv
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier cpv_2008_ver_2013.xlsx
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier geoflar-communes-2015.csv
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier departement2020.csv
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Test du fichier region2020.csv
-2021-04-16 10:48:05,355 - main.nettoyage       - INFO     - Ouverture du fichier decp.json
-2021-04-16 10:48:18,429 - main.nettoyage       - INFO     - Début du traitement: Gestion des titulaires
-2021-04-16 10:48:18,459 - main.nettoyage       - INFO     - Nombre de marché sans titulaires: 483. Remplacé par la valeur du concessionnaire
-2021-04-16 10:48:18,474 - main.nettoyage       - INFO     - Nombre de marché sans montant: 219. Remplacé par la valeur globale
-2021-04-16 10:48:18,513 - main.nettoyage       - INFO     - Nombre de marché sans identifiant acheteur: 357. Remplacé par l'identifiatn de l'autorité Concedante
-2021-04-16 10:48:18,546 - main.nettoyage       - INFO     - Nombre de marché sans nom d'acheteur: 889. Remplacé par le nom de l'autorité Concédante
-2021-04-16 10:52:23,511 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:23,511 - main.nettoyage       - INFO     - Début du traitement: Suppression des doublons
-2021-04-16 10:52:24,910 - main.nettoyage       - INFO     - Nombre de ligne doublons supprimées: 262
-2021-04-16 10:52:25,014 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:25,014 - main.nettoyage       - INFO     - Début du traitement: Déection et correction des montants aberrants
-2021-04-16 10:52:25,558 - main.nettoyage       - INFO     - 1427 montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999
-2021-04-16 10:52:25,593 - main.nettoyage       - INFO     - 3421 montant(s) étaient inférieurs à la borne inf 200.0
-2021-04-16 10:52:25,630 - main.nettoyage       - INFO     - 33 montant(s) étaient supérieurs à la borne sup: 999000000.0
-2021-04-16 10:52:25,657 - main.nettoyage       - INFO     - Au total, 6237 montant(s) ont été corrigé (on compte aussi les montants vides).
-2021-04-16 10:52:25,657 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:25,657 - main.nettoyage       - INFO     - Début du traitement: Gestion des Id null
-2021-04-16 10:52:25,694 - main.nettoyage       - INFO     - Nombre d'identifiant manquants et remplacés: 21
-2021-04-16 10:52:25,745 - main.nettoyage       - INFO     - Nombre de code CPV manquants et remplacés: 2837
-2021-04-16 10:52:25,816 - main.nettoyage       - INFO     - Nettoyage des idTitualires
-2021-04-16 10:52:26,031 - main.nettoyage       - INFO     - Nombre d'identifiant titualire ou un traitement sur les caractères spéciaux a été fait: 268033
-2021-04-16 10:52:26,031 - main.nettoyage       - INFO     - Récupération du code NIC
-2021-04-16 10:52:26,218 - main.nettoyage       - INFO     - Récupération de la division du code CPV.
-2021-04-16 10:52:26,377 - main.nettoyage       - INFO     - Mise en forme des données vides de la colonne denominationSociale
-2021-04-16 10:52:26,456 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:26,456 - main.nettoyage       - INFO     - Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché
-2021-04-16 10:52:26,456 - main.nettoyage       - INFO     - Création de la colonne département Execution
-2021-04-16 10:52:26,962 - main.nettoyage       - INFO     - Création de la colonne contenant les codes des regions d'execution
-2021-04-16 10:52:28,379 - main.nettoyage       - INFO     - Creation de la colonne contenant le libbelé des regions d'execution
-2021-04-16 10:52:28,511 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:28,511 - main.nettoyage       - INFO     - Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes
-2021-04-16 10:52:28,725 - main.nettoyage       - INFO     - Récupération de l'année
-2021-04-16 10:52:28,878 - main.nettoyage       - INFO     - Au total, 2889 marchés avaient une année érronée
-2021-04-16 10:52:29,006 - main.nettoyage       - INFO     - Récupération du mois
-2021-04-16 10:52:29,156 - main.nettoyage       - INFO     - Au total, 5 marchés n'ont pas de date de publication des données connue
-2021-04-16 10:52:29,157 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:29,157 - main.nettoyage       - INFO     - Début du traitement: Correction de la variable dureeMois.
-2021-04-16 10:52:29,199 - main.nettoyage       - INFO     - Au total, 41693 duree de marché en mois ont été jugées rentrées en jour et non en mois.
-2021-04-16 10:52:29,200 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:29,200 - main.nettoyage       - INFO     - Début du tritement: Imputation de la variable dureeMois
-2021-04-16 10:52:30,846 - main.nettoyage       - INFO     - Au total, 116 duree en mois sont encore supérieures à 120 (et les marchés ne concernent pas le monde des travaux)
-2021-04-16 10:52:31,266 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:31,266 - main.nettoyage       - INFO     - Début du traitement: Remplacement des caractères mal converti
-2021-04-16 10:52:31,360 - main.nettoyage       - INFO     - Fin du traitement
-2021-04-16 10:52:31,360 - main.nettoyage       - INFO     - Creation csv intermédiaire: decp_nettoye.csv
-2021-04-16 10:52:36,444 - main.nettoyage       - INFO     - Ecriture du csv terminé
-2021-04-16 10:52:36,796 - main                 - INFO     - Fin du script de nettoyage
-2021-04-16 10:52:36,797 - main                 - INFO     - Début du script d'enrichissement des données
-2021-04-16 10:52:37,582 - main.enrichissement  - INFO     - Début du traitement: Enrichissement siret
-2021-04-16 10:53:48,125 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:53:48,125 - main.enrichissement  - INFO     - Début du traitement: Enrichissement cpv
-2021-04-16 10:53:56,736 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:53:56,736 - main.enrichissement  - INFO     - Début du traitement: Enrichissement acheteur
-2021-04-16 10:54:55,827 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:54:55,827 - main.enrichissement  - INFO     - Début du traitement: Reorganisation du dataframe
-2021-04-16 10:54:59,541 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:54:59,541 - main.enrichissement  - INFO     - Début du traitement: Enrichissement geographique
-2021-04-16 10:55:43,288 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:55:43,289 - main.enrichissement  - INFO     - Début du traitement: Enrichissement sur le type d'entreprise
-2021-04-16 10:56:18,459 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:18,459 - main.enrichissement  - INFO     - Début du traitement: Vérification Siren/Siret par formule de Luhn
-2021-04-16 10:56:20,250 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:20,250 - main.enrichissement  - INFO     - Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements
-2021-04-16 10:56:23,051 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:23,051 - main.enrichissement  - INFO     - Début du traitement: Detection des accords cadre
-2021-04-16 10:56:46,710 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:46,711 - main.enrichissement  - INFO     - Début du traitement: Reorganisation du datframe final
-2021-04-16 10:56:47,313 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:47,313 - main.enrichissement  - INFO     - Début du traitement: Ecriture du csv final: decp_augmente
-2021-04-16 10:56:52,897 - main.enrichissement  - INFO     - Fin du traitement
-2021-04-16 10:56:53,086 - main                 - INFO     - Fin du script d'enrichissement
+2021-04-16 12:17:31,491 - main                 - INFO     - Début du script de nettoyage
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier decp.json
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier StockEtablissement_utf8.csv
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier StockUniteLegale_utf8.csv
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier cpv_2008_ver_2013.xlsx
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier geoflar-communes-2015.csv
+2021-04-16 12:17:31,492 - main.nettoyage       - INFO     - Test du fichier departement2020.csv
+2021-04-16 12:17:31,493 - main.nettoyage       - INFO     - Test du fichier region2020.csv
+2021-04-16 12:17:31,493 - main.nettoyage       - INFO     - Ouverture du fichier decp.json
+2021-04-16 12:17:44,042 - main.nettoyage       - INFO     - Début du traitement: Gestion des titulaires
+2021-04-16 12:17:44,073 - main.nettoyage       - INFO     - Nombre de marché sans titulaires: 483. Remplacé par la valeur du concessionnaire
+2021-04-16 12:17:44,087 - main.nettoyage       - INFO     - Nombre de marché sans montant: 219. Remplacé par la valeur globale
+2021-04-16 12:17:44,125 - main.nettoyage       - INFO     - Nombre de marché sans identifiant acheteur: 357. Remplacé par l'identifiatn de l'autorité Concedante
+2021-04-16 12:17:44,158 - main.nettoyage       - INFO     - Nombre de marché sans nom d'acheteur: 889. Remplacé par le nom de l'autorité Concédante
+2021-04-16 12:22:06,051 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:06,051 - main.nettoyage       - INFO     - Début du traitement: Suppression des doublons
+2021-04-16 12:22:07,521 - main.nettoyage       - INFO     - Nombre de ligne doublons supprimées: 262
+2021-04-16 12:22:07,621 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:07,621 - main.nettoyage       - INFO     - Début du traitement: Déection et correction des montants aberrants
+2021-04-16 12:22:08,205 - main.nettoyage       - INFO     - 1427 montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999
+2021-04-16 12:22:08,244 - main.nettoyage       - INFO     - 3421 montant(s) étaient inférieurs à la borne inf 200.0
+2021-04-16 12:22:08,284 - main.nettoyage       - INFO     - 33 montant(s) étaient supérieurs à la borne sup: 999000000.0
+2021-04-16 12:22:08,317 - main.nettoyage       - INFO     - Au total, 6237 montant(s) ont été corrigé (on compte aussi les montants vides).
+2021-04-16 12:22:08,318 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:08,318 - main.nettoyage       - INFO     - Début du traitement: Gestion des Id null
+2021-04-16 12:22:08,362 - main.nettoyage       - INFO     - Nombre d'identifiant manquants et remplacés: 21
+2021-04-16 12:22:08,408 - main.nettoyage       - INFO     - Nombre de code CPV manquants et remplacés: 2837
+2021-04-16 12:22:08,495 - main.nettoyage       - INFO     - Nettoyage des idTitualires
+2021-04-16 12:22:08,781 - main.nettoyage       - INFO     - Nombre d'identifiant titualire ou un traitement sur les caractères spéciaux a été fait: 268033
+2021-04-16 12:22:08,781 - main.nettoyage       - INFO     - Récupération du code NIC
+2021-04-16 12:22:08,989 - main.nettoyage       - INFO     - Récupération de la division du code CPV.
+2021-04-16 12:22:09,179 - main.nettoyage       - INFO     - Mise en forme des données vides de la colonne denominationSociale
+2021-04-16 12:22:09,268 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:09,269 - main.nettoyage       - INFO     - Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché
+2021-04-16 12:22:09,269 - main.nettoyage       - INFO     - Création de la colonne département Execution
+2021-04-16 12:22:09,913 - main.nettoyage       - INFO     - Création de la colonne contenant les codes des regions d'execution
+2021-04-16 12:22:11,173 - main.nettoyage       - INFO     - Creation de la colonne contenant le libbelé des regions d'execution
+2021-04-16 12:22:11,307 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:11,307 - main.nettoyage       - INFO     - Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes
+2021-04-16 12:22:11,522 - main.nettoyage       - INFO     - Récupération de l'année
+2021-04-16 12:22:11,675 - main.nettoyage       - INFO     - Au total, 2889 marchés avaient une année érronée
+2021-04-16 12:22:11,813 - main.nettoyage       - INFO     - Récupération du mois
+2021-04-16 12:22:11,964 - main.nettoyage       - INFO     - Au total, 5 marchés n'ont pas de date de publication des données connue
+2021-04-16 12:22:11,964 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:11,964 - main.nettoyage       - INFO     - Début du traitement: Correction de la variable dureeMois.
+2021-04-16 12:22:12,011 - main.nettoyage       - INFO     - Au total, 41693 duree de marché en mois ont été jugées rentrées en jour et non en mois.
+2021-04-16 12:22:12,011 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:12,011 - main.nettoyage       - INFO     - Début du tritement: Imputation de la variable dureeMois
+2021-04-16 12:22:13,519 - main.nettoyage       - INFO     - Au total, 116 duree en mois sont encore supérieures à 120 (et les marchés ne concernent pas le monde des travaux)
+2021-04-16 12:22:13,921 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:13,921 - main.nettoyage       - INFO     - Début du traitement: Remplacement des caractères mal converti
+2021-04-16 12:22:14,029 - main.nettoyage       - INFO     - Fin du traitement
+2021-04-16 12:22:14,029 - main.nettoyage       - INFO     - Creation csv intermédiaire: decp_nettoye.csv
+2021-04-16 12:22:19,861 - main.nettoyage       - INFO     - Ecriture du csv terminé
+2021-04-16 12:22:20,186 - main                 - INFO     - Fin du script de nettoyage
+2021-04-16 12:22:20,187 - main                 - INFO     - Début du script d'enrichissement des données
+2021-04-16 12:22:20,923 - main.enrichissement  - INFO     - Début du traitement: Enrichissement siret
+2021-04-16 12:22:21,031 - main.enrichissement  - INFO     - Aucune archive d'erreur
+2021-04-16 12:22:21,031 - main.enrichissement  - INFO     - Enrichissement insee en cours...
+2021-04-16 12:23:30,189 - main.enrichissement  - INFO     - Enrichissement insee fini
+2021-04-16 12:23:30,190 - main.enrichissement  - INFO     - Enrichissement infogreffe en cours...
+2021-04-16 12:23:30,208 - main.enrichissement  - INFO     - enrichissement infogreffe fini
+2021-04-16 12:23:30,208 - main.enrichissement  - INFO     - Concaténation des dataframes d'enrichissement...
+2021-04-16 12:23:30,627 - main.enrichissement  - INFO     - Fini
+2021-04-16 12:23:31,345 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:23:31,345 - main.enrichissement  - INFO     - Début du traitement: Enrichissement cpv
+2021-04-16 12:23:40,369 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:23:40,369 - main.enrichissement  - INFO     - Début du traitement: Enrichissement acheteur
+2021-04-16 12:24:42,369 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:24:42,370 - main.enrichissement  - INFO     - Début du traitement: Reorganisation du dataframe
+2021-04-16 12:24:46,189 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:24:46,190 - main.enrichissement  - INFO     - Début du traitement: Enrichissement geographique
+2021-04-16 12:25:32,833 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:25:32,833 - main.enrichissement  - INFO     - Début du traitement: Enrichissement sur le type d'entreprise
+2021-04-16 12:25:32,833 - main.enrichissement  - INFO     - début enrichissement_type_entreprise
+
+2021-04-16 12:26:10,046 - main.enrichissement  - INFO     - fin enrichissement_type_entreprise
+
+2021-04-16 12:26:10,110 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:10,110 - main.enrichissement  - INFO     - Début du traitement: Vérification Siren/Siret par formule de Luhn
+2021-04-16 12:26:10,525 - main.enrichissement  - INFO     - Nombre de Siren Acheteur jugé invalide:395
+2021-04-16 12:26:11,193 - main.enrichissement  - INFO     - Nombre de Siren Etablissement jugé invalide:7434
+2021-04-16 12:26:11,866 - main.enrichissement  - INFO     - Nombre de Siret Etablissement jugé invalide:5826
+2021-04-16 12:26:12,024 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:12,024 - main.enrichissement  - INFO     - Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements
+2021-04-16 12:26:12,025 - main.enrichissement  - INFO     - Début de la jointure entre les deux csv Insee: Departements et Regions
+2021-04-16 12:26:12,035 - main.enrichissement  - INFO     - Fin de la jointure
+2021-04-16 12:26:14,884 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:14,884 - main.enrichissement  - INFO     - Début du traitement: Detection des accords cadre
+2021-04-16 12:26:39,195 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:39,196 - main.enrichissement  - INFO     - Début du traitement: Reorganisation du datframe final
+2021-04-16 12:26:39,671 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:39,671 - main.enrichissement  - INFO     - Début du traitement: Ecriture du csv final: decp_augmente
+2021-04-16 12:26:45,750 - main.enrichissement  - INFO     - Fin du traitement
+2021-04-16 12:26:45,932 - main                 - INFO     - Fin du script d'enrichissement
