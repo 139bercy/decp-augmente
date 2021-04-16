@@ -80,6 +80,7 @@ def main():
 
 # Detection accord-cadre
 
+
 def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
     """En entrée: Dataframe avec une colonne anneeNotification
     En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
