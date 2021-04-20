@@ -6,13 +6,14 @@ import numpy as np
 import pandas as pd
 from pandas import json_normalize
 
+with open("config.json") as f:
+    conf = json.load(f)
+path_to_data = conf["path_to_data"]
+decp_file_name = conf["decp_file_name"]
+
 
 def main():
-    with open("config.json") as f:
-        conf = json.load(f)
     check_reference_files(conf)
-    path_to_data = conf["path_to_data"]
-    decp_file_name = conf["decp_file_name"]
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
@@ -62,7 +63,7 @@ def main():
     df = replace_char(df)
 
     with open('df_nettoye', 'wb') as df_nettoye:
-        pickle.dump(df, df_nettoye)
+        pickle.dump(df, df_nettoye)  # Export présent pour faciliter l'utilisation du module enrichissement.py
 
     df.to_csv("decp_nettoye.csv")
 
@@ -231,45 +232,21 @@ def manage_region(df):
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
         + [str(i) for i in list(np.arange(10, 96, 1))]
-
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(listeCP), np.NaN, df['codeDepartementExecution'])
 
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
-
     df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codeDepartementExecution'])
 
-    ###############################################################################
-    # Création de la colonne pour distinguer les régions
-    df['codeRegionExecution'] = df['codeDepartementExecution'].astype(str)
-    # Définition des codes des régions en fonctions des codes de départements
-    listCorrespondance = {
-        '84': ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74'],
-        '27': ['21', '25', '39', '58', '70', '71', '89', '90'],
-        '53': ['35', '22', '56', '29'],
-        '24': ['18', '28', '36', '37', '41', '45'],
-        '94': ['2A', '2B', '20'],
-        '44': ['08', '10', '51', '52', '54', '55', '57', '67', '68', '88'],
-        '32': ['02', '59', '60', '62', '80'],
-        '11': ['75', '77', '78', '91', '92', '93', '94', '95'],
-        '28': ['14', '27', '50', '61', '76'],
-        '75': ['16', '17', '19', '23', '24', '33', '40', '47', '64', '79', '86', '87'],
-        '76': ['09', '11', '12', '30', '31', '32', '34', '46', '48', '65', '66', '81', '82'],
-        '52': ['44', '49', '53', '72', '85'],
-        '93': ['04', '05', '06', '13', '83', '84'],
-        '06': ['976'],
-        '04': ['974'],
-        '02': ['972'],
-        '01': ['971'],
-        '03': ['973'],
-        '98': ['97', '98', '988', '986', '984', '987', '975', '977', '978']
-    }
-
-    # Inversion du dict
-    listCorrespondanceI = {value: str(key) for key, values in listCorrespondance.items() for value in values}
-
-    df['codeRegionExecution'].replace(listCorrespondanceI, inplace=True)
-
+    # Récupération des codes régions via le département
+    path_dep = os.path.join(path_to_data, conf["departements-francais"])
+    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
+    df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
+    df = pd.merge(df, departement, how="left",
+                  left_on="codeDepartementExecution", right_on="dep")
+    df.rename(columns={"reg": "codeRegionExecution"}, inplace=True)
+    # On supprime la colonne dep, doublon avec codeDepartementExecution
+    del df["dep"]
     # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
     df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
@@ -278,34 +255,19 @@ def manage_region(df):
                 '52', '93', '01', '02', '03', '04', '06', '98']  # 98 = collectivité d'outre mer
 
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
-
     # Identification du nom des régions
-    df['libelleRegionExecution'] = df['codeRegionExecution'].astype(str)
-    correspondance_dict = {
-        '84': 'Auvergne-Rhône-Alpes',
-        '27': 'Bourgogne-Franche-Comté',
-        '53': 'Bretagne',
-        '24': 'Centre-Val de Loire',
-        '94': 'Corse',
-        '44': 'Grand Est',
-        '32': 'Hauts-de-France',
-        '11': 'Île-de-France',
-        '28': 'Normandie',
-        '75': 'Nouvelle-Aquitaine',
-        '76': 'Occitanie',
-        '52': 'Pays de la Loire',
-        '93': 'Provence-Alpes-Côte d\'Azur',
-        '01': 'Guadeloupe',
-        '02': 'Martinique',
-        '03': 'Guyane',
-        '04': 'La Réunion',
-        '06': 'Mayotte',
-        '98': 'Collectivité d\'outre mer'}
-
-    df['libelleRegionExecution'].replace(correspondance_dict, inplace=True)
-    df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
 
+    # Import de la base region de l'Insee
+    path_reg = os.path.join(path_to_data, conf["region-fr"])
+    region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
+    region.columns = ["reg", "libelle_reg"]
+
+    df = pd.merge(df, region, how="left",
+                  left_on="codeRegionExecution", right_on="reg")
+    df.rename(columns={"libelle_reg": "libelleRegionExecution"}, inplace=True)
+    # On supprime la colonne reg, doublon avec codeRegionExecution
+    del df["reg"]
     return df
 
 

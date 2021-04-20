@@ -16,11 +16,6 @@ path_to_data = conf["path_to_data"]
 siren_len = 9
 
 
-def save(df, nom):
-    with open(nom, 'wb') as df_backup:
-        pickle.dump(df, df_backup)
-
-
 def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
@@ -223,18 +218,15 @@ def jointure_base_departement_region():
     """Permet la jointure entre la base departement de l'insee (dossier data) et la base region de l'insee"""
     # Import de la base département
     path_dep = os.path.join(path_to_data, conf["departements-francais"])
-    departement = pd.read_csv(path_dep, sep=",")
-    sub_departement = departement[['dep', 'reg', 'libelle']]
-    sub_departement.reg = sub_departement.reg.astype(str)
+    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
     # Import de la base Région
     path_reg = os.path.join(path_to_data, conf["region-fr"])
-    region = pd.read_csv(path_reg, sep=",")
-    sub_reg = region[["reg", "libelle"]]
-    sub_reg.columns = ["reg", "libelle_reg"]
-    sub_reg.reg = sub_reg.reg.astype(str)
+    region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
+    region.columns = ["reg", "libelle_reg"]
     # Merge des deux bases
-    df_dep_reg = pd.merge(sub_departement, sub_reg, how="left", left_on="reg", right_on="reg", copy=False)
+    df_dep_reg = pd.merge(departement, region, how="left", left_on="reg", right_on="reg", copy=False)
     df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
+    df_dep_reg.code_region = np.where(df_dep_reg.code_region.isin(["1", "2", "3", "4", "6"]), "0" + df_dep_reg.code_region, df_dep_reg.code_region)
     return df_dep_reg
 
 
@@ -719,9 +711,6 @@ def enrichissement_cpv(df):
     # Rename la variable CODE en codeCPV
     df.rename(columns={"codeCPV": "codeCPV_Original",
               "CODE": "codeCPV"}, inplace=True)
-    with open('df_backup_cpv', 'wb') as df_backup_cpv:
-        pickle.dump(df, df_backup_cpv)
-
     return df
 
 
@@ -729,10 +718,6 @@ def enrichissement_acheteur(df):
     # Enrichissement des données des acheteurs #
     # Enrichissement des données via les codes siret/siren #
     # Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
-
-    with open('df_backup_cpv', 'rb') as df_backup_cpv:
-        df = pickle.load(df_backup_cpv)
-
     dfAcheteurId = df['acheteur.id'].to_frame()
     dfAcheteurId.columns = ['siret']
     dfAcheteurId = dfAcheteurId.drop_duplicates(keep='first')
@@ -758,17 +743,11 @@ def enrichissement_acheteur(df):
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
     del enrichissementAcheteur
-    with open('df_backup_acheteur', 'wb') as df_backup_acheteur:
-        pickle.dump(df, df_backup_acheteur)
-
     return df
 
 
 def reorganisation(df):
     """Mise en qualité du dataframe"""
-    with open('df_backup_acheteur', 'rb') as df_backup_acheteur:
-        df = pickle.load(df_backup_acheteur)
-
     # Ajustement de certaines colonnes
     df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
     df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
@@ -811,10 +790,6 @@ def reorganisation(df):
     for column in list_to_correct:
         df[column] = df[column].str.upper()
         df[column] = df[column].str.replace("É", "E")
-
-    with open('df_reorganisation', 'wb') as df_backup2:
-        pickle.dump(df, df_backup2)
-
     return df
 
 
@@ -830,9 +805,6 @@ def fix_codegeo(code):
 
 def enrichissement_geo(df):
     """Ajout des géolocalisations des entreprises"""
-    with open('df_reorganisation', 'rb') as df_backup_acheteur:
-        df = pickle.load(df_backup_acheteur)
-
     # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
