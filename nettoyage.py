@@ -13,13 +13,9 @@ def main():
     check_reference_files(conf)
     path_to_data = conf["path_to_data"]
     decp_file_name = conf["decp_file_name"]
-    # error_siret_file_name = conf["error_siret_file_name"]
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-    # Applatit les données json en tableau
-    # pd.read_json(data['marches'])
-    # df = pd.read_json(json.dumps(data['marches']))
     df = json_normalize(data['marches'])
 
     df = df.astype({
@@ -34,36 +30,16 @@ def main():
         'lieuExecution.typeCode': 'string',
         'lieuExecution.nom': 'string',
         'dureeMois': 'int64',
-        # TODO définition d'un format de date "généraliste" qui sera capable de gérer les différents formats présents
-        # 'dateNotification': 'datetime64[ns]',
-        # 'datePublicationDonnees': 'datetime64[ns]',
         'montant': 'float64',
         'formePrix': 'string',
         'titulaires': 'object',
-        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
-        # 'titulaires.typeIdentifiant': 'string',
-        # 'titulaires.id': 'string',
-        # 'titulaires.denominationSociale': 'string',
         'modifications': 'object',
-        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
-        # Risque de duplication car c'est un tableau
-        # 'modifications.objetModification': 'string',
-        # 'modifications.dateNotificationModification': 'string',
-        # 'modifications.datePublicationDonneesModification': 'string',
-        # 'modifications.montant': 'float64',
         'nature': 'string',
         'autoriteConcedante.id': 'string',
         'autoriteConcedante.nom': 'string',
         'acheteur.id': 'string',
         'acheteur.nom': 'string',
         'donneesExecution': 'string'
-        # TODO doit-on normaliser aussi ce champ (qui ne l'est pas automatiquement)
-        # Risque de duplication car c'est un tableau
-        # 'donneesExecution.datePublicationDonneesExecution': 'datetime64[ns]',
-        # 'donneesExecution.depensesInvestissement': 'datetime64[ns]',
-        # 'donneesExecution.depensesInvestissement.tarifs': 'object',
-        # 'donneesExecution.depensesInvestissement.tarifs.intituleTarif': 'string',
-        # 'donneesExecution.depensesInvestissement.tarifs.tarif': 'float64',
     }, copy=False)
 
     df = manage_titulaires(df)
@@ -120,7 +96,7 @@ def manage_titulaires(df):
     df["titulaires"].fillna('0', inplace=True)
     df = df[df['titulaires'] != '0']
 
-    # Création d'une colonne nbTitulairesSurCeMarche
+    # Création d'une colonne nbTitulairesSurCeMarche. Cette colonne sera retravaillé dans la fonction detection_accord_cadre
     df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))
 
     df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']],
@@ -132,6 +108,7 @@ def manage_titulaires(df):
 
 
 def manage_duplicates(df):
+    """Permet la suppression des eventuels doublons pour un subset du dataframe"""
     df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
                                'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
@@ -141,12 +118,10 @@ def manage_duplicates(df):
                        inplace=True)
     df.reset_index(inplace=True, drop=True)
 
-    # Correction afin que ces variables soient représentées pareil
+    # Correction afin que ces variables soient représentées identiquement
     df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
-
-    # détection des accords cadres avec de multiples titulaires
 
     return df
 
@@ -165,6 +140,7 @@ def is_false_amount(x, threshold=5):
 
 
 def manage_amount(df):
+    """Travail sur la détection des montants erronés. Ici inférieur à 200, supérieur à 9.99e8 et composé d'un seul chiffre: 999 999"""
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
@@ -176,15 +152,13 @@ def manage_amount(df):
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
 
-    # Nettoyage colonnes
-    # df['montant'].fillna(0, inplace=True)
-
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     return df
 
 
 def manage_missing_code(df):
+    """Travail sur les variables d'identifiant """
     df.id = np.where(df["id"].isnull(), '0000000000000000', df.id)
     df.codeCPV = np.where(df["codeCPV"].isnull(), '00000000', df.codeCPV)
 
@@ -202,11 +176,9 @@ def manage_missing_code(df):
     df.idTitulaires[mask].replace(caracteres_speciaux_dict, inplace=True)
     df.idTitulaires = np.where(df.idTitulaires == '', np.NaN, df.idTitulaires)
 
-    # Récupération code NIC
+    # Récupération code NIC: 5 dernier chiffres du Siret <- idTitulaires
     df.idTitulaires = df.idTitulaires.astype(str)
     df['nic'] = df["idTitulaires"].str[-5:]
-
-    # df.loc[~df["nic"].str.isdigit()] = np.NaN
     df.nic = np.where(~df["nic"].str.isdigit(), np.NaN, df.nic)
     df['nic'] = df.nic.astype(str)
 
@@ -226,6 +198,7 @@ def manage_missing_code(df):
 
 
 def manage_region(df):
+    """Ajout des libellés Régions/département pour le lieu d'execution du marché"""
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
@@ -254,7 +227,7 @@ def manage_region(df):
         'BL': '977'}
     df['codeDepartementExecution'].replace(listCorrespondance2, inplace=True)
 
-    # Vérification si c'est bien un code postal
+    # Vérification si c'est bien un code département
     listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
                '97', '988', '987', '984', '978', '975', '977', '986'] \
         + [str(i) for i in list(np.arange(10, 96, 1))]
@@ -330,7 +303,6 @@ def manage_region(df):
         '98': 'Collectivité d\'outre mer'}
 
     df['libelleRegionExecution'].replace(correspondance_dict, inplace=True)
-    # del chemin, chemindata, dfO, initial, key, listCorrespondance, listCorrespondanceI, string, value, word
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
 
@@ -338,6 +310,7 @@ def manage_region(df):
 
 
 def manage_date(df):
+    """Travail sur les Dates. Récupération de l'année de notification du marché ainsi que son mois"""
     # Date / Temps #
     # ..............Travail sur les variables de type date
     df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
@@ -360,6 +333,7 @@ def manage_date(df):
 
 
 def correct_date(df):
+    """Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois"""
     # On cherche les éventuelles erreurs mois -> jours
     mask = ((df['montant'] == df['dureeMois'])
             | (df['montant'] / df['dureeMois'] < 100)
@@ -408,7 +382,6 @@ def replace_char(df):
     """Fonction pour mettre en qualité le champ objetMarche"""
     # Remplacement brutal du caractère (?) par un espace
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
-
     return df
 
 

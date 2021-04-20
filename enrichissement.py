@@ -13,7 +13,6 @@ from lxml import html
 with open("config.json") as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-# error_siret_file = conf["error_siret_file_name"]
 siren_len = 9
 
 
@@ -41,10 +40,8 @@ def main():
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        # 'montantEstime': 'string',
         'formePrix': 'string',
         'idTitulaires': 'object',
-        # 'typeIdentifiant': 'string',
         'denominationSociale': 'string',
         'nature': 'string',
         'acheteur.id': 'string',
@@ -70,7 +67,7 @@ def main():
 
     df = apply_luhn(df)
 
-    df = enrichissement_departement(df)  # il y a des na dans departements
+    df = enrichissement_departement(df)
 
     df = detection_accord_cadre(df)
 
@@ -78,20 +75,21 @@ def main():
 
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
 
-# Detection accord-cadre
 
+# Detection accord-cadre
 
 def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
     """En entrée: Dataframe avec une colonne anneeNotification
     En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
     df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
     liste_dataframe = []
-    # On remplace les annee nulle par 0 pour que la boucle ne plante pas. Sur ces années on ne fait pas ce traitement.
+    # On remplace les annees nulles par 0 pour que la boucle ne plante pas.
+    # Sur année = 0, le dataframe ne contiendra que le mois de decembre. 
     df2.anneeNotification = np.where(df2.anneeNotification == 'nan', '0', df2.anneeNotification)
     df2.moisNotification = np.where(df2.moisNotification.isna(), '0', df2.moisNotification)
-    for annee in np.unique(df2.anneeNotification):  
+    for annee in np.unique(df2.anneeNotification):
         sub1 = df2[(df2["anneeNotification"] == annee) & (df2["moisNotification"] == "12")]
-        sub2 = df2[(df2.anneeNotification == str(int(annee)+1)) & (df2.moisNotification == '01')]
+        sub2 = df2[(df2.anneeNotification == str(int(annee) + 1)) & (df2.moisNotification == '01')]
         df_sub = pd.concat([sub1, sub2])
         liste_dataframe += [df_sub]
     return liste_dataframe
@@ -118,7 +116,6 @@ def detection_accord_cadre_without_date(df):
         if nombre_titulaire > 1:
             accord_presume = True
         L_data_fram += [[index[i][0], index[i][1], index[i][2], nombre_titulaire, str(accord_presume)]]
-        # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
                                                         "montantOriginal",
                                                         "dureeMois",
@@ -131,7 +128,7 @@ def detection_accord_cadre_without_date(df):
                             right_on=["objetMarche",
                                       "montantOriginal",
                                       "dureeMois"])
-    # Si l'une des 4 clefs à une valeur nulle alors nombreTitulaireSurMarchePresume, cadrePresume, montantCalcule2 alors le tout sera vide. Coreection en dessous
+    # Si l'une des 3 clefs à une valeur nulle alors nombreTitulaireSurMarchePresume, cadrePresume sera vide. Correction en dessous
     df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(),
                                                                df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["accord-cadrePresume"].isnull(),
@@ -141,13 +138,12 @@ def detection_accord_cadre_without_date(df):
                                       "NC", df_to_output["nature"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE",
                                                    df_to_output["accord-cadrePresume"], "True")
-    # df_to_output["montantCalcule"] = df_to_output["montant"] / df_to_output["nombreTitulaireSurMarchePresume"]
     return df_to_output
 
 
 def detection_accord_cadre(df):
     """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
-    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
+    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord induit par la détection par année.
     On compare les deux nombres de titulaires et on conserve le plus immportant """
     # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
     dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
@@ -182,9 +178,8 @@ def detection_accord_cadre(df):
 
 
 def manage_column_final(df):
-    """Rename de certaines colonne et trie des colonnes"""
+    """Renommage de certaines colonnes et trie des colonnes."""
     df = df.rename(columns={
-        # 'montant': 'montantCalcule',
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
@@ -197,13 +192,13 @@ def manage_column_final(df):
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'codeRegionAcheteur','libelleRegionAcheteur',
+                             'codeRegionAcheteur', 'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'codeRegionEtablissement','libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
+                             'codeRegionEtablissement', 'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -213,7 +208,7 @@ def manage_column_final(df):
 
 
 def extraction_departement_from_code_postal(code_postal):
-    """renvoie le code postal en prenant en compte les Drom
+    """Renvoie le code postal en prenant en compte les territoires outre-mer
     code_postal est un str"""
     try:
         code = code_postal[:2]
@@ -225,25 +220,27 @@ def extraction_departement_from_code_postal(code_postal):
 
 
 def jointure_base_departement_region():
+    """Permet la jointure entre la base departement de l'insee (dossier data) et la base region de l'insee"""
+    # Import de la base département
     path_dep = os.path.join(path_to_data, conf["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",")
     sub_departement = departement[['dep', 'reg', 'libelle']]
     sub_departement.reg = sub_departement.reg.astype(str)
+    # Import de la base Région
     path_reg = os.path.join(path_to_data, conf["region-fr"])
     region = pd.read_csv(path_reg, sep=",")
     sub_reg = region[["reg", "libelle"]]
     sub_reg.columns = ["reg", "libelle_reg"]
     sub_reg.reg = sub_reg.reg.astype(str)
+    # Merge des deux bases
     df_dep_reg = pd.merge(sub_departement, sub_reg, how="left", left_on="reg", right_on="reg", copy=False)
     df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
     return df_dep_reg
 
 
 def enrichissement_departement(df):
-    """Ajout des variables région et departement dans decp"""
+    """Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements"""
     df_dep_reg = jointure_base_departement_region()
-    # codePostalAcheteur pour le departement de l acheteur
-    # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
     df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
     df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
@@ -281,7 +278,6 @@ def enrichissement_type_entreprise(df):
         'dureeMois': 'int64',
         'montant': 'float64',
         'montantOriginal': 'float64',
-        # 'montantEstime': 'string',
         'formePrix': 'string',
         'typeIdentifiantEtablissement': 'object',
         'siretEtablissement': 'string',
@@ -290,7 +286,6 @@ def enrichissement_type_entreprise(df):
         'idAcheteur': 'string',
         'nomAcheteur': 'string',
         'codePostalEtablissement': 'string',
-        # 'codeRegionAcheteur': 'string',
         'anneeNotification': 'string',
         'moisNotification': 'string',
         'dureeMoisEstimee': 'string',
@@ -308,7 +303,7 @@ def enrichissement_type_entreprise(df):
 
     # Recuperation de la base
     path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
-
+    # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
     to_add = pd.DataFrame(columns=["siren", "categorieEntreprise"])
     chunksize = 1000000
     for to_add_chunk in pd.read_csv(
@@ -320,23 +315,19 @@ def enrichissement_type_entreprise(df):
         # On doit creer Siret
         to_add_chunk["nicSiegeUniteLegale"] = to_add_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
 
-        #  À Partir d'ici le siren correspond siretEtablissement
+        #  À Partir d'ici le siren correspond à siretEtablissement
         #  C'est la même colonne pour optimiser la mémoire
         to_add_chunk["siren"] = to_add_chunk["siren"].astype(str).str\
             .cat(to_add_chunk["nicSiegeUniteLegale"].astype(str), sep='')
 
         # filtrer only existing siret
         to_add = to_add.append(to_add_chunk[to_add_chunk['siren'].isin(df['siretEtablissement'])])
-        # np.where(lambda x: df['siretEtablissement'] == x['siretEtablissement'], x['categorieEntreprise])
-        # df['categorieEntreprise'][lambda x: df['siretEtablissement'] == x['siretEtablissement']] =
-
         del to_add_chunk
 
     to_add.rename(columns={"siren": "siretEtablissement"}, inplace=True)
     # # Jointure sur le Siret entre df et to_add
     df = df.merge(
-        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False
-    )
+        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
     df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
     del to_add
     print('fin enrichissement_type_entreprise\n')
@@ -363,15 +354,15 @@ def is_luhn_valid(x):
 
 
 def apply_luhn(df):
-    # Application sur les siren des acheteurs
-    df['siren1Acheteur'] = df["idAcheteur"].str[:9]  # Modification acheteur.id = idAcheteur
+    """Application de la formule de Luhn sur les siren/siret"""
+    # Application sur les siren des Acheteur
+    df['siren1Acheteur'] = df["idAcheteur"].str[:9]
     df_SA = pd.DataFrame(df['siren1Acheteur'])
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
     del df['siren1Acheteur']
     del df_SA
-
     # Application sur les siren des établissements
     df['siren2Etablissement'] = df.sirenEtablissement.str[:]
     df_SE = pd.DataFrame(df['siren2Etablissement'])
@@ -380,32 +371,26 @@ def apply_luhn(df):
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
     del df['siren2Etablissement']
     del df_SE
-
     # Application sur les siret des établissements
     df['siret2Etablissement'] = df.siretEtablissement.str[:]
     df_SE2 = pd.DataFrame(df['siret2Etablissement'])
     df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
     df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
-
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     del df["siret2Etablissement"]
     del df_SE2
-
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
         (df.typeIdentifiantEtablissement != 'SIRET'),
         "Non valable",
-        df.siretEtablissementValide
-    )  # A améliorer ?
+        df.siretEtablissementValide)
     return df
 
 
 def enrichissement_siret(df):
-    # Enrichissement des données via les codes siret/siren #
-
+    """Enrichissement des données via les codes siret/siren"""
     dfSIRET = get_siretdf_from_original_data(df)
-
     archiveErrorSIRET = getArchiveErrorSIRET()
 
     print("Enrichissement insee en cours...")
@@ -414,7 +399,6 @@ def enrichissement_siret(df):
 
     print("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
-
     del archiveErrorSIRET
     print("enrichissement infogreffe fini")
 
@@ -424,7 +408,7 @@ def enrichissement_siret(df):
     del enrichissementInsee
     print("Fini")
 
-    # Ajout au df principal !
+    # Ajout au df principal
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
     del dfenrichissement
     return df
@@ -452,14 +436,15 @@ def get_siretdf_from_original_data(df):
 
 
 def getArchiveErrorSIRET():
+    """Récupération des siret erronés"""
     archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
     print('Aucune archive d\'erreur')
     return archiveErrorSIRET
 
 
 def get_enrichissement_insee(dfSIRET, path_to_data):
+    """Ajout des informations Adresse/Activité des entreprises via la base siren Insee"""
     # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
-
     path = os.path.join(path_to_data, conf["base_sirene_insee"])
     columns = [
         'siren',
@@ -471,7 +456,7 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
         'libelleCommuneEtablissement',
         'codeCommuneEtablissement',
         'activitePrincipaleEtablissement',
-        'nomenclatureActivitePrincipaleEtablissement']
+        'nomenclatureActivitePrincipaleEtablissement']  # Colonne à utiliser dans la base Siren
     dtypes = {
         'siret': 'string',
         'typeVoieEtablissement': 'string',
@@ -496,14 +481,13 @@ def get_enrichissement_insee(dfSIRET, path_to_data):
         enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
     nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale"]]
 
-    # Concat des deux resultats
-    enrichissementInsee = enrichissement_insee_siret  # pd.concat([enrichissement_insee_siret, enrichissement_insee_siren])
+    # Concaténation des deux resultats
+    enrichissementInsee = enrichissement_insee_siret
 
     temp_df = pd.merge(nanSiret, result, indicator=True, how="outer", on='siren', copy=False)
     del result
     nanSiret = temp_df[temp_df['activitePrincipaleEtablissement'].isnull()]
     nanSiret = nanSiret.iloc[:, :3]
-    # nanSiren = nanSiren.iloc[:, :3]
     nanSiret.reset_index(inplace=True, drop=True)
 
     return [enrichissementInsee, nanSiret]
@@ -713,7 +697,7 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 
 
 def enrichissement_cpv(df):
-    # Enrichissement avec le code CPV #
+    """Récupération des codes CPV formatés."""
     # Importation et mise en forme des codes/ref CPV
     path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
     refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
@@ -781,6 +765,7 @@ def enrichissement_acheteur(df):
 
 
 def reorganisation(df):
+    """Mise en qualité du dataframe"""
     with open('df_backup_acheteur', 'rb') as df_backup_acheteur:
         df = pickle.load(df_backup_acheteur)
 
@@ -834,7 +819,8 @@ def reorganisation(df):
 
 
 def fix_codegeo(code):
-    """Code doit etre un code commune/postal"""
+    """Correction de l'erreur ou le code 01244 soit considérer comme l'entier 1244
+    code doit etre un code commune/postal"""
     if len(code) == 4:
         code = "0" + code
     if "." in code[:5]:
@@ -843,14 +829,15 @@ def fix_codegeo(code):
 
 
 def enrichissement_geo(df):
+    """Ajout des géolocalisations des entreprises"""
     with open('df_reorganisation', 'rb') as df_backup_acheteur:
         df = pickle.load(df_backup_acheteur)
 
     # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
-
     df_villes = get_df_villes()
+    # Ajout des données Acheteur
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
     df.rename(columns={"superficie": "superficieCommuneAcheteur",
                        "population": "populationCommuneAcheteur",
@@ -858,7 +845,7 @@ def enrichissement_geo(df):
                        "longitude": "longitudeCommuneAcheteur"},
               inplace=True)
     df.drop(columns="codeCommune", inplace=True)
-
+    # Ajout des données Etablissements
     df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune', copy=False)
     df.rename(columns={"superficie": "superficieCommuneEtablissement",
                        "population": "populationCommuneEtablissement",
@@ -869,22 +856,18 @@ def enrichissement_geo(df):
 
     # Calcul de la distance entre l'acheteur et l'etablissement
     df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
-    # Taux d'enrichissement
-    # round(100 - df_decp.distanceAcheteurEtablissement.isnull().sum() / len(df_decp) * 100, 2)
 
     # Remise en forme des colonnes géo-spatiales
     cols = ["longitudeCommuneAcheteur",
             "latitudeCommuneAcheteur",
             "longitudeCommuneEtablissement",
             "latitudeCommuneEtablissement"]
-
     df[cols] = df[cols].astype(str)
-
     df['geolocCommuneAcheteur'] = df.latitudeCommuneAcheteur + ',' + df.longitudeCommuneAcheteur
-    df['geolocCommuneEtablissement'] = df.latitudeCommuneEtablissement + ',' + df.longitudeCommuneEtablissement
-
     df['geolocCommuneAcheteur'] = np.where(
         df['geolocCommuneAcheteur'] == 'nan,nan', np.NaN, df['geolocCommuneAcheteur'])
+
+    df['geolocCommuneEtablissement'] = df.latitudeCommuneEtablissement + ',' + df.longitudeCommuneEtablissement
     df['geolocCommuneEtablissement'] = np.where(
         df['geolocCommuneEtablissement'] == 'nan,nan', np.NaN, df['geolocCommuneEtablissement'])
     df.reset_index(inplace=True, drop=True)
@@ -893,6 +876,7 @@ def enrichissement_geo(df):
 
 
 def get_df_villes():
+    """Récupération des informations sur les communes (superficie/population"""
     path = os.path.join(path_to_data, conf["base_geoflar"])
     df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                             usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
@@ -918,7 +902,7 @@ def get_df_villes():
                               "SUPERFICIE": 'superficie'},
                      inplace=True)
 
-    # Un brin de conversion c'est toujours bien
+    # Conversion des colonnes
     df_villes.population = df_villes.population.astype(float)
     df_villes.codeCommune = df_villes.codeCommune.astype(object)
     df_villes.latitude = df_villes.latitude.astype(float)
@@ -928,6 +912,7 @@ def get_df_villes():
 
 
 def get_distance(row):
+    """Calcul des distances entre l'acheteur et l'établissement qui répond à l'offre"""
     try:
         x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
         y = Point(row.longitudeCommuneEtablissement, row.latitudeCommuneEtablissement)
