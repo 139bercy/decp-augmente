@@ -164,12 +164,24 @@ def is_false_amount(x, threshold=5):
     return False
 
 
+def is_increase_amount(x):
+    """Detection des montants du format 123456789"""
+    to_avoid = "123456789"
+    str_number = str(x)
+    if "." in str_number:
+        str_number = str_number.split(".")[0]
+    if str_number in to_avoid:
+        return True
+    return False
+
+
 def manage_amount(df):
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
     df['montant'].fillna(0, inplace=True)
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_increase_amount(x) else x)
 
     borne_inf = 200.0
     borne_sup = 9.99e8
