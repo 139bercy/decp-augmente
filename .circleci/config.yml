@@ -9,7 +9,7 @@ jobs:
       - restore_cache:
           keys:
             - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
-            - dependencies-master-{{ checksum "requirements.txt"}}
+            - dependencies-master-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
       - run: cp config-circleci.json config.json
       - run:
           name: Installation des requirements
@@ -76,7 +76,7 @@ jobs:
       - restore_cache:
           keys:
             - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
-            - dependencies
+            - dependencies-master-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
       - run: date +%F > date
       - restore_cache:
           keys:
@@ -121,6 +121,7 @@ workflows:
       - compute:
           requires:
             - install_requirements
+
   daily-data:
     jobs:
       - get_data
