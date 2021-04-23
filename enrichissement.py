@@ -2,12 +2,16 @@ import csv
 import json
 import os
 import pickle
-
+import logging
 import numpy as np
 import pandas as pd
 import requests
 from geopy.distance import distance, Point
 from lxml import html
+
+
+logger = logging.getLogger("main.enrichissement")
+logger.setLevel(logging.DEBUG)
 
 
 with open("config.json") as f:
@@ -55,28 +59,49 @@ def main():
         'moisNotification': 'string',
         'dureeMoisEstimee': 'string',
     }, copy=False)
-
+    logger.info("Début du traitement: Enrichissement siret")
     df = enrichissement_siret(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Enrichissement cpv")
     df = enrichissement_cpv(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Enrichissement acheteur")
     df = enrichissement_acheteur(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Reorganisation du dataframe")
     df = reorganisation(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Enrichissement geographique")
     df = enrichissement_geo(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
     df = enrichissement_type_entreprise(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
     df = apply_luhn(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
     df = enrichissement_departement(df)  # il y a des na dans departements
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Detection des accords cadre")
     df = detection_accord_cadre(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Reorganisation du datframe final")
     df = manage_column_final(df)
+    logger.info("Fin du traitement")
 
+    logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    logger.info("Fin du traitement")
 
 # Detection accord-cadre
 
@@ -89,9 +114,9 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
     # On remplace les annee nulle par 0 pour que la boucle ne plante pas. Sur ces années on ne fait pas ce traitement.
     df2.anneeNotification = np.where(df2.anneeNotification == 'nan', '0', df2.anneeNotification)
     df2.moisNotification = np.where(df2.moisNotification.isna(), '0', df2.moisNotification)
-    for annee in np.unique(df2.anneeNotification):  
+    for annee in np.unique(df2.anneeNotification):
         sub1 = df2[(df2["anneeNotification"] == annee) & (df2["moisNotification"] == "12")]
-        sub2 = df2[(df2.anneeNotification == str(int(annee)+1)) & (df2.moisNotification == '01')]
+        sub2 = df2[(df2.anneeNotification == str(int(annee) + 1)) & (df2.moisNotification == '01')]
         df_sub = pd.concat([sub1, sub2])
         liste_dataframe += [df_sub]
     return liste_dataframe
@@ -197,13 +222,13 @@ def manage_column_final(df):
                              'nature', "accord-cadrePresume", 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'codeRegionAcheteur','libelleRegionAcheteur',
+                             'codeRegionAcheteur', 'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'codeRegionEtablissement','libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
+                             'codeRegionEtablissement', 'libelleRegionEtablissement', 'libelleDepartementEtablissement', 'departementEtablissement', 'codePostalEtablissement',
                              'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -241,7 +266,9 @@ def jointure_base_departement_region():
 
 def enrichissement_departement(df):
     """Ajout des variables région et departement dans decp"""
+    logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
     df_dep_reg = jointure_base_departement_region()
+    logger.info("Fin de la jointure")
     # codePostalAcheteur pour le departement de l acheteur
     # codePostalEtablissement pour l'Etablissement
     # Creation de deux variables récupérant le numéro du departement
@@ -267,7 +294,7 @@ def enrichissement_departement(df):
 
 
 def enrichissement_type_entreprise(df):
-    print('début enrichissement_type_entreprise\n')
+    logger.info('début enrichissement_type_entreprise\n')
 
     df = df.astype({
         'id': 'string',
@@ -339,7 +366,7 @@ def enrichissement_type_entreprise(df):
     )
     df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
     del to_add
-    print('fin enrichissement_type_entreprise\n')
+    logger.info('fin enrichissement_type_entreprise\n')
     return df
 
 
@@ -369,6 +396,7 @@ def apply_luhn(df):
     df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
+    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide)))
     del df['siren1Acheteur']
     del df_SA
 
@@ -378,6 +406,7 @@ def apply_luhn(df):
     df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
+    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide)))
     del df['siren2Etablissement']
     del df_SE
 
@@ -389,6 +418,7 @@ def apply_luhn(df):
 
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
+    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
     del df["siret2Etablissement"]
     del df_SE2
 
@@ -408,21 +438,21 @@ def enrichissement_siret(df):
 
     archiveErrorSIRET = getArchiveErrorSIRET()
 
-    print("Enrichissement insee en cours...")
+    logger.info("Enrichissement insee en cours...")
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
-    print("Enrichissement insee fini")
+    logger.info("Enrichissement insee fini")
 
-    print("Enrichissement infogreffe en cours...")
+    logger.info("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
 
     del archiveErrorSIRET
-    print("enrichissement infogreffe fini")
+    logger.info("enrichissement infogreffe fini")
 
-    print("Concaténation des dataframes d'enrichissement...")
+    logger.info("Concaténation des dataframes d'enrichissement...")
     dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
     del enrichissementScrap
     del enrichissementInsee
-    print("Fini")
+    logger.info("Fini")
 
     # Ajout au df principal !
     df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
@@ -453,7 +483,7 @@ def get_siretdf_from_original_data(df):
 
 def getArchiveErrorSIRET():
     archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
-    print('Aucune archive d\'erreur')
+    logger.info('Aucune archive d\'erreur')
     return archiveErrorSIRET
 
 
