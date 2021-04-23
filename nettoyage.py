@@ -169,7 +169,7 @@ def manage_amount(df):
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
     df['montant'].fillna(0, inplace=True)
-    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
 
     borne_inf = 200.0
     borne_sup = 9.99e8
