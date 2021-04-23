@@ -189,7 +189,7 @@ def is_false_amount(x, threshold=5):
     """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999.
     Ces montants seront considérés comme faux"""
     d = [0] * 10
-    str_x = str(x).split(".")[0]
+    str_x = str(abs(int(x)))
     for c in str_x:
         d[int(c)] += 1
     for counter in d[1:]:
@@ -205,7 +205,7 @@ def manage_amount(df):
     df['montant'].fillna(0, inplace=True)
     # variable témoin pour les logs
     nb_montant_egal_zero = df.montant.value_counts()[0]
-    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
 
     logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0] - nb_montant_egal_zero))
     nb_montant_egal_zero = df.montant.value_counts()[0]
