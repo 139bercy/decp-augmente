@@ -73,35 +73,43 @@ def main():
     logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Suppression des doublons")
     df = manage_duplicates(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Déection et correction des montants aberrants")
     df = manage_amount(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Gestion des Id null")
     df = manage_missing_code(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
     df = manage_region(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
     df = manage_date(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Correction de la variable dureeMois.")
     df = correct_date(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du tritement: Imputation de la variable dureeMois")
     df = data_inputation(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Remplacement des caractères mal converti")
     # suppression des caractères mal encodés
     df = replace_char(df)
     logger.info("Fin du traitement")
+
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye', 'wb') as df_nettoye:
         pickle.dump(df, df_nettoye)
-
     df.to_csv("decp_nettoye.csv")
     logger.info("Ecriture du csv terminé")
 

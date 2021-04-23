@@ -62,33 +62,43 @@ def main():
     logger.info("Début du traitement: Enrichissement siret")
     df = enrichissement_siret(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Enrichissement cpv")
     df = enrichissement_cpv(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Enrichissement acheteur")
     df = enrichissement_acheteur(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Reorganisation du dataframe")
     df = reorganisation(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Enrichissement geographique")
     df = enrichissement_geo(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
     df = enrichissement_type_entreprise(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
     df = apply_luhn(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
     df = enrichissement_departement(df)  # il y a des na dans departements
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Detection des accords cadre")
     df = detection_accord_cadre(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Reorganisation du datframe final")
     df = manage_column_final(df)
     logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     logger.info("Fin du traitement")
