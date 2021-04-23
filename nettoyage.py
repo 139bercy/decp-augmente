@@ -155,7 +155,7 @@ def is_false_amount(x, threshold=5):
     """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999.
     Ces montants seront considérés comme faux"""
     d = [0] * 10
-    str_x = str(x).split(".")[0]
+    str_x = str(abs(int(x)))
     for c in str_x:
         d[int(c)] += 1
     for counter in d[1:]:
@@ -169,7 +169,7 @@ def manage_amount(df):
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
     df['montant'].fillna(0, inplace=True)
-    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else x)
+    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
 
     borne_inf = 200.0
     borne_sup = 9.99e8
