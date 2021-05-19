@@ -116,7 +116,9 @@ workflows:
           requires:
             - install_requirements
             - get_data
-
+      - send:
+          requires:
+            - compute
   daily-data:
     jobs:
       - get_data
