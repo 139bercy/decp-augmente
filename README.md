@@ -24,6 +24,7 @@ Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
        <td>tqdm</td>
        <td>lxml</td>
        <td>requests</td>
+       <td>logging</td>
        <td>pickle (optionel)</td>
    </tr>
    <tr>
@@ -36,6 +37,7 @@ Une version mise à jour est en implémentation pour Python 3.8 et Syper 4.
        <td>colorama</td>
        <td>math</td>
        <td>bokeh</td>
+       <td></td>
    </tr>
 </table>
 
@@ -48,8 +50,10 @@ https://www.data.gouv.fr/fr/datasets/fichiers-consolides-des-donnees-essentielle
 Plusieurs données sous format csv - xlsx sont nécessaires afin d'enrichir les données :
 - code-insee-postaux-geoflar.csv : https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/export/?flg=fr
 - cpv_2008_ver_2013.xlsx : https://simap.ted.europa.eu/fr/web/simap/cpv
-- departements-francais.csv : https://www.regions-et-departements.fr/departements-francais
 - StockEtablissement_utf8.csv : https://www.data.gouv.fr/fr/datasets/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/
+- StockUniteLegale_utf8.csv : https://www.data.gouv.fr/fr/datasets/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/
+- departement2020.csv : https://www.insee.fr/fr/information/4316069
+- region2020.csv : https://www.insee.fr/fr/information/4316069
 
 #### GEOJSON
 Pour réaliser la représentation graphique des données, ségmentée par régions et départements, certaines donneés en geojson sont récupérées directement via leur URL.
@@ -85,6 +89,7 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Mise en forme et correction des données temporelles (date/durée)
 - <b>Imputation des montants</b> en utilisant la médiane stratifiée (le plus possible : Région, code CPV, forme du marché), et création d’une colonne permettant d’identifier les montants imputés
 - Identification et <b>rectification des durées</b> (en mois) exprimées en jours
+- Imputation des durées encore fausses après conversion en mois. Utilisation de la médiane des durées, en fonction des code CPV 
 
 ### Enrichissement des données 
 - Enrichissement des données des acheteurs et des entreprises via le code SIRET/SIREN (et dans le pire des cas grâce à la dénomination sociale des entreprises)
