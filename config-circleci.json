@@ -7,5 +7,7 @@
 	"cpv_2008_ver_2013" : "cpv_2008_ver_2013.xlsx",  
 	"base_geoflar" : "geoflar-communes-2015.csv", 
 	"departements-francais" : "departement2020.csv",
-	"region-fr" : "region2020.csv"
+	"region-fr" : "region2020.csv",
+	"commune-fr": "commune2021.csv",
+	"canton-fr": "canton2021.csv"
 }
