@@ -96,15 +96,13 @@ def main():
     logger.info("Fin du traitement")
 
 
-# Detection accord-cadre
-
 def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
     """En entrée: Dataframe avec une colonne anneeNotification
     En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
     df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
     liste_dataframe = []
     # On remplace les annees nulles par 0 pour que la boucle ne plante pas.
-    # Sur année = 0, le dataframe ne contiendra que le mois de decembre. 
+    # Sur année = 0, le dataframe ne contiendra que le mois de decembre.
     df2.anneeNotification = np.where(df2.anneeNotification == 'nan', '0', df2.anneeNotification)
     df2.moisNotification = np.where(df2.moisNotification.isna(), '0', df2.moisNotification)
     for annee in np.unique(df2.anneeNotification):
@@ -115,7 +113,7 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
     return liste_dataframe
 
 
-def detection_accord_cadre_without_date(df):
+def detection_accord_cadre_without_date(df, compteur):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
     On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois.
@@ -135,12 +133,15 @@ def detection_accord_cadre_without_date(df):
         accord_presume = False
         if nombre_titulaire > 1:
             accord_presume = True
-        L_data_fram += [[index[i][0], index[i][1], index[i][2], nombre_titulaire, str(accord_presume)]]
+        compteur += 1
+        L_data_fram += [[index[i][0], index[i][1], index[i][2], nombre_titulaire, str(accord_presume), compteur]]
+        # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
     data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
                                                         "montantOriginal",
                                                         "dureeMois",
                                                         "nombreTitulaireSurMarchePresume",
-                                                        "accord-cadrePresume"])
+                                                        "accord-cadrePresume",
+                                                        "idMarche"])
 
     df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche",
                                                                      "montantOriginal",
@@ -158,22 +159,23 @@ def detection_accord_cadre_without_date(df):
                                       "NC", df_to_output["nature"])
     df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE",
                                                    df_to_output["accord-cadrePresume"], "True")
-    return df_to_output
+    return df_to_output, compteur
 
 
 def detection_accord_cadre(df):
     """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
-    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord induit par la détection par année.
-    On compare les deux nombres de titulaires et on conserve le plus immportant """
+    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
+    On compare les deux nombres de titulaires et on conserve le plus important """
+    temoin_idmarche = 0
     # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
     dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
     dataframe_mois = subset_liste_dataframe_dec_jan(df)
     # On detecte les accord-cadre sur les différents dataframe ci dessus
     for i in range(len(dataframe_annee)):
-        dataframe_annee[i] = detection_accord_cadre_without_date(dataframe_annee[i])
+        dataframe_annee[i], temoin_idmarche = detection_accord_cadre_without_date(dataframe_annee[i], temoin_idmarche)
         # Certains Df_mois sont vides d'ou la disjonction de cas
         if len(dataframe_mois[i]) > 0:
-            dataframe_mois[i] = detection_accord_cadre_without_date(dataframe_mois[i])
+            dataframe_mois[i], temoin_idmarche = detection_accord_cadre_without_date(dataframe_mois[i], temoin_idmarche)
         else:
             dataframe_mois[i]["nombreTitulaireSurMarchePresume"] = ""
             dataframe_mois[i]["accord-cadrePresume"] = ""
@@ -188,8 +190,10 @@ def detection_accord_cadre(df):
     for identifiant in sub_datamois.id.unique():
         titulaire_annee = max(dataframe_annee[dataframe_annee.id == identifiant]["nombreTitulaireSurMarchePresume"])
         titulaire_mois = max(dataframe_mois[dataframe_mois.id == identifiant]["nombreTitulaireSurMarchePresume"])
+        id_add = max(dataframe_mois.idMarche)
         # On localise les lignes concernées par l'identifiant et on remplace par le maximum du nombre de titulaire
         dataframe_annee.loc[dataframe_annee.id == identifiant, "nombreTitulaireSurMarchePresume"] = max(titulaire_annee, titulaire_mois)
+        dataframe_annee.loc[dataframe_annee.id == identifiant, "idMarche"] = id_add + 1
     # Actualisation de la colonne booléenne
     dataframe_annee.loc[dataframe_annee.nombreTitulaireSurMarchePresume > 1, "accord-cadrePresume"] = True
     # Calcul de la colonne montantCalcule
@@ -204,7 +208,7 @@ def manage_column_final(df):
         "categorieEntreprise": "categorieEtablissement"
     })
     # Réorganisation finale 'codeRegionAcheteur'
-    df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
+    df = df.reindex(columns=['id', 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
