@@ -43,28 +43,27 @@ jobs:
       docker:
         - image: 139bercy/decp-rama
       steps:
+        - checkout
         - run: date +%F > date
+        - run:
+            name: Condition pour les branches
+            command: |
+              if [ "$CIRCLE_BRANCH" != "master" ]; then
+                  if [ $(git diff --name-only master..Add_Canton | grep "get-data.sh" | wc -l) = 0 ]; then
+                    commit_id_head=$(git log -n1 --format=format:"%H")
+                    commit_id_head1=$(git log -n2 --format=format:"%H" | tail -1)
+                    if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data.sh" | wc -l) = 0 ]; then
+                      circleci-agent step halt
+                    fi
+                  fi
+              fi
         - run:
             name: Récupération des données utiles
             no_output_timeout: 1h
             command: |
-              mkdir data && cd data
-              wget 'https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O geoflar-communes-2015.csv
-              #wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
-              wget https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip
-              unzip cpv_2008_xls.zip
-              wget https://www.insee.fr/fr/statistiques/fichier/4316069/departement2020-csv.zip
-              unzip departement2020-csv.zip
-              wget https://www.insee.fr/fr/statistiques/fichier/4316069/region2020-csv.zip
-              unzip region2020-csv.zip
-              wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
-              unzip StockEtablissement_utf8.zip
-              wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip
-              unzip StockUniteLegale_utf8.zip
-              wget https://www.data.gouv.fr/fr/datasets/r/16962018-5c31-4296-9454-5998585496d2 -O decp.json
-              ls
+              bash get-data.sh
         - save_cache:
-           key: data-input-{{ checksum "date" }}
+           key: data-input-{{ checksum "date" }}-{{ checksum "get-data.sh" }}
            paths:
              - "data"
 
@@ -80,7 +79,7 @@ jobs:
       - run: date +%F > date
       - restore_cache:
           keys:
-            - data-input-{{ checksum "date" }}
+            - data-input-{{ checksum "date" }}-{{ checksum "get-data.sh" }}
       - run:
           name: Traitement des données
           no_output_timeout: 2h
@@ -111,10 +110,13 @@ workflows:
   version: 2
   main:
     jobs:
+      - get_data
       - install_requirements
       - compute:
           requires:
             - install_requirements
+            - get_data
+
   daily-data:
     jobs:
       - get_data
