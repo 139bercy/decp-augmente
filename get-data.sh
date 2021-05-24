@@ -9,8 +9,8 @@ wget https://www.insee.fr/fr/statistiques/fichier/4316069/region2020-csv.zip
 unzip region2020-csv.zip
 wget https://www.insee.fr/fr/statistiques/fichier/5057840/commune2021-csv.zip
 unzip commune2021-csv.zip
-wget https://www.insee.fr/fr/statistiques/fichier/5057840/canton2021-csv.zip
-unzip canton2021-csv.zip
+wget https://www.insee.fr/fr/statistiques/fichier/5057840/arrondissement2021-csv.zip
+unzip arrondissement2021-csv.zip
 wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
 unzip StockEtablissement_utf8.zip
 wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip

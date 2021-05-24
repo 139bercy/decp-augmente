@@ -83,8 +83,8 @@ def main():
     df = enrichissement_departement(df)  # il y a des na dans departements
     logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Ajout des codes/libelles des cantons pour les acheteurs et les etablissements")
-    df = enrichissement_canton(df)  # il y a des na dans departements
+    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
+    df = enrichissement_arrondissement(df)  # il y a des na dans departements
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Detection des accords cadre")
@@ -222,14 +222,14 @@ def manage_column_final(df):
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
                              'codeRegionAcheteur', 'libelleRegionAcheteur',
                              'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
-                             'libelleCantonAcheteur', 'codeCantonAcheteur',
+                             'libelleArrondissementAcheteur', 'codeArrondissementAcheteur',
                              'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
 
                              'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
                              "categorieEtablissement", 'denominationSocialeEtablissement',
                              'codeRegionEtablissement', 'libelleRegionEtablissement',
                              'libelleDepartementEtablissement', 'departementEtablissement',
-                             'libelleCantonEtablissement', 'codeCantonEtablissement',
+                             'libelleArrondissementEtablissement', 'codeArrondissementEtablissement',
                              'codePostalEtablissement', 'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
                              'codeTypeEtablissement',
                              'superficieCommuneEtablissement', 'populationCommuneEtablissement',
@@ -293,38 +293,36 @@ def enrichissement_departement(df):
     return df
 
 
-def enrichissement_canton(df):
-    """Ajout du code Canton à partir du code commune et du libelle du Canton à partir de son code"""
-    df = get_code_canton(df)
-    df = get_libelle_canton(df)
+def enrichissement_arrondissement(df):
+    """Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code"""
+    df = get_code_arrondissement(df)
+    df = get_libelle_arrondissement(df)
     return df
 
 
-def get_code_canton(df):
-    """Ajout de la colonne code canton à partir du code commune"""
+def get_code_arrondissement(df):
+    """Ajout de la colonne code Arrondissement à partir du code commune"""
     path_to_commune = os.path.join(path_to_data, conf["commune-fr"])
-    commune = pd.read_csv(path_to_commune, sep=",", usecols=['COM', 'CAN'], dtype={"COM": str, "CAN": str})
+    commune = pd.read_csv(path_to_commune, sep=",", usecols=['COM', 'ARR'], dtype={"COM": str, "ARR": str})
     df = pd.merge(df, commune, how="left", left_on="codeCommuneAcheteur", right_on="COM", copy=False)
     df = df.drop(["COM"], axis=1)
-    df = df.rename(columns={"CAN": "codeCantonAcheteur"})
+    df = df.rename(columns={"ARR": "codeArrondissementAcheteur"})
     df = pd.merge(df, commune, how="left", left_on="codeCommuneEtablissement", right_on="COM", copy=False)
     df = df.drop(["COM"], axis=1)
-    df = df.rename(columns={"CAN": "codeCantonEtablissement"})
+    df = df.rename(columns={"ARR": "codeArrondissementEtablissement"})
     return df
 
 
-def get_libelle_canton(df):
-    """Ajout de la colonne libelle canton à partir du code canton"""
-    path_to_canton = os.path.join(path_to_data, conf["canton-fr"])
-    canton = pd.read_csv(path_to_canton, sep=",", usecols=['CAN', 'LIBELLE'], dtype={"CAN": str, "LIBELLE": str})
-    # Attention, les canton des departement < 9 n'ont que 3 chiffres
-    canton.CAN = np.where(len(canton.CAN) == 3, "0" + canton.CAN, canton.CAN)
-    df = pd.merge(df, canton, how="left", left_on="codeCantonAcheteur", right_on="CAN", copy=False)
-    df = df.drop(["CAN"], axis=1)
-    df = df.rename(columns={"LIBELLE": "libelleCantonAcheteur"})
-    df = pd.merge(df, canton, how="left", left_on="codeCantonEtablissement", right_on="CAN", copy=False)
-    df = df.drop(["CAN"], axis=1)
-    df = df.rename(columns={"LIBELLE": "libelleCantonEtablissement"})
+def get_libelle_arrondissement(df):
+    """Ajout de la colonne libelle Arrondissement à partir du code Arrondissement"""
+    path_to_arrondissement = os.path.join(path_to_data, conf["arrondissement-fr"])
+    arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
+    df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
+    df = df.drop(["ARR"], axis=1)
+    df = df.rename(columns={"LIBELLE": "libelleArrondissementAcheteur"})
+    df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementEtablissement", right_on="ARR", copy=False)
+    df = df.drop(["ARR"], axis=1)
+    df = df.rename(columns={"LIBELLE": "libelleArrondissementEtablissement"})
     return df
 
 
