@@ -15,5 +15,6 @@ wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
 unzip StockEtablissement_utf8.zip
 wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip
 unzip StockUniteLegale_utf8.zip
-wget https://www.data.gouv.fr/fr/datasets/r/16962018-5c31-4296-9454-5998585496d2 -O decp.json
+# Supprimer les archives que l'on a extraite
+rm -rf *.zip
 ls
