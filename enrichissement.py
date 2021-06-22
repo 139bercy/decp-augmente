@@ -303,8 +303,10 @@ def enrichissement_arrondissement(df):
 def get_code_arrondissement(df):
     """Ajout de la colonne code Arrondissement à partir du code commune"""
     path_to_commune = os.path.join(path_to_data, conf["commune-fr"])
-    commune = pd.read_csv(path_to_commune, sep=",", usecols=['COM', 'ARR'], dtype={"COM": str, "ARR": str})
-    df = pd.merge(df, commune, how="left", left_on="codeCommuneAcheteur", right_on="COM", copy=False)
+    commune = pd.read_csv(path_to_commune, sep=",", usecols=['TYPECOM', 'COM', 'ARR'], dtype={"COM": str, "ARR": str})
+    commune = commune[commune.TYPECOM == "COM"]
+    commune.drop(['TYPECOM'], axis=1)
+    df = df.merge(commune, how="left", left_on="codeCommuneAcheteur", right_on="COM", copy=False)
     df = df.drop(["COM"], axis=1)
     df = df.rename(columns={"ARR": "codeArrondissementAcheteur"})
     df = pd.merge(df, commune, how="left", left_on="codeCommuneEtablissement", right_on="COM", copy=False)
