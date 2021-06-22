@@ -82,7 +82,7 @@ def main():
     logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
     df = enrichissement_departement(df)  # il y a des na dans departements
     logger.info("Fin du traitement")
-    
+
     logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
     df = enrichissement_arrondissement(df)  # il y a des na dans departements
     logger.info("Fin du traitement")

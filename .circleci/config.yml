@@ -39,7 +39,7 @@ jobs:
             PYTHON_FILE="$(ls *.py)"
             pylint $PYTHON_FILE
 
-  get_data:
+  get_data_daily:
       docker:
         - image: 139bercy/decp-rama
       steps:
@@ -49,10 +49,10 @@ jobs:
             name: Condition pour les branches
             command: |
               if [ "$CIRCLE_BRANCH" != "master" ]; then
-                  if [ $(git diff --name-only master..Add_Canton | grep "get-data.sh" | wc -l) = 0 ]; then
+                  if [ $(git diff --name-only master..${CIRCLE_BRANCH} | grep "get-data-daily.sh" | wc -l) = 0 ]; then
                     commit_id_head=$(git log -n1 --format=format:"%H")
                     commit_id_head1=$(git log -n2 --format=format:"%H" | tail -1)
-                    if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data.sh" | wc -l) = 0 ]; then
+                    if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data-daily.sh" | wc -l) = 0 ]; then
                       circleci-agent step halt
                     fi
                   fi
@@ -61,11 +61,39 @@ jobs:
             name: Récupération des données utiles
             no_output_timeout: 1h
             command: |
-              bash get-data.sh
+              bash get-data-daily.sh
         - save_cache:
-           key: data-input-{{ checksum "date" }}-{{ checksum "get-data.sh" }}
+           key: data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
            paths:
              - "data"
+
+  get_data_weekly:
+     docker:
+       - image: 139bercy/decp-rama
+     steps:
+       - checkout
+       - run: date +%G-%V > date
+       - run:
+           name: Condition pour les branches
+           command: |
+             if [ "$CIRCLE_BRANCH" != "master" ]; then
+                 if [ $(git diff --name-only master..${CIRCLE_BRANCH} | grep "get-data-weekly.sh" | wc -l) = 0 ]; then
+                   commit_id_head=$(git log -n1 --format=format:"%H")
+                   commit_id_head1=$(git log -n2 --format=format:"%H" | tail -1)
+                   if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data-weekly.sh" | wc -l) = 0 ]; then
+                     circleci-agent step halt
+                   fi
+                 fi
+             fi
+       - run:
+           name: Récupération des données utiles
+           no_output_timeout: 1h
+           command: |
+             bash get-data-weekly.sh
+       - save_cache:
+          key: data-input-weekly-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          paths:
+            - "data"
 
   compute:
     docker:
@@ -77,9 +105,13 @@ jobs:
             - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "config-circleci.json"}}
             - dependencies
       - run: date +%F > date
+      - run: date +%G-%V > date-weekly
       - restore_cache:
           keys:
-            - data-input-{{ checksum "date" }}-{{ checksum "get-data.sh" }}
+            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+      - restore_cache:
+          keys:
+            - data-input-weekly-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
       - run:
           name: Traitement des données
           no_output_timeout: 2h
@@ -118,21 +150,34 @@ workflows:
   version: 2
   main:
     jobs:
-      - get_data
+      - get_data_daily
+      - get_data_weekly
       - install_requirements
       - compute:
           requires:
             - install_requirements
-            - get_data
+            - get_data_daily
+            - get_data_weekly
       - send:
           requires:
             - compute
+
   daily-data:
     jobs:
-      - get_data
+      - get_data_daily
     triggers:
       - schedule:
           cron: 0 4 * * 1-6
+          filters:
+            branches:
+              only:
+                - master
+  weekly-data:
+    jobs:
+      - get_data_weekly
+    triggers:
+      - schedule:
+          cron: 0 4 * * 1
           filters:
             branches:
               only:
