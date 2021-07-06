@@ -88,7 +88,7 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Detection des accords cadre")
-    #df = detection_accord_cadre(df)
+    # df = detection_accord_cadre(df)
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Reorganisation du dataframe final")
