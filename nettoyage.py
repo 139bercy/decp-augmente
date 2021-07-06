@@ -415,17 +415,17 @@ def regroupement_marche_complet(df):
     les marchés en fonction de leur objets/date de publication des données."""
     # Creation du sub DF necessaire
     df_intermediaire = df[["objet", "datePublicationDonnees", "id"]]
-    #df_intermediaire["index_source"] = df_intermediaire.index #Conservation des index
+    # df_intermediaire["index_source"] = df_intermediaire.index #Conservation des index
     # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
                                                       "datePublicationDonnees"])["id"])
     # Initialisation du resultat sous forme de liste
-    index = df_group.index #df_group a un multi_index objet-datePublicationDonnees
+    index = df_group.index  # df_group a un multi_index objet-datePublicationDonnees
     df_to_update = pd.DataFrame()
     for i in range(len(df_group)):
-        ids_to_modify = df_group[1].iloc[i]
-        new_index = list(ids_to_modify.index)
-        new_df = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])
+        ids_to_modify = df_group[1].iloc[i]  # dataframe contenant les id d'un meme marche
+        new_index = list(ids_to_modify.index)  # Contient les index des lignes d'un meme marché. Utile pour le update
+        new_df = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])  # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         df_to_update = pd.concat([df_to_update, new_df])
         if len(df_to_update) > 50000: #Arbitraire, le tmps de la fonction concat est proportionnel à la taille. 
             df.update(df_to_update)
