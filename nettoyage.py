@@ -20,31 +20,11 @@ def main():
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
-    df = json_normalize(data['marches'])
 
-    df = df.astype({
-        'id': 'string',
-        'source': 'string',
-        'uid': 'string',
-        'uuid': 'string',
-        '_type': 'string',
-        'objet': 'string',
-        'codeCPV': 'string',
-        'lieuExecution.code': 'string',
-        'lieuExecution.typeCode': 'string',
-        'lieuExecution.nom': 'string',
-        'dureeMois': 'int64',
-        'montant': 'float64',
-        'formePrix': 'string',
-        'titulaires': 'object',
-        'modifications': 'object',
-        'nature': 'string',
-        'autoriteConcedante.id': 'string',
-        'autoriteConcedante.nom': 'string',
-        'acheteur.id': 'string',
-        'acheteur.nom': 'string',
-        'donneesExecution': 'string'
-    }, copy=False)
+    logger.info("Début du traitement: Conversion des données en pandas")
+    df = manage_modifications(data)
+    logger.info("Fin du traitement")
+
     logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
     logger.info("Fin du traitement")
@@ -149,7 +129,7 @@ def manage_duplicates(df):
     nb_ligne_apres_suppresion = len(df)
 
     # Ecriture dans les logs
-    logger.info("Nombre de ligne doublons supprimées: {}".format(nb_ligne_avant_suppression - nb_ligne_apres_suppresion))
+    logger.info("Nombre de lignes doublons supprimées: {}".format(nb_ligne_avant_suppression - nb_ligne_apres_suppresion))
 
     # Correction afin que ces variables soient représentées identiquement
     df['formePrix'] = np.where(df['formePrix'].isna(), np.nan, df['formePrix'])
@@ -424,20 +404,21 @@ def recuperation_colonne_a_modifier(data, L_indice):
     sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification} """
     L_colonne = []
     colonne_to_modify = {}
-    for indice in L_indice: # Pour les marchés subissant au moins une modification
+    for indice in L_indice:
         colonne_modifiees = list(data["marches"][indice]["modifications"][0].keys())
         for col in colonne_modifiees:
+            if "Modification" not in col:
+                col += "Modification"
             if col not in L_colonne:
-                if "Modification" not in col:
-                    col += "Modification" #Normalisation du nom
                 L_colonne += [col]
     for col in L_colonne:
-        name_col = col.replace("Modification", "")
-        colonne_to_modify[col] = name_col
+        if "Modification" in col and col != "objetModification":
+            name_col = col.replace("Modification", "")
+            colonne_to_modify[col] = name_col
+        else:
+            colonne_to_modify[col] = col
     return colonne_to_modify
-#A incorporer dans le main et non pas ici
-L_indice = indice_marche_avec_modification(data)
-dict_modification = recuperation_colonne_a_modifier(data, L_indice)
+
 ## Objectif Numéro 2: Ajouter les modifications présentes dans le json à la clef modification 
 
 def prise_en_compte_modifications(df, col_to_normalize = 'modifications'):
@@ -479,61 +460,77 @@ def split_dataframe(df, sub_data, modalite):
     marche = marche.sort_values(by = 'id')
     #Second dataframe: Dans le df complet, récupération des lignes correspondant au marché récupéré
     date = marche.datePublicationDonnees.iloc[0]
-    lieu = marche["lieuExecution.code"].iloc[0]
     # A concaténer ? 
     marche_init = df[df.objet == modalite]
     marche_init = marche_init[marche_init.datePublicationDonnees == date]
-    marche_init = marche_init[marche_init["lieuExecution.code"] == lieu]
     return (marche, marche_init)
     
 
 # Partie fusion des datas modifiées
 def fusion_source_modification(raw, df_source, col_modification, dict_modification):
-    """ Permet de fusionner les colonnes xxxModification et leurs colonnes respectives"""
+    """ Permet de fusionner les colonnes xxxModification et sa colonne """
     for col in col_modification:
-        # Différenciation des cas car pour l'objet du marché, on veut ajouter la raison de la mise à jour et non pas juste remplacer
-        if col == "objetModification":
-            #Le try except est là pour les cas ou acheteur.id n'est pas renseigne
-            try:
-                df_source.objet = np.where(df_source["acheteur.id"] == raw["acheteur.id"], 
-                                                df_source.objet.iloc[0] + " Mise à jour: {}".format(raw[col]), df_source.objet) #Forme balisée afin de pouvoir split au besoin dans les traitements futurs
-            except:
-                df_source.objet = np.where(df_source["montant"] == raw["montant"], 
-                                                df_source.objet.iloc[0] + " Mise à jour: {}".format(raw[col]), df_source.objet)
-        elif col == "titulairesModification":
-            #Il faut remplacer l'ex valeur par la nouvelle. Traitement identique que le else, mais l'objet est dfférent (dictionnaire et non pas juste une entité)
-            #TODO
-            #print(2)
-            pass
-        else:
-            col_init = dict_modification[col]
-            try:
-                df_source[col_init] = np.where(df_source["acheteur.id"] == raw["acheteur.id"], raw[col], df_source[col_init])
-            except:
-                df_source[col_init] = np.where(df_source["montant"] == raw["montant"], raw[col], df_source[col_init])
-    return df_source
+        col_init = dict_modification[col]
+        df_source[col_init].loc[raw.name] = raw[col]
+        return df_source
 
 #Fonction Finale
 
 def regroupement_marche(df, dict_modification):
-    """Permet de ne conserver qu'un seul des marchés si modification il y a"""
-    df["idMarche_Test"] = ""
+    """Permet de recoder la variable identifiant. 
+    Actuellement: 1 identifiant par déclaration (marché initial / modification sur marché/ un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprise)
+    En sortie: idMarche correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une modification"""
+    df["idMarcheM"] = ""
     col_modification = list(dict_modification.keys())
     subdata_modif = df[df.booleanModification == 1] # Tout les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
+    df_to_concatene = pd.DataFrame() #df vide pour la concaténation
+    logger.info("Au total, {} marchés sont concernés par au moins une modification".format(len(liste_objet)))
     for objet_marche in liste_objet:
         #Récupération du dataframe modification et du dataframe source
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         for j in range(len(marche)):
-            raw = marche.iloc[0]
+            raw = marche.iloc[j]
             marche_init = fusion_source_modification(raw, marche_init, col_modification, dict_modification)
-        marche_init["idMarche_Test"] = marche.iloc[-1].id
-        #Si la fonction se terminait ici, alors le temps d'éxécution serait d'neviron 0,8s pour 30 marchés. Soit environ 15min
-        df.drop(list(marche_init.index), axis=0, inplace=True) #Avec ces deux lignes supplémentaires, on passe à 45min à optimiser/Réussir à tout faire dans le df directement
-        df = pd.concat([df, marche_init])
-    df.reset_index(drop=True, inplace=True)
+        marche_init["idMarcheM"] = marche.iloc[-1].id
+        df_to_concatene = pd.concat([df_to_concatene, marche_init], copy = False)
+    df.update(df_to_concatene)
+    #Attention aux id. 
+    df.rename(columns = {"id": "id_source"}, inplace = True)
+    df["id"] = np.where(df.idMarcheM != "", df.idMarcheM, df.id_source)
     return df
 
+def manage_modifications(data):
+    """Conversion du json en pandas et incorporation des modifications"""
+    L_indice = indice_marche_avec_modification(data)
+    dict_modification = recuperation_colonne_a_modifier(data, L_indice)
+    df = json_normalize(data['marches'])
+    df = df.astype({
+        'id': 'string',
+        'source': 'string',
+        'uid': 'string',
+        'uuid': 'string',
+        '_type': 'string',
+        'objet': 'string',
+        'codeCPV': 'string',
+        'lieuExecution.code': 'string',
+        'lieuExecution.typeCode': 'string',
+        'lieuExecution.nom': 'string',
+        'dureeMois': 'int64',
+        'montant': 'float64',
+        'formePrix': 'string',
+        'titulaires': 'object',
+        'modifications': 'object',
+        'nature': 'string',
+        'autoriteConcedante.id': 'string',
+        'autoriteConcedante.nom': 'string',
+        'acheteur.id': 'string',
+        'acheteur.nom': 'string',
+        'donneesExecution': 'string'
+    }, copy=False)
+    df = prise_en_compte_modifications(df)
+    df = regroupement_marche(df, dict_modification)
+    return df
 # Fin de la Review
 
 

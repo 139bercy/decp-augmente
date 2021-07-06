@@ -168,7 +168,7 @@ def detection_accord_cadre_without_date(df, compteur):
 
 def detection_accord_cadre(df):
     """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
-    Ensuite on detecte, toujours sans la date, sur la section Decemre-Janvier pour prendre en compte l'effet de bord.
+    Ensuite on detecte, toujours sans la date, sur la section Decembre-Janvier pour prendre en compte l'effet de bord.
     On compare les deux nombres de titulaires et on conserve le plus important """
     temoin_idmarche = 0
     # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
@@ -212,7 +212,7 @@ def manage_column_final(df):
         "categorieEntreprise": "categorieEtablissement"
     })
     # Réorganisation finale 'codeRegionAcheteur'
-    df = df.reindex(columns=['id', 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
+    df = df.reindex(columns=['id', "id_source", 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
                              'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
