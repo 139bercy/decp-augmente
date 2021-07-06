@@ -116,7 +116,7 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
         liste_dataframe += [df_sub]
     return liste_dataframe
 
-
+# On suppose que id permet d'identifier un marché
 def detection_accord_cadre_without_date(df, compteur):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
@@ -212,12 +212,12 @@ def manage_column_final(df):
         "categorieEntreprise": "categorieEtablissement"
     })
     # Réorganisation finale 'codeRegionAcheteur'
-    df = df.reindex(columns=['id', 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
+    df = df.reindex(columns=['id', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
-                             'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
+                             'montantOriginal', 'montantCalcule', 'formePrix',
                              'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution", "libelleRegionExecution",
-                             'nature', "accord-cadrePresume", 'procedure',
+                             'nature', 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
                              'codeRegionAcheteur', 'libelleRegionAcheteur',
