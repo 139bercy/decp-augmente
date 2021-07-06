@@ -402,11 +402,36 @@ def data_inputation(df):
 
 
 def replace_char(df):
-    """Fonction pour mettre en qualité le champ objetMarche"""
+    """Fonction pour mettre en qualité le champ objet"""
     # Remplacement brutal du caractère (?) par un espace
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
     return df
 
+# Pour la PR
+# Cette fonction doit s'insérer après le traitement de la branche Add feature modifications
+# C'est pour cela qu'elle n'a pas été intégré dans le main
+def regroupement_marche_complet(df):
+    """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant 
+    les marchés en fonction de leur objets/date de publication des données."""
+    # Creation du sub DF necessaire
+    df_intermediaire = df[["objet", "datePublicationDonnees", "id"]]
+    #df_intermediaire["index_source"] = df_intermediaire.index #Conservation des index
+    # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais idMarche ne l'est pas non plus.
+    df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
+                                                      "datePublicationDonnees"])["id"])
+    # Initialisation du resultat sous forme de liste
+    index = df_group.index #df_group a un multi_index objet-datePublicationDonnees
+    df_to_update = pd.DataFrame()
+    for i in range(len(df_group)):
+        ids_to_modify = df_group[1].iloc[i]
+        new_index = list(ids_to_modify.index)
+        new_df = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])
+        df_to_update = pd.concat([df_to_update, new_df])
+        if len(df_to_update) > 50000: #Arbitraire, le tmps de la fonction concat est proportionnel à la taille. 
+            df.update(df_to_update)
+            df_to_update = pd.DataFrame()
+    df.update(df_to_update)
+    return df
 
 if __name__ == "__main__":
     main()
