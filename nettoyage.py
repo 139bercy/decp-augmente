@@ -187,14 +187,15 @@ def manage_amount(df):
     nb_montant_egal_zero = df.montant.value_counts()[0]
     borne_inf = 200.0
     borne_sup = 9.99e8
+    df["montant"] = df["montant"] / df["nombreTitulaireSurMarchePresume"]
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
     logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_inf))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
     logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
-
+    df.rename(columns = {"montant": "montantCalcule"})
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
+    df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, 'True', 'False')
     # Ecriture dans la log
     logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
     return df
@@ -421,17 +422,29 @@ def regroupement_marche_complet(df):
                                                       "datePublicationDonnees"])["id"])
     # Initialisation du resultat sous forme de liste
     index = df_group.index  # df_group a un multi_index objet-datePublicationDonnees
+    df_titulaires = pd.DataFrame()
     df_to_update = pd.DataFrame()
     for i in range(len(df_group)):
         ids_to_modify = df_group[1].iloc[i]  # dataframe contenant les id d'un meme marche
         new_index = list(ids_to_modify.index)  # Contient les index des lignes d'un meme marché. Utile pour le update
         new_df = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])  # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
+        new_df_titulaires = pd.DataFrame(len(new_index)*[len(new_index)], index=new_index, columns = ["nombreTitulaireSurMarchePresume"])
         df_to_update = pd.concat([df_to_update, new_df])
+        df_titulaires = pd.concat([df_titulaires, new_df_titulaires])
         if len(df_to_update) > 50000: #Arbitraire, le tmps de la fonction concat est proportionnel à la taille. 
             df.update(df_to_update)
             df_to_update = pd.DataFrame()
+    df = df.merge(df_titulaires, how='left', left_index=True, right_index=True)
     df.update(df_to_update)
     return df
+
+import time
+t1 = time.time()
+df = regroupement_marche_complet(df)
+t2 = time.time()
+print((t2-t1)/60)
+
+
 
 if __name__ == "__main__":
     main()
