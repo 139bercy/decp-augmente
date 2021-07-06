@@ -438,13 +438,6 @@ def regroupement_marche_complet(df):
     df.update(df_to_update)
     return df
 
-import time
-t1 = time.time()
-df = regroupement_marche_complet(df)
-t2 = time.time()
-print((t2-t1)/60)
-
-
 
 if __name__ == "__main__":
     main()
