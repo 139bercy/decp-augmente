@@ -198,7 +198,7 @@ def manage_amount(df):
     logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
     df = df.rename(columns = {"montant": "montantCalcule"})
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, 'True', 'False')
+    df['montantEstime'] = np.where(df['montantCalcule'] != df.montantOriginal, 'True', 'False')
     # Ecriture dans la log
     logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
     return df
