@@ -46,6 +46,9 @@ def main():
         'acheteur.nom': 'string',
         'donneesExecution': 'string'
     }, copy=False)
+
+    df = regroupement_marche_complet(df)
+
     logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
     logger.info("Fin du traitement")
