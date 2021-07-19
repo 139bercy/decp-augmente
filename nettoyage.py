@@ -47,7 +47,9 @@ def main():
         'donneesExecution': 'string'
     }, copy=False)
 
+    logger.info("Début du traitement: Gestion des identifiants marché")
     df = regroupement_marche_complet(df)
+    logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
@@ -190,7 +192,7 @@ def manage_amount(df):
     nb_montant_egal_zero = df.montant.value_counts()[0]
     borne_inf = 200.0
     borne_sup = 9.99e8
-    df["montant"] = df["montant"] / df["nombreTitulaireSurMarchePresume"]
+    df["montant"] = df["montant"] / df["nbTitulairesSurCeMarche"]
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
     logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_inf))
     nb_montant_egal_zero = df.montant.value_counts()[0]
@@ -198,9 +200,9 @@ def manage_amount(df):
     logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
     df = df.rename(columns = {"montant": "montantCalcule"})
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montantCalcule'] != df.montantOriginal, 'True', 'False')
+    df['montantEstime'] = np.where(df['montantCalcule'] != df.montantOriginal, True, False)
     # Ecriture dans la log
-    logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
+    logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(sum(df.montantEstime)))
     return df
 
 
@@ -360,15 +362,15 @@ def manage_date(df):
 def correct_date(df):
     """Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois"""
     # On cherche les éventuelles erreurs mois -> jours
-    mask = ((df['montant'] == df['dureeMois'])
-            | (df['montant'] / df['dureeMois'] < 100)
-            | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
-            | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
-            | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
-            | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
+    mask = ((df['montantCalcule'] == df['dureeMois'])
+            | (df['montantCalcule'] / df['dureeMois'] < 100)
+            | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
+            | ((df['dureeMois'] == 30) & (df['montantCalcule'] < 200000))
+            | ((df['dureeMois'] == 31) & (df['montantCalcule'] < 200000))
+            | ((df['dureeMois'] == 360) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] == 365) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] == 366) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] > 120) & (df['montantCalcule'] < 2000000)))
 
     df['dureeMoisEstimee'] = np.where(mask, "True", "False")
 
@@ -383,7 +385,7 @@ def correct_date(df):
 
 def data_inputation(df):
     """Permet une estimation de la dureeMois (pour les durees évidemment fausses) grace au contenu de la commande (codeCPV)"""
-    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
+    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"]]
     # On fait un groupby sur la division des cpv (CPV_min) afin d'obtenir toutes les durees par division
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
     # On cherche à obtenir la médiane par division de CPV
