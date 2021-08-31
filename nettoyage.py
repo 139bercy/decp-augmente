@@ -97,7 +97,7 @@ def manage_titulaires(df):
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
     donneesInutiles = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
-                       'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom']
+                       'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom', 'idtech', "id_technique"]
     df.drop(columns=donneesInutiles, inplace=True)
 
     # Récupération des données titulaires
@@ -394,6 +394,7 @@ def indice_marche_avec_modification(data):
     """ Renvoie la liste des indices des marchés contenant une modification """
     L_indice = []
     for i in range(len(data["marches"])):
+        data["marches"][i]["id_technique"] = i  # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
         if len(data["marches"][i]["modifications"]) > 0:
             L_indice += [i]
     return L_indice
@@ -480,7 +481,7 @@ def regroupement_marche(df, dict_modification):
     """Permet de recoder la variable identifiant. 
     Actuellement: 1 identifiant par déclaration (marché initial / modification sur marché/ un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprise)
     En sortie: idMarche correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une modification"""
-    df["idMarcheM"] = ""
+    df["idtech"] = ""
     col_modification = list(dict_modification.keys())
     subdata_modif = df[df.booleanModification == 1] # Tout les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
@@ -492,12 +493,12 @@ def regroupement_marche(df, dict_modification):
         for j in range(len(marche)):
             raw = marche.iloc[j]
             marche_init = fusion_source_modification(raw, marche_init, col_modification, dict_modification)
-        marche_init["idMarcheM"] = marche.iloc[-1].id
+        marche_init["idtech"] = marche.iloc[-1].id_technique
         df_to_concatene = pd.concat([df_to_concatene, marche_init], copy = False)
     df.update(df_to_concatene)
     #Attention aux id. 
     df.rename(columns = {"id": "id_source"}, inplace = True)
-    df["id"] = np.where(df.idMarcheM != "", df.idMarcheM, df.id_source)
+    df["id"] = np.where(df.idtech != "", df.idtech, df.id_technique)
     return df
 
 def manage_modifications(data):
