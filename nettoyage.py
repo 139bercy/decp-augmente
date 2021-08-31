@@ -415,33 +415,39 @@ def replace_char(df):
 
 # Pour la PR
 # Cette fonction doit s'insérer après le traitement de la branche Add feature modifications
-# C'est pour cela qu'elle n'a pas été intégré dans le main
 
 def regroupement_marche_complet(df):
     """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant 
     les marchés en fonction de leur objets/date de publication des données et montant.
     Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
     # Creation du sub DF necessaire
+    df_titulaires = pd.DataFrame()
+    df_to_update = pd.DataFrame()
     df_intermediaire = df[["objet", "datePublicationDonnees", "montant", "id"]]
-    # df_intermediaire["index_source"] = df_intermediaire.index #Conservation des index
     # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
                                                       "datePublicationDonnees", "montant"])["id"])
     # Initialisation du resultat sous forme de liste
-    index = df_group.index  # df_group a un multi_index objet-datePublicationDonnees
-    df_titulaires = pd.DataFrame()
-    df_to_update = pd.DataFrame()
+    # df_group a un multi_index objet-datePublicationDonnees
+    index = df_group.index
     for i in range(len(df_group)):
-        ids_to_modify = df_group[1].iloc[i]  # dataframe contenant les id d'un meme marche
-        new_index = list(ids_to_modify.index)  # Contient les index des lignes d'un meme marché. Utile pour le update
-        df_avec_bon_id = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])  # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
-        df_nbtitulaires = pd.DataFrame(len(new_index)*[len(new_index)], index=new_index, columns = ["nombreTitulaireSurMarchePresume"]) # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
+        # dataframe contenant les id d'un meme marche
+        ids_to_modify = df_group[1].iloc[i]
+        # Contient les index des lignes d'un meme marché. Utile pour le update
+        new_index = list(ids_to_modify.index)
+        # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
+        df_avec_bon_id = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])
+        # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
+        df_nbtitulaires = pd.DataFrame(len(new_index)*[len(new_index)], index=new_index, columns = ["nombreTitulaireSurMarchePresume"])
         df_to_update = pd.concat([df_to_update, df_avec_bon_id])
-        df_titulaires = pd.concat([df_titulaires, df_nbtitulaires])  # Dataframe permettant de faire la jointure pour ajouter la colonne nombreTitulaireSurMarchePresume dans le df initial
-        if len(df_to_update) > 50000: #Arbitraire, faire un update a chaque étape rallonge le temps d'execution, un update final idem. 
+        # Dataframe permettant de faire la jointure pour ajouter la colonne nombreTitulaireSurMarchePresume dans le df initial
+        df_titulaires = pd.concat([df_titulaires, df_nbtitulaires])
+        # Arbitraire, faire un update a chaque étape rallonge le temps d'execution, un update final idem.
+        if len(df_to_update) > 50000:
             df.update(df_to_update)
             df_to_update = pd.DataFrame()
-    df = df.merge(df_titulaires, how='left', left_index=True, right_index=True) # Ajout effectif de nombreTitulaireSurMarchePresume
+    # Ajout effectif de nombreTitulaireSurMarchePresume
+    df = df.merge(df_titulaires, how='left', left_index=True, right_index=True)
     df.update(df_to_update)
     return df
 
