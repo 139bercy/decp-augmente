@@ -392,27 +392,27 @@ def replace_char(df):
 ## Utilisation de data: l'objet json.
 def indice_marche_avec_modification(data):
     """ Renvoie la liste des indices des marchés contenant une modification """
-    L_indice = []
+    liste_indices = []
     for i in range(len(data["marches"])):
         data["marches"][i]["id_technique"] = i  # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
-        if len(data["marches"][i]["modifications"]) > 0:
-            L_indice += [i]
-    return L_indice
+        if data["marches"][i]["modifications"]:
+            liste_indices += [i]
+    return liste_indices
 
 
-def recuperation_colonne_a_modifier(data, L_indice):
+def recuperation_colonne_a_modifier(data, liste_indices):
     """ Renvoie les noms des differentes colonnes recevant une modification 
     sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification} """
-    L_colonne = []
+    liste_colonne = []
     colonne_to_modify = {}
-    for indice in L_indice:
-        colonne_modifiees = list(data["marches"][indice]["modifications"][0].keys())
-        for col in colonne_modifiees:
+    for indice in liste_indices:
+        # colonne_modifiees = list(data["marches"][indice]["modifications"][0].keys())
+        for col in data["marches"][indice]["modifications"][0].keys():
             if "Modification" not in col:
                 col += "Modification"
-            if col not in L_colonne:
-                L_colonne += [col]
-    for col in L_colonne:
+            if col not in liste_colonne:
+                liste_colonne += [col]
+    for col in liste_colonne:
         if "Modification" in col and col != "objetModification":
             name_col = col.replace("Modification", "")
             colonne_to_modify[col] = name_col
@@ -422,41 +422,44 @@ def recuperation_colonne_a_modifier(data, L_indice):
 
 ## Objectif Numéro 2: Ajouter les modifications présentes dans le json à la clef modification 
 
-def prise_en_compte_modifications(df, col_to_normalize = 'modifications'):
+def prise_en_compte_modifications(df, col_to_normalize='modifications'):
     """La fonction json_normalize de pandas ne permet pas de spliter la clef modifications automatiquement. 
     Cette fonction permet de le faire
     En entrée : La sortie json_normalize de pandas. (avec une colonne modifications)
-    En sortie: Un dataframe pandas"""
+    Le dataframe en entrée est directement modifié dans la fonction."""
     # Check colonne modifications. 
-    colonne = df.columns
-    col_add = []
-    if col_to_normalize not in colonne:
+    if col_to_normalize not in df.columns:
         raise ValueError("Il n'y a aucune colonne du nom de {} dans le dataframe entrée en paramètre".format(col_to_normalize))
     to_normalize = df[col_to_normalize] #Récupération de la colonne à splitter
     df["booleanModification"] = 0
     for i in range(len(to_normalize)):
         json_modification = to_normalize[i]
         if json_modification != []: # dans le cas ou des modifications ont été apportées
-            col_to_add = list(json_modification[0].keys()) #Récupération des noms de colonnes
-            for col in col_to_add:
+            # col_to_add = list(json_modification[0].keys()) #Récupération des noms de colonnes
+            for col in json_modification[0].keys():
                 col_init = col
                 # Formatage du nom de la colonne
                 if "Modification" not in col:
                         col += "Modification"
-                if col not in col_add: # Cas ou on tombe sur le premier marche qui modifie un champ
+                if col not in df.columns: # Cas ou on tombe sur le premier marche qui modifie un champ
                     df[col] = "" # Initialisation dans le df initial
-                    col_add += [col]
                 df[col][i] = json_modification[0][col_init]
                 df["booleanModification"][i] = 1 #Création d'une booléenne pour simplifier le subset pour la suite
-    return df
 
 ## Objectif numéro 3: Définition des fonctions nécéssaire pour l'identification des marchés/mis à jour de marchés
 
 def split_dataframe(df, sub_data, modalite):
     """Définition de deux dataFrame.
         - Le premier qui contiendra uniquement les lignes avec modification, pour le marché ayant pour objet modalite
-        - Le second contiendra l'ensemble des lignes correspondant au marché isolé dans le df1 qui ont pour objet modalite"""
-    #Premier df: Contenant les lignes d'un marche aec des colonnes modifications non vide
+        - Le second contiendra l'ensemble des lignes correspondant au marché isolé dans le df1 qui ont pour objet modalite
+        
+        :param df: la source totale des données
+        :param sub_data: le sous-ensemble correspondant à l'ensemble des marchés avec une modification
+        :param modalite: la modalité sur laquelle on veut filtrer
+
+        :return: un tuple (premier_df, second_df)
+    """
+    #Premier df: Contenant les lignes d'un marche avec des colonnes modifications non vide
     marche = sub_data[sub_data.objet == modalite]
     marche = marche.sort_values(by = 'id')
     #Second dataframe: Dans le df complet, récupération des lignes correspondant au marché récupéré
@@ -469,20 +472,25 @@ def split_dataframe(df, sub_data, modalite):
 
 # Partie fusion des datas modifiées
 def fusion_source_modification(raw, df_source, col_modification, dict_modification):
-    """ Permet de fusionner les colonnes xxxModification et sa colonne """
+    """ Permet de fusionner les colonnes xxxModification et sa colonne.
+    raw correspond à une ligne du df_source
+    Modifie le df_source
+    """
     for col in col_modification:
         col_init = dict_modification[col]
         df_source[col_init].loc[raw.name] = raw[col]
-        return df_source
+    return df_source
 
 #Fonction Finale
 
 def regroupement_marche(df, dict_modification):
     """Permet de recoder la variable identifiant. 
     Actuellement: 1 identifiant par déclaration (marché initial / modification sur marché/ un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprise)
-    En sortie: idMarche correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une modification"""
+    En sortie: idMarche correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une modification
+    Modification inplace du df source
+    """
     df["idtech"] = ""
-    col_modification = list(dict_modification.keys())
+    #col_modification = list(dict_modification.keys())
     subdata_modif = df[df.booleanModification == 1] # Tout les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
     df_to_concatene = pd.DataFrame() #df vide pour la concaténation
@@ -491,8 +499,7 @@ def regroupement_marche(df, dict_modification):
         #Récupération du dataframe modification et du dataframe source
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         for j in range(len(marche)):
-            raw = marche.iloc[j]
-            marche_init = fusion_source_modification(raw, marche_init, col_modification, dict_modification)
+            marche_init = fusion_source_modification(marche.iloc[j], marche_init, dict_modification.keys(), dict_modification)
         marche_init["idtech"] = marche.iloc[-1].id_technique
         df_to_concatene = pd.concat([df_to_concatene, marche_init], copy = False)
     df.update(df_to_concatene)
@@ -529,7 +536,7 @@ def manage_modifications(data):
         'acheteur.nom': 'string',
         'donneesExecution': 'string'
     }, copy=False)
-    df = prise_en_compte_modifications(df)
+    prise_en_compte_modifications(df)
     df = regroupement_marche(df, dict_modification)
     return df
 # Fin de la Review
