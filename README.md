@@ -126,10 +126,12 @@ Les montants corrigés sont ceux :
 
 ### Durées exprimées en jours
 Les durées corrigées sont celles :
-- manquantes
-- durée égale au montant
+- manquantes: corrigées à 0
+Tous les cas suivant seront corrigées en divisant par 30 (conversion en mois)
+- durée égale au montant 
 - montant / durée < <b>100</b>
-- montant / durée < <b>1000</b> pour une durée > <b>12</b>
-- duréee == <b>30</b> ou <b>31</b> et montant < <b>200 000</b>
-- duréee == <b>360</b> ou <b>365</b> ou <b>366</b> et montant < <b>10 000 000</b>
-- durée > <b>120</b> et montant < <b>2 000 000</b>
+- montant / durée < <b>1000</b> pour une durée > <b>12</b> mois
+- duréee == <b>30</b> ou <b>31</b> et montant < <b>200 000</b> €
+- duréee == <b>360</b> ou <b>365</b> ou <b>366</b> et montant < <b>10 000 000</b> €
+- durée > <b>120</b> et montant < <b>2 000 000</b> €
+
