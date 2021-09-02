@@ -48,7 +48,7 @@ def main():
     logger.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
     df = manage_date(df)
     logger.info("Fin du traitement")
-
+    
     logger.info("Début du traitement: Correction de la variable dureeMois.")
     df = correct_date(df)
     logger.info("Fin du traitement")
@@ -315,7 +315,7 @@ def manage_date(df):
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
     # Pour les annee non renseignée (égale à '') on les mets à 0000, cas traité 3 lignes plus tard 
-    df['anneeNotification'] = np.where(df.anneeNotification == "", "0000", df.anneeNotification)
+    # df['anneeNotification'] = np.where(df.anneeNotification == "", "0000", df.anneeNotification)
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
@@ -480,7 +480,8 @@ def fusion_source_modification(raw, df_source, col_modification, dict_modificati
     """
     for col in col_modification:
         col_init = dict_modification[col]
-        df_source[col_init].loc[raw.name] = raw[col]
+        if raw[col] != '':
+            df_source[col_init].loc[raw.name] = raw[col]
     return df_source
 
 #Fonction Finale
