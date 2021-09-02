@@ -314,6 +314,8 @@ def manage_date(df):
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
+    # Pour les annee non renseignée (égale à '') on les mets à 0000, cas traité 3 lignes plus tard 
+    df['anneeNotification'] = np.where(df.anneeNotification == "", "0000", df.anneeNotification)
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
