@@ -16,7 +16,9 @@ logger.setLevel(logging.DEBUG)
 
 
 def main():
+    # Vérification: l'ensemble des datas sont présentes
     check_reference_files(conf)
+    # Import des datas
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
@@ -26,50 +28,27 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Gestion des titulaires")
-    df = manage_titulaires(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Suppression des doublons")
-    df = manage_duplicates(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Déection et correction des montants aberrants")
-    df = manage_amount(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Gestion des Id null")
-    df = manage_missing_code(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
-    df = manage_region(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
-    df = manage_date(df)
-    logger.info("Fin du traitement")
-    
-    logger.info("Début du traitement: Correction de la variable dureeMois.")
-    df = correct_date(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du tritement: Imputation de la variable dureeMois")
-    df = data_inputation(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Remplacement des caractères mal converti")
-    # suppression des caractères mal encodés
-    df = replace_char(df)
+    (df.pipe(manage_titulaires)
+       .pipe(manage_duplicates)
+       .pipe(manage_amount)
+       .pipe(manage_missing_code)
+       .pipe(manage_region)
+       .pipe(manage_date)
+       .pipe(correct_date)
+       .pipe(data_inputation)
+       .pipe(replace_char)
+    )
     logger.info("Fin du traitement")
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye', 'wb') as df_nettoye:
-        pickle.dump(df, df_nettoye)  # Export présent pour faciliter l'utilisation du module enrichissement.py
+        # Export présent pour faciliter l'utilisation du module enrichissement.py
+        pickle.dump(df, df_nettoye)  
     df.to_csv("decp_nettoye.csv")
     logger.info("Ecriture du csv terminé")
 
 
-def check_reference_files(conf):
+def check_reference_files(conf: dict):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.
         StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv"""
     path_to_data = conf["path_to_data"]
@@ -84,7 +63,7 @@ def check_reference_files(conf):
                 raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
 
 
-def manage_titulaires(df):
+def manage_titulaires(df: pd.DataFrame):
     # Ecriture dans les logs
     logger.info("Nombre de marché sans titulaires: {}. Remplacé par la valeur du concessionnaire".format(sum(df["titulaires"].isnull())))
     logger.info("Nombre de marché sans montant: {}. Remplacé par la valeur globale".format(sum(df["montant"].isnull())))
@@ -115,8 +94,14 @@ def manage_titulaires(df):
     return df
 
 
-def manage_duplicates(df):
-    """Permet la suppression des eventuels doublons pour un subset du dataframe"""
+def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Permet la suppression des eventuels doublons pour un subset précis du dataframe
+    
+    Retour:
+        pd.DataFrame
+    """
+    logger.info("Début du traitement: Suppression des doublons")
     nb_ligne_avant_suppression = len(df)
     df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
@@ -136,15 +121,21 @@ def manage_duplicates(df):
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
+    logger.info("Fin du traitement")
     return df
 
 
-def is_false_amount(x, threshold=5):
-    """On cherche à vérifier si des montants ne sont composés que d'un seul chiffre. exemple: 999 999.
-    Ces montants seront considérés comme faux"""
+def is_false_amount(x: float, threshold: int=5) -> bool:
+    """
+    On cherche à vérifier si les parties entières des montants sont composés d'au moins 5 threshold fois le meme chiffre (hors 0). 
+    Exemple pour threshold = 5: 999 999 ou 222 262.
+    Ces montants seront considérés comme faux
+    """
+    # Création d'une liste compteur
     d = [0] * 10
     str_x = str(abs(int(x)))
     for c in str_x:
+        # On compte le nombre de fois que chaque chiffre apparait
         d[int(c)] += 1
     for counter in d[1:]:
         if counter > threshold:
@@ -152,18 +143,31 @@ def is_false_amount(x, threshold=5):
     return False
 
 
-def manage_amount(df):
-    """Travail sur la détection des montants erronés. Ici inférieur à 200, supérieur à 9.99e8 et composé d'un seul chiffre: 999 999"""
+def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Travail sur la détection des montants erronés. Ici inférieur à 200, supérieur à 9.99e8 et 
+    si la partie entière du montant est composé d'au moins 5 fois le même chiffre hors 0.
+    Exemple de montant érronés: 
+        - 999 999
+        - 222 522
+
+    Retour:
+        pd.DataFrame
+    """
+
+    logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
     df['montantOriginal'] = df["montant"]
     df['montant'].fillna(0, inplace=True)
     # variable témoin pour les logs
     nb_montant_egal_zero = df.montant.value_counts()[0]
+    # Détection des montants "1 chiffre"
     df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
 
     logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0] - nb_montant_egal_zero))
     nb_montant_egal_zero = df.montant.value_counts()[0]
+    # Définition des bornes inf et sup et traitement
     borne_inf = 200.0
     borne_sup = 9.99e8
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
@@ -176,19 +180,30 @@ def manage_amount(df):
     df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
     # Ecriture dans la log
     logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
+    logger.info("Fin du traitement")
     return df
 
 
-def manage_missing_code(df):
-    """Travail sur les variables d'identifiant """
+def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Mise en qualité des variables identifiantes.
+    Cf Readme (copier coller la partie du Readme correspondante)
+    
+    Retour:
+        pd.DataFrame
+    """
+
+    logger.info("Début du traitement: Gestion des Id null")
     # Ecriture dans les logs
     logger.info("Nombre d'identifiant manquants et remplacés: {}".format(sum(df["id"].isnull())))
     logger.info("Nombre de code CPV manquants et remplacés: {}".format(sum(df["codeCPV"].isnull())))
 
+    # Les id et codeCPV manquants sont remplacés par des '0'. Dans le cas de id, la fonction [insérer nom de la fonction présente dans la MR Gestion_ID] 
+    # Permet le retraitement de la variable pour la rendre unique
     df.id = np.where(df["id"].isnull(), '0000000000000000', df.id)
     df.codeCPV = np.where(df["codeCPV"].isnull(), '00000000', df.codeCPV)
 
-    # Nettoyage des codes idTitulaires
+    # Nettoyage des caractères spéciaux dans codes idTitulaires
     logger.info("Nettoyage des idTitualires")
     caracteres_speciaux_dict = {
         "\\t": "",
@@ -212,7 +227,8 @@ def manage_missing_code(df):
     df.nic = np.where(~df["nic"].str.isdigit(), np.NaN, df.nic)
     df['nic'] = df.nic.astype(str)
 
-    # Gestion code CPV
+    # Récupération de ce qu'on appelle la division du marché selon la nomenclature européenne CPV. 
+    # Ajout du nom de la division
     logger.info("Récupération de la division du code CPV.")
     df.codeCPV = df.codeCPV.astype(str)
     df["CPV_min"] = df["codeCPV"].str[:2]
@@ -225,12 +241,20 @@ def manage_missing_code(df):
     df.denominationSociale = np.where(
         (df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'),
         np.NaN, df.denominationSociale)
+    logger.info('Fin du traitement')
 
     return df
 
 
-def manage_region(df):
-    """Ajout des libellés Régions/département pour le lieu d'execution du marché"""
+def manage_region(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout des libellés Régions/Département pour le lieu d'execution du marché
+
+    Retour:
+        pd.DataFrame
+    """
+
+    logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
     logger.info("Création de la colonne département Execution")
@@ -302,11 +326,19 @@ def manage_region(df):
     df.rename(columns={"libelle_reg": "libelleRegionExecution"}, inplace=True)
     # On supprime la colonne reg, doublon avec codeRegionExecution
     del df["reg"]
+    logger.info("Fin du traitement")
     return df
 
 
-def manage_date(df):
-    """Travail sur les Dates. Récupération de l'année de notification du marché ainsi que son mois"""
+def manage_date(df: pd.DataFrame) -> pd.DataFrame:
+    """
+        Récupération de l'année de notification du marché ainsi que son mois à partir de la variable dateNotification.
+    
+    Retour:
+        - pd.DataFrame
+    """
+
+    logger.info("Début du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
     # Date / Temps #
     # ..............Travail sur les variables de type date
     df.datePublicationDonnees = df.datePublicationDonnees.str[0:10]
@@ -314,8 +346,6 @@ def manage_date(df):
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
-    # Pour les annee non renseignée (égale à '') on les mets à 0000, cas traité 3 lignes plus tard 
-    # df['anneeNotification'] = np.where(df.anneeNotification == "", "0000", df.anneeNotification)
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
@@ -330,12 +360,19 @@ def manage_date(df):
     df['moisNotification'] = df.dateNotification.str[5:7]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
     logger.info("Au total, {} marchés n'ont pas de date de publication des données connue".format(sum(df["datePublicationDonnees"].isna())))
+    logger.info("Fin du traitement")
 
     return df
 
 
-def correct_date(df):
-    """Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois"""
+def correct_date(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois
+    
+    Retour:
+        - pd.DataFrame
+    """
+    logger.info("Début du traitement: Correction de la variable dureeMois.")
     # On cherche les éventuelles erreurs mois -> jours
     mask = ((df['montant'] == df['dureeMois'])
             | (df['montant'] / df['dureeMois'] < 100)
@@ -354,12 +391,21 @@ def correct_date(df):
     # Comme certaines valeurs atteignent zero, on remplace par un mois
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])  # Il y a une valeur négative
     logger.info("Au total, {} duree de marché en mois ont été jugées rentrées en jour et non en mois.".format(sum(mask)))
+    logger.info("Fin du traitement")
 
     return df
 
 
-def data_inputation(df):
-    """Permet une estimation de la dureeMois (pour les durees évidemment fausses) grace au contenu de la commande (codeCPV)"""
+def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Permet une estimation de la dureeMois grace au contenu de la commande (codeCPV).
+    Dans le cas des Fournitures et des Services (toutes les commandes hors Travaux), 
+    si la durée est supérieur à 10 ans, alors on impute par la médiane des durées pour le même codeCPV 
+    
+    Retour
+        - pd.DataFrame
+    """
+    logger.info("Début du tritement: Imputation de la variable dureeMois")
     df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
     # On fait un groupby sur la division des cpv (CPV_min) afin d'obtenir toutes les durees par division
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
@@ -379,30 +425,42 @@ def data_inputation(df):
     df['dureeMoisEstimee'] = np.where(mask, "True", df.dureeMoisEstimee)
     # La mediane n'est pas utile dans le df final: on supprime
     df.drop("mediane_dureeMois_CPV", axis=1, inplace=True)
+
+    logger.info("Fin du traitement")
     return df
 
 
-def replace_char(df):
-    """Fonction pour mettre en qualité le champ objetMarche"""
-    # Remplacement brutal du caractère (?) par un espace
+def replace_char(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fonction pour mettre en qualité le champ objetMarche
+
+    Retour:
+        - pd.DataFrame
+    """
+    logger.info("Début du traitement: Remplacement des caractères mal converti")
+    # Remplacement brutal du caractère (?) par XXXXX
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
+    logger.info("Fin du traitement")
     return df
 
 
-# Partie pour la Review
-## Objectif: Récupérer un dictionnaire contenant le passage colonne actuel / colonne subissant la modification
-## Utilisation de data: l'objet json.
-def indice_marche_avec_modification(data):
-    """ Renvoie la liste des indices des marchés contenant une modification """
+def indice_marche_avec_modification(data: dict) -> list:
+    """
+    Renvoie la liste des indices des marchés contenant une modification
+    
+    Retour:
+        - list
+    """
     liste_indices = []
     for i in range(len(data["marches"])):
-        data["marches"][i]["id_technique"] = i  # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
+        # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
+        data["marches"][i]["id_technique"] = i  
         if data["marches"][i]["modifications"]:
             liste_indices += [i]
     return liste_indices
 
 
-def recuperation_colonne_a_modifier(data, liste_indices):
+def recuperation_colonne_a_modifier(data: dict, liste_indices: list):
     """ Renvoie les noms des differentes colonnes recevant une modification 
     sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification} """
     liste_colonne = []
@@ -424,7 +482,7 @@ def recuperation_colonne_a_modifier(data, liste_indices):
 
 ## Objectif Numéro 2: Ajouter les modifications présentes dans le json à la clef modification 
 
-def prise_en_compte_modifications(df, col_to_normalize='modifications'):
+def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str ='modifications'):
     """La fonction json_normalize de pandas ne permet pas de spliter la clef modifications automatiquement. 
     Cette fonction permet de le faire
     En entrée : La sortie json_normalize de pandas. (avec une colonne modifications)
@@ -450,7 +508,7 @@ def prise_en_compte_modifications(df, col_to_normalize='modifications'):
 
 ## Objectif numéro 3: Définition des fonctions nécéssaire pour l'identification des marchés/mis à jour de marchés
 
-def split_dataframe(df, sub_data, modalite):
+def split_dataframe(df: pd.DataFrame, sub_data: pd.DataFrame, modalite: str):
     """Définition de deux dataFrame.
         - Le premier qui contiendra uniquement les lignes avec modification, pour le marché ayant pour objet modalite
         - Le second contiendra l'ensemble des lignes correspondant au marché isolé dans le df1 qui ont pour objet modalite
@@ -473,7 +531,7 @@ def split_dataframe(df, sub_data, modalite):
     
 
 # Partie fusion des datas modifiées
-def fusion_source_modification(raw, df_source, col_modification, dict_modification):
+def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_modification: list, dict_modification: dict):
     """ Permet de fusionner les colonnes xxxModification et sa colonne.
     raw correspond à une ligne du df_source
     Modifie le df_source
@@ -486,7 +544,7 @@ def fusion_source_modification(raw, df_source, col_modification, dict_modificati
 
 #Fonction Finale
 
-def regroupement_marche(df, dict_modification):
+def regroupement_marche(df: pd.DataFrame, dict_modification: dict):
     """Permet de recoder la variable identifiant. 
     Actuellement: 1 identifiant par déclaration (marché initial / modification sur marché/ un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprise)
     En sortie: idMarche correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une modification
@@ -511,7 +569,7 @@ def regroupement_marche(df, dict_modification):
     df["id"] = np.where(df.idtech != "", df.idtech, df.id_technique)
     return df
 
-def manage_modifications(data):
+def manage_modifications(data: dict):
     """Conversion du json en pandas et incorporation des modifications"""
     L_indice = indice_marche_avec_modification(data)
     dict_modification = recuperation_colonne_a_modifier(data, L_indice)
