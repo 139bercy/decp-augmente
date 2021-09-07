@@ -30,7 +30,7 @@ venv/
 *.log
 
 #Suppression des json 
-*.json
+decp.json
 
 #Suppression des zip
 *.zip
