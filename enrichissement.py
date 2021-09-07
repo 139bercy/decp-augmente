@@ -51,49 +51,62 @@ def main():
         'moisNotification': 'string',
         'dureeMoisEstimee': 'string',
     }, copy=False)
-    logger.info("Début du traitement: Enrichissement siret")
-    df = enrichissement_siret(df)
-    logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement cpv")
-    df = enrichissement_cpv(df)
-    logger.info("Fin du traitement")
+    (df.pipe(enrichissement_siret)
+        .pipe(enrichissement_cpv)
+        .pipe(enrichissement_acheteur)
+        .pipe(reorganisation)
+        .pipe(enrichissement_geo)
+        .pipe(enrichissement_type_entreprise)
+        .pipe(apply_luhn)
+        .pipe(enrichissement_departement)
+        .pipe(enrichissement_arrondissement)
+        .pipe(detection_accord_cadre)
+        .pipe(manage_column_final)
+    )
+    # logger.info("Début du traitement: Enrichissement siret")
+    # df = enrichissement_siret(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement acheteur")
-    df = enrichissement_acheteur(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement cpv")
+    # df = enrichissement_cpv(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Reorganisation du dataframe")
-    df = reorganisation(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement acheteur")
+    # df = enrichissement_acheteur(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement geographique")
-    df = enrichissement_geo(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Reorganisation du dataframe")
+    # df = reorganisation(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
-    df = enrichissement_type_entreprise(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement geographique")
+    # df = enrichissement_geo(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
-    df = apply_luhn(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
+    # df = enrichissement_type_entreprise(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
-    df = enrichissement_departement(df)  # il y a des na dans departements
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
+    # df = apply_luhn(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
-    df = enrichissement_arrondissement(df)  # il y a des na dans departements
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
+    # df = enrichissement_departement(df)  # il y a des na dans departements
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Detection des accords cadre")
-    df = detection_accord_cadre(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
+    # df = enrichissement_arrondissement(df)  # il y a des na dans departements
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Reorganisation du dataframe final")
-    df = manage_column_final(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Detection des accords cadre")
+    # df = detection_accord_cadre(df)
+    # logger.info("Fin du traitement")
+
+    # logger.info("Début du traitement: Reorganisation du dataframe final")
+    # df = manage_column_final(df)
+    # logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
@@ -101,8 +114,13 @@ def main():
 
 
 def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
-    """En entrée: Dataframe avec une colonne anneeNotification
-    En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
+    """
+    En entrée: Dataframe avec une colonne anneeNotification
+    En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1
+
+    Retour:
+        list
+    """
     df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
     liste_dataframe = []
     # On remplace les annees nulles par 0 pour que la boucle ne plante pas.
@@ -118,10 +136,14 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
 
 
 def detection_accord_cadre_without_date(df, compteur):
-    """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
+    """
+    Fonction qui va disparaitre!
+    
+    On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
     On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois.
-    On fera le choix de ne pas considérer la date exacte de notification, mais le df passé en entrée correspondra aux données d'une plage précise: 1 an, 2mois ..."""
+    On fera le choix de ne pas considérer la date exacte de notification, mais le df passé en entrée correspondra aux données d'une plage précise: 1 an, 2mois ...
+    """
     # Creation du sub DF necessaire
     df_intermediaire = df[["objetMarche", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
     # On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus.
@@ -167,9 +189,12 @@ def detection_accord_cadre_without_date(df, compteur):
 
 
 def detection_accord_cadre(df):
-    """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
+    """ 
+    Idem
+    Principe de fonctionnement. On detecte les accords cadre par annee sans la date
     Ensuite on detecte, toujours sans la date, sur la section Decembre-Janvier pour prendre en compte l'effet de bord.
-    On compare les deux nombres de titulaires et on conserve le plus important """
+    On compare les deux nombres de titulaires et on conserve le plus important 
+    """
     temoin_idmarche = 0
     # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
     dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
@@ -205,8 +230,13 @@ def detection_accord_cadre(df):
     return dataframe_annee.reset_index(drop=True)
 
 
-def manage_column_final(df):
-    """Renommage de certaines colonnes et trie des colonnes."""
+def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Renommage de certaines colonnes et trie des colonnes.
+
+    Retour:
+        - pd.DataFrame
+    """
     df = df.rename(columns={
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
@@ -238,9 +268,14 @@ def manage_column_final(df):
     return df
 
 
-def extraction_departement_from_code_postal(code_postal):
-    """Renvoie le code postal en prenant en compte les territoires outre-mer
-    code_postal est un str"""
+def extraction_departement_from_code_postal(code_postal: str) -> str:
+    """
+    Renvoie le code postal en prenant en compte les territoires outre-mer
+    code_postal est un str
+
+    Retour:
+        str
+    """
     try:
         code = code_postal[:2]
         if code == "97" or code == "98":
@@ -250,8 +285,13 @@ def extraction_departement_from_code_postal(code_postal):
         return "00"
 
 
-def jointure_base_departement_region():
-    """Permet la jointure entre la base departement de l'insee (dossier data) et la base region de l'insee"""
+def jointure_base_departement_region() -> pd.DataFrame:
+    """
+    Permet la jointure entre la base departement de l'Insee (dossier data) et la base region de l'Insee
+
+    Retour:
+        - pd.DataFrame
+    """
     # Import de la base département
     path_dep = os.path.join(path_to_data, conf["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
@@ -266,8 +306,13 @@ def jointure_base_departement_region():
     return df_dep_reg
 
 
-def enrichissement_departement(df):
-    """Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements"""
+def enrichissement_departement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements
+    
+    Retour:
+        - pd.DataFrame
+    """
     logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
     df_dep_reg = jointure_base_departement_region()
     logger.info("Fin de la jointure")
@@ -293,15 +338,26 @@ def enrichissement_departement(df):
     return df
 
 
-def enrichissement_arrondissement(df):
-    """Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code"""
+def enrichissement_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code.
+    L'Arrondissement correspond à la zone géographique raccrochée à une sous-prefecture
+
+    Retour:
+        - pd.DataFrame
+    """
     df = get_code_arrondissement(df)
     df = get_libelle_arrondissement(df)
     return df
 
 
 def get_code_arrondissement(df):
-    """Ajout de la colonne code Arrondissement à partir du code commune"""
+    """
+    Ajout de la colonne code Arrondissement à partir du code commune
+    
+    Retour:
+        - pd.DataFrame
+    """
     path_to_commune = os.path.join(path_to_data, conf["commune-fr"])
     commune = pd.read_csv(path_to_commune, sep=",", usecols=['TYPECOM', 'COM', 'ARR'], dtype={"COM": str, "ARR": str})
     commune = commune[commune.TYPECOM == "COM"]
@@ -315,8 +371,12 @@ def get_code_arrondissement(df):
     return df
 
 
-def get_libelle_arrondissement(df):
-    """Ajout de la colonne libelle Arrondissement à partir du code Arrondissement"""
+def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout de la colonne libelle Arrondissement à partir du code Arrondissement
+    
+    Retour:
+        - pd.DataFrame"""
     path_to_arrondissement = os.path.join(path_to_data, conf["arrondissement-fr"])
     arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
     df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
@@ -328,7 +388,13 @@ def get_libelle_arrondissement(df):
     return df
 
 
-def enrichissement_type_entreprise(df):
+def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données avec la catégorie de l'entreprise. Utilisation de la base StockUniteLegale de l'Insee  
+
+    Retour:
+        - pd.DataFrame
+    """
     logger.info('début enrichissement_type_entreprise\n')
 
     df = df.astype({
@@ -401,9 +467,14 @@ def enrichissement_type_entreprise(df):
 
 # Algorithme de Luhn
 
-def is_luhn_valid(x):
-    """Application de la formule de Luhn à un nombre
-    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
+def is_luhn_valid(x: int) -> bool:
+    """
+    Application de la formule de Luhn à un nombre
+    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement
+    
+    Retour:
+        - bool
+    """
     try:
         luhn_corr = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]
         list_number_in_x = [int(i) for i in list(str(x))]
@@ -418,8 +489,13 @@ def is_luhn_valid(x):
         return False
 
 
-def apply_luhn(df):
-    """Application de la formule de Luhn sur les siren/siret"""
+def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Application de la formule de Luhn sur les siren/siret
+    
+    Retour:
+        - pd.DataFrame
+    """
     # Application sur les siren des Acheteur
     df['siren1Acheteur'] = df["idAcheteur"].str[:9]
     df_SA = pd.DataFrame(df['siren1Acheteur'])
@@ -456,8 +532,13 @@ def apply_luhn(df):
     return df
 
 
-def enrichissement_siret(df):
-    """Enrichissement des données via les codes siret/siren"""
+def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données via les codes siret/siren
+    
+    Retour:
+        - pd.DataFrame
+    """
     dfSIRET = get_siretdf_from_original_data(df)
     archiveErrorSIRET = getArchiveErrorSIRET()
 
@@ -482,8 +563,13 @@ def enrichissement_siret(df):
     return df
 
 
-def get_siretdf_from_original_data(df):
-    # Utilisation d'un dataframe intermediaire pour traiter les Siret unique
+def get_siretdf_from_original_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Utilisation d'un dataframe intermediaire pour traiter les Siret unique
+
+    Retour:
+        - pd.DataFrame
+    """
 
     dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
     dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
@@ -503,15 +589,27 @@ def get_siretdf_from_original_data(df):
     return dfSIRET
 
 
-def getArchiveErrorSIRET():
-    """Récupération des siret erronés"""
+def getArchiveErrorSIRET() -> pd.DataFrame:
+    """
+    Récupération des siret erronés
+    
+    Retour:
+        - pd.DataFrame
+    """
     archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
     logger.info('Aucune archive d\'erreur')
     return archiveErrorSIRET
 
 
-def get_enrichissement_insee(dfSIRET, path_to_data):
-    """Ajout des informations Adresse/Activité des entreprises via la base siren Insee"""
+def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str) -> list:
+    """
+    Ajout des informations Adresse/Activité des entreprises via la base siren Insee
+
+    Retour:
+        - list:
+            - list[0]: pd.DataFrame -- données principales
+            - list[1]: pd.DataFrame -- données ou le SIRET n'est pas renseigné
+    """
     # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
     path = os.path.join(path_to_data, conf["base_sirene_insee"])
     columns = [
