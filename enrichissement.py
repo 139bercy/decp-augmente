@@ -102,7 +102,9 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
     df = df.reindex(columns=colonne_to_export)
     df = df.rename(columns={
         "natureObjet": "natureObjetMarche",
-        "categorieEntreprise": "categorieEtablissement"
+        "categorieEntreprise": "categorieEtablissement",
+        "id": "idMarche",
+        "id_source": "id"
     })
     return df
 
