@@ -27,166 +27,71 @@ siren_len = 9
 def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
-        
+
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
+    df = (df.pipe(enrichissement_siret)
+          .pipe(enrichissement_cpv)
+          .pipe(enrichissement_acheteur)
+          .pipe(reorganisation)
+          .pipe(enrichissement_geo)
+          .pipe(enrichissement_type_entreprise)
+          .pipe(apply_luhn)
+          .pipe(enrichissement_departement)
+          .pipe(enrichissement_arrondissement)
+          .pipe(manage_column_final)
+          )
+    # logger.info("Début du traitement: Enrichissement siret")
+    # df = enrichissement_siret(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement siret")
-    df = enrichissement_siret(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement cpv")
+    # df = enrichissement_cpv(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement cpv")
-    df = enrichissement_cpv(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement acheteur")
+    # df = enrichissement_acheteur(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement acheteur")
-    df = enrichissement_acheteur(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Reorganisation du dataframe")
+    # df = reorganisation(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Reorganisation du dataframe")
-    df = reorganisation(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement geographique")
+    # df = enrichissement_geo(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement geographique")
-    df = enrichissement_geo(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
+    # df = enrichissement_type_entreprise(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
-    df = enrichissement_type_entreprise(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
+    # df = apply_luhn(df)
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
-    df = apply_luhn(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
+    # df = enrichissement_departement(df)  # il y a des na dans departements
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
-    df = enrichissement_departement(df)  # il y a des na dans departements
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
+    # df = enrichissement_arrondissement(df)  # il y a des na dans departements
+    # logger.info("Fin du traitement")
 
-    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
-    df = enrichissement_arrondissement(df)  # il y a des na dans departements
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Detection des accords cadre")
-    # df = detection_accord_cadre(df)
-    logger.info("Fin du traitement")
-
-    logger.info("Début du traitement: Reorganisation du dataframe final")
-    df = manage_column_final(df)
-    logger.info("Fin du traitement")
+    # logger.info("Début du traitement: Reorganisation du dataframe final")
+    # df = manage_column_final(df)
+    # logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     logger.info("Fin du traitement")
 
 
-def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
-    """En entrée: Dataframe avec une colonne anneeNotification
-    En sortie: une liste de dataframe <- subset de df sur Décembre 20XX et Janvier 20XX+1"""
-    df2 = df.copy()  # Ainsi on opère aucune modification sur le dataframe initial
-    liste_dataframe = []
-    # On remplace les annees nulles par 0 pour que la boucle ne plante pas.
-    # Sur année = 0, le dataframe ne contiendra que le mois de decembre.
-    df2.anneeNotification = np.where(df2.anneeNotification == 'nan', '0', df2.anneeNotification)
-    df2.moisNotification = np.where(df2.moisNotification.isna(), '0', df2.moisNotification)
-    for annee in np.unique(df2.anneeNotification):
-        sub1 = df2[(df2["anneeNotification"] == annee) & (df2["moisNotification"] == "12")]
-        sub2 = df2[(df2.anneeNotification == str(int(annee) + 1)) & (df2.moisNotification == '01')]
-        df_sub = pd.concat([sub1, sub2])
-        liste_dataframe += [df_sub]
-    return liste_dataframe
+def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Renommage de certaines colonnes et trie des colonnes.
 
-# On suppose que id permet d'identifier un marché
-def detection_accord_cadre_without_date(df, compteur):
-    """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
-    Accord cadre : Plusieurs Etablissements sur un meme marche
-    On va considerer qu un marche est definit entierement par son objet, sa date de notification, son montant et sa duree en mois.
-    On fera le choix de ne pas considérer la date exacte de notification, mais le df passé en entrée correspondra aux données d'une plage précise: 1 an, 2mois ..."""
-    # Creation du sub DF necessaire
-    df_intermediaire = df[["objetMarche", "montantOriginal", "dureeMois", "siretEtablissement", "nature"]]
-    # On regroupe selon l objet du marché. Attention, objetMarche n est pas forcément unique mais idMarche ne l'est pas non plus.
-    df_group = pd.DataFrame(df_intermediaire.groupby(["objetMarche",
-                                                      "montantOriginal",
-                                                      "dureeMois"])
-                            ["siretEtablissement"].unique())
-    # Initialisation du resultat sous forme de liste
-    index = df_group.index
-    L_data_fram = []
-    for i in range(len(df_group)):
-        nombre_titulaire = len(df_group["siretEtablissement"][i])
-        accord_presume = False
-        if nombre_titulaire > 1:
-            accord_presume = True
-        compteur += 1
-        L_data_fram += [[index[i][0], index[i][1], index[i][2], nombre_titulaire, str(accord_presume), compteur]]
-        # L_to_join += [[objet, nb_titulaire, montantO, montantE, montantC]]
-    data_to_fusion = pd.DataFrame(L_data_fram, columns=["objetMarche",
-                                                        "montantOriginal",
-                                                        "dureeMois",
-                                                        "nombreTitulaireSurMarchePresume",
-                                                        "accord-cadrePresume",
-                                                        "idMarche"])
-
-    df_to_output = pd.merge(df, data_to_fusion, how="left", left_on=["objetMarche",
-                                                                     "montantOriginal",
-                                                                     "dureeMois"],
-                            right_on=["objetMarche",
-                                      "montantOriginal",
-                                      "dureeMois"])
-    # Si l'une des 3 clefs à une valeur nulle alors nombreTitulaireSurMarchePresume, cadrePresume sera vide. Correction en dessous
-    df_to_output["nombreTitulaireSurMarchePresume"] = np.where(df_to_output["nombreTitulaireSurMarchePresume"].isnull(),
-                                                               df_to_output['nbTitulairesSurCeMarche'], df_to_output["nombreTitulaireSurMarchePresume"])
-    df_to_output["accord-cadrePresume"] = np.where(df_to_output["accord-cadrePresume"].isnull(),
-                                                   "False", df_to_output["accord-cadrePresume"])
-    # synchronisation avec la colonne nature qui donne si c est oui ou non un accord cadre declaré
-    df_to_output["nature"] = np.where(df_to_output["nature"].isnull(),
-                                      "NC", df_to_output["nature"])
-    df_to_output["accord-cadrePresume"] = np.where(df_to_output["nature"] != "ACCORD-CADRE",
-                                                   df_to_output["accord-cadrePresume"], "True")
-    return df_to_output, compteur
-
-
-def detection_accord_cadre(df):
-    """ Principe de fonctionnement. On detecte les accords cadre par annee sans la date
-    Ensuite on detecte, toujours sans la date, sur la section Decembre-Janvier pour prendre en compte l'effet de bord.
-    On compare les deux nombres de titulaires et on conserve le plus important """
-    temoin_idmarche = 0
-    # Création des différentes liste de dataframe: Une par année, et une autre contenant des dataframes Dec/Jan
-    dataframe_annee = [df[df.anneeNotification == annee] for annee in np.unique(df.anneeNotification)]
-    dataframe_mois = subset_liste_dataframe_dec_jan(df)
-    # On detecte les accord-cadre sur les différents dataframe ci dessus
-    for i in range(len(dataframe_annee)):
-        dataframe_annee[i], temoin_idmarche = detection_accord_cadre_without_date(dataframe_annee[i], temoin_idmarche)
-        # Certains Df_mois sont vides d'ou la disjonction de cas
-        if len(dataframe_mois[i]) > 0:
-            dataframe_mois[i], temoin_idmarche = detection_accord_cadre_without_date(dataframe_mois[i], temoin_idmarche)
-        else:
-            dataframe_mois[i]["nombreTitulaireSurMarchePresume"] = ""
-            dataframe_mois[i]["accord-cadrePresume"] = ""
-    # On passe du format liste de dataframe à un seul dataframe
-    dataframe_annee = pd.concat(dataframe_annee)
-    dataframe_annee = dataframe_annee.sort_index(axis=0)
-    dataframe_mois = pd.concat(dataframe_mois)
-    dataframe_mois = dataframe_mois.sort_index(axis=0)
-    # On peut ne boucler que sur les marchés présent dans dataframe_mois.
-    sub_datamois = dataframe_mois[dataframe_mois.nombreTitulaireSurMarchePresume > 1]
-    # On boucle sur l'id pour identifier de façon sure les marchés. objet n'est pas unique.
-    for identifiant in sub_datamois.id.unique():
-        titulaire_annee = max(dataframe_annee[dataframe_annee.id == identifiant]["nombreTitulaireSurMarchePresume"])
-        titulaire_mois = max(dataframe_mois[dataframe_mois.id == identifiant]["nombreTitulaireSurMarchePresume"])
-        id_add = max(dataframe_mois.idMarche)
-        # On localise les lignes concernées par l'identifiant et on remplace par le maximum du nombre de titulaire
-        dataframe_annee.loc[dataframe_annee.id == identifiant, "nombreTitulaireSurMarchePresume"] = max(titulaire_annee, titulaire_mois)
-        dataframe_annee.loc[dataframe_annee.id == identifiant, "idMarche"] = id_add + 1
-    # Actualisation de la colonne booléenne
-    dataframe_annee.loc[dataframe_annee.nombreTitulaireSurMarchePresume > 1, "accord-cadrePresume"] = True
-    # Calcul de la colonne montantCalcule
-    dataframe_annee["montantCalcule"] = dataframe_annee["montant"] / dataframe_annee["nombreTitulaireSurMarchePresume"]
-    return dataframe_annee.reset_index(drop=True)
-
-
-def manage_column_final(df):
-    """Renommage de certaines colonnes et trie des colonnes."""
-
+    Retour:
+        - pd.DataFrame
+    """
     with open(os.path.join("confs", "var_to_export.json")) as f:
         conf_export = json.load(f)
     colonne_to_export = []
@@ -194,17 +99,24 @@ def manage_column_final(df):
     for key in conf_export["export"].keys():
         if conf_export["export"][key] == 1:
             colonne_to_export += [key]
-    df = df.reindex(columns = colonne_to_export)
+    df = df.reindex(columns=colonne_to_export)
     df = df.rename(columns={
         "natureObjet": "natureObjetMarche",
-        "categorieEntreprise": "categorieEtablissement"
+        "categorieEntreprise": "categorieEtablissement",
+        "id": "idMarche",
+        "id_source": "id"
     })
     return df
 
 
-def extraction_departement_from_code_postal(code_postal):
-    """Renvoie le code postal en prenant en compte les territoires outre-mer
-    code_postal est un str"""
+def extraction_departement_from_code_postal(code_postal: str) -> str:
+    """
+    Renvoie le code postal en prenant en compte les territoires outre-mer
+    code_postal est un str
+
+    Retour:
+        str
+    """
     try:
         code = code_postal[:2]
         if code == "97" or code == "98":
@@ -214,8 +126,13 @@ def extraction_departement_from_code_postal(code_postal):
         return "00"
 
 
-def jointure_base_departement_region():
-    """Permet la jointure entre la base departement de l'insee (dossier data) et la base region de l'insee"""
+def jointure_base_departement_region() -> pd.DataFrame:
+    """
+    Permet la jointure entre la base departement de l'Insee (dossier data) et la base region de l'Insee
+
+    Retour:
+        - pd.DataFrame
+    """
     # Import de la base département
     path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
@@ -230,8 +147,13 @@ def jointure_base_departement_region():
     return df_dep_reg
 
 
-def enrichissement_departement(df):
-    """Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements"""
+def enrichissement_departement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements
+
+    Retour:
+        - pd.DataFrame
+    """
     logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
     df_dep_reg = jointure_base_departement_region()
     logger.info("Fin de la jointure")
@@ -257,15 +179,26 @@ def enrichissement_departement(df):
     return df
 
 
-def enrichissement_arrondissement(df):
-    """Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code"""
+def enrichissement_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code.
+    L'Arrondissement correspond à la zone géographique raccrochée à une sous-prefecture
+
+    Retour:
+        - pd.DataFrame
+    """
     df = get_code_arrondissement(df)
     df = get_libelle_arrondissement(df)
     return df
 
 
 def get_code_arrondissement(df):
-    """Ajout de la colonne code Arrondissement à partir du code commune"""
+    """
+    Ajout de la colonne code Arrondissement à partir du code commune
+
+    Retour:
+        - pd.DataFrame
+    """
     path_to_commune = os.path.join(path_to_data, conf_data["commune-fr"])
     commune = pd.read_csv(path_to_commune, sep=",", usecols=['TYPECOM', 'COM', 'ARR'], dtype={"COM": str, "ARR": str})
     commune = commune[commune.TYPECOM == "COM"]
@@ -279,8 +212,12 @@ def get_code_arrondissement(df):
     return df
 
 
-def get_libelle_arrondissement(df):
-    """Ajout de la colonne libelle Arrondissement à partir du code Arrondissement"""
+def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout de la colonne libelle Arrondissement à partir du code Arrondissement
+
+    Retour:
+        - pd.DataFrame"""
     path_to_arrondissement = os.path.join(path_to_data, conf_data["arrondissement-fr"])
     arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
     df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
@@ -292,7 +229,13 @@ def get_libelle_arrondissement(df):
     return df
 
 
-def enrichissement_type_entreprise(df):
+def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données avec la catégorie de l'entreprise. Utilisation de la base StockUniteLegale de l'Insee
+
+    Retour:
+        - pd.DataFrame
+    """
     logger.info('début enrichissement_type_entreprise\n')
 
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
@@ -331,9 +274,14 @@ def enrichissement_type_entreprise(df):
 
 # Algorithme de Luhn
 
-def is_luhn_valid(x):
-    """Application de la formule de Luhn à un nombre
-    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement"""
+def is_luhn_valid(x: int) -> bool:
+    """
+    Application de la formule de Luhn à un nombre
+    Permet la verification du numero SIREN et Siret d'un acheteur/etablissement
+
+    Retour:
+        - bool
+    """
     try:
         luhn_corr = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]
         list_number_in_x = [int(i) for i in list(str(x))]
@@ -348,8 +296,13 @@ def is_luhn_valid(x):
         return False
 
 
-def apply_luhn(df):
-    """Application de la formule de Luhn sur les siren/siret"""
+def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Application de la formule de Luhn sur les siren/siret
+
+    Retour:
+        - pd.DataFrame
+    """
     # Application sur les siren des Acheteur
     df['siren1Acheteur'] = df["idAcheteur"].str[:9]
     df_SA = pd.DataFrame(df['siren1Acheteur'])
@@ -386,8 +339,13 @@ def apply_luhn(df):
     return df
 
 
-def enrichissement_siret(df):
-    """Enrichissement des données via les codes siret/siren"""
+def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données via les codes siret/siren
+
+    Retour:
+        - pd.DataFrame
+    """
     dfSIRET = get_siretdf_from_original_data(df)
     archiveErrorSIRET = getArchiveErrorSIRET()
 
@@ -412,8 +370,13 @@ def enrichissement_siret(df):
     return df
 
 
-def get_siretdf_from_original_data(df):
-    # Utilisation d'un dataframe intermediaire pour traiter les Siret unique
+def get_siretdf_from_original_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Utilisation d'un dataframe intermediaire pour traiter les Siret unique
+
+    Retour:
+        - pd.DataFrame
+    """
 
     dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
     dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
@@ -433,15 +396,27 @@ def get_siretdf_from_original_data(df):
     return dfSIRET
 
 
-def getArchiveErrorSIRET():
-    """Récupération des siret erronés"""
+def getArchiveErrorSIRET() -> pd.DataFrame:
+    """
+    Récupération des siret erronés
+
+    Retour:
+        - pd.DataFrame
+    """
     archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
     logger.info('Aucune archive d\'erreur')
     return archiveErrorSIRET
 
 
-def get_enrichissement_insee(dfSIRET, path_to_data):
-    """Ajout des informations Adresse/Activité des entreprises via la base siren Insee"""
+def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str) -> list:
+    """
+    Ajout des informations Adresse/Activité des entreprises via la base siren Insee
+
+    Retour:
+        - list:
+            - list[0]: pd.DataFrame -- données principales
+            - list[1]: pd.DataFrame -- données ou le SIRET n'est pas renseigné
+    """
     # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
     path = os.path.join(path_to_data, conf_data["base_sirene_insee"])
     columns = [

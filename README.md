@@ -68,65 +68,56 @@ Afin d'optimiser l'enrichissement via le code siret/siren, une partie des donné
 - Posséder tous les éléments cités ci-dessus
 - Changer le chemin indiquer dans le code à la ligne 39 (mettre le chemin où se situe le code et les données)
 - S'assurer que les données sont dans les bons sous-chemins (le fichier decp.zip permet de vérifier cela)
+- Dans le dossier confs, le fichier var_to_export correspond à toutes les variables dans le DataFrame decp avant export final. 
+   - Mettre à 1 les colonnes que l'on souhaite exporter
+   - 0 Sinon.
 - Exécuter tout le code 
 
-## Détails sur le script
-### Importation et mise en forme des données 
-- Importation des librairies (certaines ont besoin d’être installées au préalable)
-- Chargement des données JSON puis <b>aplatissement par marchés</b>
-- Colonnes titulaires et concessionnaires réunies puis traitées ensemble
-- Aplatissement des données par titulaires on obtient alors les données par "contrats" (relation acheteurs – entreprises), moins de 10% des marchés ont plus d'un titulaire donc l’impact est faible
-- Suppression des doublons
-- Non prise en charge de la colonne ‘<b>Modification</b>’
+## Valorisation de la donnée
 
-### Premier traitement – Valorisation 
-- <b>Identification et suppression des montants aberrants</b> (imputés plus tard)
-- Gestion des id et codes CPV manquants
-- Création d’une colonne permettant de connaitre le nombre de titulaires par marchés
-- Montant total réparti de façon uniforme en fonction du nombre de titulaires sur un marché (montant total sauvegardé dans une nouvelle colonne)
-- Suppression des caractères spéciaux et alphabétique dans les codes SIRET pour tenter de les récupérer
-- Création de deux colonnes permettant d’attribuer précisément une région et un département à chaque marché (localisation générale des acheteurs)
-- Mise en forme et correction des données temporelles (date/durée)
-- <b>Imputation des montants</b> en utilisant la médiane stratifiée (le plus possible : Région, code CPV, forme du marché), et création d’une colonne permettant d’identifier les montants imputés
-- Identification et <b>rectification des durées</b> (en mois) exprimées en jours
-- Imputation des durées encore fausses après conversion en mois. Utilisation de la médiane des durées, en fonction des code CPV 
+### Nettoyage 
+Explication de l'ensemble du traitement réalisé pour la partie nettoyage des données. 
 
-### Enrichissement des données 
-- Enrichissement des données des acheteurs et des entreprises via le code SIRET/SIREN (et dans le pire des cas grâce à la dénomination sociale des entreprises)
-   - 1er enrichissement réalisé avec le code SIRET en fusionnant avec une BDD INSEE
-   - 2nd enrichissement réalisé avec le code SIREN en fusionnant avec une BDD INSEE
-   - 3e enrichissement en utilisant plusieurs méthodes de scraping sur le site INFOGREFFE (en utilisant code SIRET, SIREN, et dénomination sociale)
-- Si certains codes SIRET sont déjà identifiés comme faux (lors d’un lancement ultérieur du code) alors ils sont automatiquement supprimés des méthodes d’enrichissement pour gagner du temps
-- Enrichissement via les codes CPV : identification précise de leur référence via une BDD
-- Ajout de la <b>géolocalisation précise des acheteurs et des entreprises</b> : latitude et longitude de la ville dans laquelle ils sont identifiés via les codes SIRET/SIREN
-   - La géolocalisation précise permet ensuite de calculer la distance entre les acheteurs et les entreprises pour chaque marché (utilisation de la formule de Vincenty avec le rayon moyen de la Terre)
-- <b>Segmentation de marché</b> : utilisation de la classification par ascendant hiérarchique (CAH) afin de classer les acheteurs dans des clusters (au total <b>3 clusters</b> principaux et quelques données hors-clusters)
+#### Travail sur les titulaires
+Au sein des decp on distingue deux types de données: les marchés et les concessions. Nous avons donc fusionner les colonnes comportant des informations semblables.
 
-### Vérification de la qualité des données
-- Utilisation de l’<b>algorithme de Luhn</b> pour détecter les SIREN faux
-- Calcul du ratio nb entreprises / nb marchés (avec tous les montants et avec les montants>40K)
-- <b>Récapitulatif de toutes les erreurs supposées</b> répertoriées dans le df_ERROR
-- Calcul et sauvegarde du nombre d'erreurs par commune
+- La colonne concessionnaire a fusionné avec la colonne <b>titulaire</b> 
+- La colonne valeur globale a fusionné avec la colonne <b>montant</b>
+- La colonne autoriteConcedante.id a fusionné avec la colonne <b>acheteur.id</b>
+- La colonne autoriteConcedante.nom a fusionné avec la colonne <b>acheteur.nom</b>
+- On ne conserve que les données ou un titulaire est renseigné.
 
-### Réalisation d'un dashboard 
-- <b>Représentation cartographique</b> des données
-  - Données par commune, information sur le montant total, le nombre de marchés, le nombre d’entreprises, la distance médiane (acheteurs – entreprises) et la segmentation de l’acheteur
-  - HeatMap des contrats au niveau national
-  - Répartition des montants totaux par région
-  - Répartition des montants / nb population par département
-- Réalisation de <b>vignettes</b> mettant en avant les chiffres / indicateurs quantitatifs les plus importants
-- Réalisation de nombreux <b>graphiques</b> permettant d'avoir une première approche facile et rapide des données 
+#### Travail sur les montants
+Dans un soucis de conservation de l'information source, la colonne montant est renomée en <b>montantOriginal</b> et l'ensemble des opérations suivantes seront appliquées à la colonne <b>montantCalcule</b>.
 
-## Règles d'imputations
-### Montants aberrants
-Les montants corrigés sont ceux :
-- manquants
-- inférieurs à <b>200€</b> 
-- supérieurs à <b>999 000 000€</b>
+- Les valeurs manquantes sont remplacées par 0
+- Les montants inférieurs à 200€ et supérieur à 999 999 999€ sont remis à 0
+- Les montants composés d'au moins 5 fois le même chiffre (hors 0) sont remis à 0.
 
-### Durées exprimées en jours
+#### Travail sur des codes manquants
+Ce qui est appelé code correspond aux variables d'identifications. On parle ici aussi bien de la viariable id (identifiant des lignes de la base), que id.Titulaires (ientifiant des entreprises) ou encore code_CPV permettant l'identification des types de marchés. 
+
+- Remplacement des valeurs manquantes de <b>id</b> par '0000000000000000' (la colonne id sera retravaillé un peu plus tard dans le processus de nettoyage)
+- Rerait des caractères spéciaux présent dans <b>idTitulaires</b>. On obtient le numéro SIRET
+- Récupération du NIC et stockage dans une colonne <b>nic</b>
+- Création d'une colonne <b>CPV_min</b> composé des deux premiers chiffre du code CPV. Cela permet d'identifier le type de marché (Fournitures/Travaux/Services)
+
+#### Travail sur les régions
+Récupération des codes de départements des marchés. On en profite pour ajouter les libellés et la région. 
+
+- Extraction du code département de la colonne <b>lieuExecution.code</b> et stocké dans <b>codeDepartementExecution</b>
+- Ajout du libellé du département / code de la région / libellé de la région respectivement dans <b>libelleDepartementExecution</b>, <b>codeRegionExecution</b> et <b>libelleRegionExecution</b>
+
+#### Travail sur les dates
+
+- Récupération de l'année et du mois de notification du marché et stockage dans <b>anneeNotification</b> et <b>moisNotification</b>
+- Remplacement par np.NaN des dates lorsque l'années est inférieur à 1980 et supérieur à 2100
+
+#### Travail sur la durée du marché
+Au sein des DECP les durées de marché sont exprimées en mois. De même que pour les montants, on conserve les durées initiales et on modifie les durées dans la colonne <b>dureeMoisCalculee</b>. De plus, on ajoute la colonne <b>dureeMoisEstimee</b>: Booléenne, la durée est elle estimée ? <br>
 Les durées corrigées sont celles :
-- manquantes: corrigées à 0
+- manquantes: corrigées à 0 <br>
+
 Tous les cas suivant seront corrigées en divisant par 30 (conversion en mois)
 - durée égale au montant 
 - montant / durée < <b>100</b>
@@ -135,3 +126,22 @@ Tous les cas suivant seront corrigées en divisant par 30 (conversion en mois)
 - duréee == <b>360</b> ou <b>365</b> ou <b>366</b> et montant < <b>10 000 000</b> €
 - durée > <b>120</b> et montant < <b>2 000 000</b> €
 
+Un début de travail sur de l'imputation a aussi été réalisé. On se place dans le cas des marchés qui ne sont pas des travaux (CPV_min != 45) et qui ont une duréeCalculee supérieure à 120. <br>
+    - Imputation par la médiane des durées de mois pour un <b>CPV_min</b> équivalent.
+
+#### Travail sur la variable qualitative objet.
+Remplacement du caractère '�' par 'XXXXX' dans la colonne objet
+
+## Enrichissement des données
+
+La partie enrichissement des données va nous permettre d'ajouter, grâce à des sources externes, de la donnée dans nos DECP. Pour cela nous utiliserons les sources de données suivantes:
+   - INSEE
+       - Code des régions, départements, arrondissements, cantons.
+       - La base SIREN 
+   - OpenDatasoft
+       - Géolocalisations des communes
+   - SIMAP (Système d'Information pour les MArchés Publics)
+       - Nomencalture européenne des codes CPV
+
+### Réalisation d'un dashboard 
+   Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
