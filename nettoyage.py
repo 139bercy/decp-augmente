@@ -7,16 +7,24 @@ import numpy as np
 import pandas as pd
 from pandas import json_normalize
 
-with open("config.json") as f:
-    conf = json.load(f)
-path_to_data = conf["path_to_data"]
-decp_file_name = conf["decp_file_name"]
+
+
+with open(os.path.join("confs", "config_data.json")) as f:
+    conf_data = json.load(f)
+path_to_data = conf_data["path_to_data"]
+decp_file_name = conf_data["decp_file_name"]
+
+with open(os.path.join("confs", "var_glob.json")) as f:
+    conf_glob = json.load(f)
+
 logger = logging.getLogger("main.nettoyage")
 logger.setLevel(logging.DEBUG)
 
 
+
+
 def main():
-    check_reference_files(conf)
+    check_reference_files(conf_data)
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
@@ -71,19 +79,19 @@ def main():
     logger.info("Ecriture du csv terminé")
 
 
-def check_reference_files(conf):
+def check_reference_files(conf_data):
     """Vérifie la présence des fichiers datas nécessaires, dans le dossier data.
         StockEtablissement_utf8.csv, cpv_2008_ver_2013.xlsx, "geoflar-communes-2015.csv", departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv"""
-    path_to_data = conf["path_to_data"]
+    path_to_data = conf_data["path_to_data"]
     L_key_useless = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_to_data)
-    for key in list(conf.keys()):
+    for key in list(conf_data.keys()):
         if key not in L_key_useless:
-            logger.info('Test du fichier {}'.format(conf[key]))
-            mask = os.path.exists(os.path.join(path, conf[key]))
+            logger.info('Test du fichier {}'.format(conf_data[key]))
+            mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
-                logger.error("Le fichier {} n'existe pas".format(conf[key]))
-                raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf[key]))
+                logger.error("Le fichier {} n'existe pas".format(conf_data[key]))
+                raise ValueError("Le fichier data: {} n'a pas été trouvé".format(conf_data[key]))
 
 
 def manage_titulaires(df):
@@ -193,13 +201,7 @@ def manage_missing_code(df):
 
     # Nettoyage des codes idTitulaires
     logger.info("Nettoyage des idTitualires")
-    caracteres_speciaux_dict = {
-        "\\t": "",
-        "-": "",
-        " ": "",
-        ".": "",
-        "?": "",
-        "    ": ""}
+    caracteres_speciaux_dict = conf_glob["nettoyage"]["caractere_speciaux"]
     mask = (df.typeIdentifiant == 'SIRET') | \
            (df.typeIdentifiant.isnull()) | \
            (df.typeIdentifiant == 'nan')
@@ -238,34 +240,16 @@ def manage_region(df):
     # Création de la colonne pour distinguer les départements
     logger.info("Création de la colonne département Execution")
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
-    listCorrespondance = {
-        '976': 'YT',
-        '974': 'RE',
-        '972': 'MQ',
-        '971': 'GP',
-        '973': 'GF'}
+    listCorrespondance = conf_glob["nettoyage"]["DOM2name"]
     df['codeDepartementExecution'].replace(listCorrespondance, inplace=True)
 
     df['codeDepartementExecution'] = df['codeDepartementExecution'].str[:2]
 
-    listCorrespondance2 = {
-        'YT': '976',
-        'RE': '974',
-        'MQ': '972',
-        'GP': '971',
-        'GF': '973',
-        'TF': '98',
-        'NC': '988',
-        'PF': '987',
-        'WF': '986',
-        'MF': '978',
-        'PM': '975',
-        'BL': '977'}
+    listCorrespondance2 = conf_glob["nettoyage"]["name2DOMCOM"]
     df['codeDepartementExecution'].replace(listCorrespondance2, inplace=True)
 
     # Vérification si c'est bien un code département
-    listeCP = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '2A', '2B', '98', '976', '974', '972', '971', '973',
-               '97', '988', '987', '984', '978', '975', '977', '986'] \
+    listeCP = conf_glob["nettoyage"]["code_CP"].split(',') \
         + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(listeCP), np.NaN, df['codeDepartementExecution'])
 
@@ -275,7 +259,7 @@ def manage_region(df):
 
     # Récupération des codes régions via le département
     logger.info("Ajout des code regions pour le lieu d'execution")
-    path_dep = os.path.join(path_to_data, conf["departements-francais"])
+    path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
     df = pd.merge(df, departement, how="left",
@@ -287,8 +271,7 @@ def manage_region(df):
     df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
     # Vérification des codes région
-    listeReg = ['84', '27', '53', '24', '94', '44', '32', '11', '28', '75', '76',
-                '52', '93', '01', '02', '03', '04', '06', '98']  # 98 = collectivité d'outre mer
+    listeReg = conf_glob["nettoyage"]["code_reg"].split(',')  # 98 = collectivité d'outre mer
 
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
     # Identification du nom des régions
@@ -296,7 +279,7 @@ def manage_region(df):
 
     # Import de la base region de l'Insee
     logger.info("Ajout du libelle des regions d'execution")
-    path_reg = os.path.join(path_to_data, conf["region-fr"])
+    path_reg = os.path.join(path_to_data, conf_data["region-fr"])
     region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
     region.columns = ["reg", "libelle_reg"]
 
@@ -557,29 +540,7 @@ def manage_modifications(data):
     L_indice = indice_marche_avec_modification(data)
     dict_modification = recuperation_colonne_a_modifier(data, L_indice)
     df = json_normalize(data['marches'])
-    df = df.astype({
-        'id': 'string',
-        'source': 'string',
-        'uid': 'string',
-        'uuid': 'string',
-        '_type': 'string',
-        'objet': 'string',
-        'codeCPV': 'string',
-        'lieuExecution.code': 'string',
-        'lieuExecution.typeCode': 'string',
-        'lieuExecution.nom': 'string',
-        'dureeMois': 'int64',
-        'montant': 'float64',
-        'formePrix': 'string',
-        'titulaires': 'object',
-        'modifications': 'object',
-        'nature': 'string',
-        'autoriteConcedante.id': 'string',
-        'autoriteConcedante.nom': 'string',
-        'acheteur.id': 'string',
-        'acheteur.nom': 'string',
-        'donneesExecution': 'string'
-    }, copy=False)
+    df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
     df = regroupement_marche(df, dict_modification)
     return df

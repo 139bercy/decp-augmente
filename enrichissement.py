@@ -14,43 +14,22 @@ logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
 
 
-with open("config.json") as f:
-    conf = json.load(f)
-path_to_data = conf["path_to_data"]
+with open(os.path.join("confs", "config_data.json")) as f:
+    conf_data = json.load(f)
+
+with open(os.path.join("confs", "var_glob.json")) as f:
+    conf_glob = json.load(f)
+
+path_to_data = conf_data["path_to_data"]
 siren_len = 9
 
 
 def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
+        
+    df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
 
-    df = df.astype({
-        'id': 'string',
-        'source': 'string',
-        'uid': 'string',
-        'uuid': 'string',
-        '_type': 'string',
-        'objet': 'string',
-        'codeCPV': 'string',
-        'CPV_min': 'string',
-        'lieuExecution.code': 'string',
-        'lieuExecution.typeCode': 'string',
-        'lieuExecution.nom': 'string',
-        'dureeMois': 'int64',
-        'montantCalcule': 'float64',
-        'montantOriginal': 'float64',
-        'formePrix': 'string',
-        'idTitulaires': 'object',
-        'denominationSociale': 'string',
-        'nature': 'string',
-        'acheteur.id': 'string',
-        'acheteur.nom': 'string',
-        'codeDepartementExecution': 'string',
-        'codeRegionExecution': 'string',
-        'anneeNotification': 'string',
-        'moisNotification': 'string',
-        'dureeMoisEstimee': 'string',
-    }, copy=False)
     logger.info("Début du traitement: Enrichissement siret")
     df = enrichissement_siret(df)
     logger.info("Fin du traitement")
@@ -207,34 +186,19 @@ def detection_accord_cadre(df):
 
 def manage_column_final(df):
     """Renommage de certaines colonnes et trie des colonnes."""
+
+    with open(os.path.join("confs", "var_to_export.json")) as f:
+        conf_export = json.load(f)
+    colonne_to_export = []
+
+    for key in conf_export["export"].keys():
+        if conf_export["export"][key] == 1:
+            colonne_to_export += [key]
+    df = df.reindex(columns = colonne_to_export)
     df = df.rename(columns={
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement"
     })
-    # Réorganisation finale 'codeRegionAcheteur'
-    df = df.reindex(columns=['id', "id_source", 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
-                             'referenceCPV',
-                             'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
-                             'montantOriginal', 'montantCalcule', 'nbTitulairesSurCeMarche', 'formePrix',
-                             'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution", "libelleRegionExecution",
-                             'nature', 'procedure',
-
-                             'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
-                             'codeRegionAcheteur', 'libelleRegionAcheteur',
-                             'departementAcheteur', 'libelleDepartementAcheteur', 'codePostalAcheteur',
-                             'libelleArrondissementAcheteur', 'codeArrondissementAcheteur',
-                             'libelleCommuneAcheteur', 'codeCommuneAcheteur', 'superficieCommuneAcheteur', 'populationCommuneAcheteur', 'geolocCommuneAcheteur',
-
-                             'typeIdentifiantEtablissement', 'siretEtablissement', "siretEtablissementValide", 'sirenEtablissement', 'nicEtablissement', 'sirenEtablissementValide',
-                             "categorieEtablissement", 'denominationSocialeEtablissement',
-                             'codeRegionEtablissement', 'libelleRegionEtablissement',
-                             'libelleDepartementEtablissement', 'departementEtablissement',
-                             'libelleArrondissementEtablissement', 'codeArrondissementEtablissement',
-                             'codePostalEtablissement', 'adresseEtablissement', 'communeEtablissement', 'codeCommuneEtablissement',
-                             'codeTypeEtablissement',
-                             'superficieCommuneEtablissement', 'populationCommuneEtablissement',
-                             'distanceAcheteurEtablissement',
-                             'geolocCommuneEtablissement'])
     return df
 
 
@@ -253,10 +217,10 @@ def extraction_departement_from_code_postal(code_postal):
 def jointure_base_departement_region():
     """Permet la jointure entre la base departement de l'insee (dossier data) et la base region de l'insee"""
     # Import de la base département
-    path_dep = os.path.join(path_to_data, conf["departements-francais"])
+    path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
     # Import de la base Région
-    path_reg = os.path.join(path_to_data, conf["region-fr"])
+    path_reg = os.path.join(path_to_data, conf_data["region-fr"])
     region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
     region.columns = ["reg", "libelle_reg"]
     # Merge des deux bases
@@ -302,7 +266,7 @@ def enrichissement_arrondissement(df):
 
 def get_code_arrondissement(df):
     """Ajout de la colonne code Arrondissement à partir du code commune"""
-    path_to_commune = os.path.join(path_to_data, conf["commune-fr"])
+    path_to_commune = os.path.join(path_to_data, conf_data["commune-fr"])
     commune = pd.read_csv(path_to_commune, sep=",", usecols=['TYPECOM', 'COM', 'ARR'], dtype={"COM": str, "ARR": str})
     commune = commune[commune.TYPECOM == "COM"]
     commune.drop(['TYPECOM'], axis=1)
@@ -317,7 +281,7 @@ def get_code_arrondissement(df):
 
 def get_libelle_arrondissement(df):
     """Ajout de la colonne libelle Arrondissement à partir du code Arrondissement"""
-    path_to_arrondissement = os.path.join(path_to_data, conf["arrondissement-fr"])
+    path_to_arrondissement = os.path.join(path_to_data, conf_data["arrondissement-fr"])
     arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
     df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
     df = df.drop(["ARR"], axis=1)
@@ -331,43 +295,9 @@ def get_libelle_arrondissement(df):
 def enrichissement_type_entreprise(df):
     logger.info('début enrichissement_type_entreprise\n')
 
-    df = df.astype({
-        'id': 'string',
-        'source': 'string',
-        'type': 'string',
-        'objetMarche': 'object',
-        'codeCPV': 'string',
-        'lieuExecutionCode': 'string',
-        'lieuExecutionTypeCode': 'string',
-        'lieuExecutionNom': 'string',
-        'dureeMois': 'int64',
-        'montantCalcule': 'float64',
-        'montantOriginal': 'float64',
-        'formePrix': 'string',
-        'typeIdentifiantEtablissement': 'object',
-        'siretEtablissement': 'string',
-        'denominationSocialeEtablissement': 'string',
-        'natureObjet': 'object',
-        'idAcheteur': 'string',
-        'nomAcheteur': 'string',
-        'codePostalEtablissement': 'string',
-        'anneeNotification': 'string',
-        'moisNotification': 'string',
-        'dureeMoisEstimee': 'string',
-        'procedure': 'string',
-        'nbTitulairesSurCeMarche': 'int64',
-        'sirenEtablissement': 'string',
-        'codeTypeEtablissement': 'string',
-        'codeCommuneAcheteur': 'string',
-        'libelleCommuneAcheteur': 'string',
-        'codePostalAcheteur': 'string',
-        'nicEtablissement': 'string',
-        'communeEtablissement': 'string',
-        'adresseEtablissement': 'string',
-    }, copy=False)
-
+    df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
     # Recuperation de la base
-    path = os.path.join(path_to_data, conf["base_ajout_type_entreprise"])
+    path = os.path.join(path_to_data, conf_data["base_ajout_type_entreprise"])
     # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
     to_add = pd.DataFrame(columns=["siren", "categorieEntreprise"])
     chunksize = 1000000
@@ -513,7 +443,7 @@ def getArchiveErrorSIRET():
 def get_enrichissement_insee(dfSIRET, path_to_data):
     """Ajout des informations Adresse/Activité des entreprises via la base siren Insee"""
     # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
-    path = os.path.join(path_to_data, conf["base_sirene_insee"])
+    path = os.path.join(path_to_data, conf_data["base_sirene_insee"])
     columns = [
         'siren',
         'nic',
@@ -662,49 +592,7 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
     # Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
-    listCorrespondance = {
-        'ALL': 'Allée',
-        'AV': 'Avenue',
-        'BD': 'Boulevard',
-        'CAR': 'Carrefour',
-        'CHE': 'Chemin',
-        'CHS': 'Chaussée',
-        'CITE': 'Cité',
-        'COR': 'Corniche',
-        'CRS': 'Cours',
-        'DOM': 'Domaine',
-        'DSC': 'Descente',
-        'ECA': 'Ecart',
-        'ESP': 'Esplanade',
-        'FG': 'Faubourg',
-        'GR': 'Grande Rue',
-        'HAM': 'Hameau',
-        'HLE': 'Halle',
-        'IMP': 'Impasse',
-        'LD': 'Lieu dit',
-        'LOT': 'Lotissement',
-        'MAR': 'Marché',
-        'MTE': 'Montée',
-        'PAS': 'Passage',
-        'PL': 'Place',
-        'PLN': 'Plaine',
-        'PLT': 'Plateau',
-        'PRO': 'Promenade',
-        'PRV': 'Parvis',
-        'QUA': 'Quartier',
-        'QUAI': 'Quai',
-        'RES': 'Résidence',
-        'RLE': 'Ruelle',
-        'ROC': 'Rocade',
-        'RPT': 'Rond Point',
-        'RTE': 'Route',
-        'RUE': 'Rue',
-        'SEN': 'Sentier',
-        'SQ': 'Square',
-        'TPL': 'Terre-plein',
-        'TRA': 'Traverse',
-        'VLA': 'Villa',
-        'VLGE': 'Village'}
+    listCorrespondance = conf_glob["enrichissement"]["abrev2nom"]
 
     enrichissementInsee['typeVoieEtablissement'].replace(listCorrespondance, inplace=True)
     enrichissementInsee['rue'] = \
@@ -767,7 +655,7 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 def enrichissement_cpv(df):
     """Récupération des codes CPV formatés."""
     # Importation et mise en forme des codes/ref CPV
-    path = os.path.join(path_to_data, conf["cpv_2008_ver_2013"])
+    path = os.path.join(path_to_data, conf_data["cpv_2008_ver_2013"])
     refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
     refCPV.columns = ['CODE', 'refCodeCPV']
     refCPV_min = pd.DataFrame.copy(refCPV, deep=True)
@@ -801,7 +689,7 @@ def enrichissement_acheteur(df):
     dfAcheteurId = dfAcheteurId.astype(str)
 
     # StockEtablissement_utf8
-    chemin = os.path.join(path_to_data, conf["base_sirene_insee"])
+    chemin = os.path.join(path_to_data, conf_data["base_sirene_insee"])
     # chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
     result = pd.DataFrame(columns=['siret', 'codePostalEtablissement',
                                    'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
@@ -925,7 +813,7 @@ def enrichissement_geo(df):
 
 def get_df_villes():
     """Récupération des informations sur les communes (superficie/population"""
-    path = os.path.join(path_to_data, conf["base_geoflar"])
+    path = os.path.join(path_to_data, conf_data["base_geoflar"])
     df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                             usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
 
