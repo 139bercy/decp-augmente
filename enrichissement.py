@@ -37,7 +37,7 @@ def main():
         'lieuExecution.typeCode': 'string',
         'lieuExecution.nom': 'string',
         'dureeMois': 'int64',
-        'montant': 'float64',
+        'montantCalcule': 'float64',
         'montantOriginal': 'float64',
         'formePrix': 'string',
         'idTitulaires': 'object',
@@ -88,7 +88,7 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Detection des accords cadre")
-    df = detection_accord_cadre(df)
+    # df = detection_accord_cadre(df)
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Reorganisation du dataframe final")
@@ -116,7 +116,7 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
         liste_dataframe += [df_sub]
     return liste_dataframe
 
-
+# On suppose que id permet d'identifier un marché
 def detection_accord_cadre_without_date(df, compteur):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
@@ -215,9 +215,9 @@ def manage_column_final(df):
     df = df.reindex(columns=['id', "id_source", 'idMarche', 'source', 'type', 'natureObjetMarche', 'objetMarche', 'codeCPV_Original', 'codeCPV', "codeCPV_division",
                              'referenceCPV',
                              'dateNotification', 'anneeNotification', 'moisNotification', 'datePublicationDonnees', 'dureeMois', 'dureeMoisEstimee', 'dureeMoisCalculee',
-                             'montantOriginal', 'nombreTitulaireSurMarchePresume', 'montantCalcule', 'formePrix',
+                             'montantOriginal', 'montantCalcule', 'nbTitulairesSurCeMarche', 'formePrix',
                              'lieuExecutionCode', 'lieuExecutionTypeCode', 'lieuExecutionNom', "codeDepartementExecution", "codeRegionExecution", "libelleRegionExecution",
-                             'nature', "accord-cadrePresume", 'procedure',
+                             'nature', 'procedure',
 
                              'idAcheteur', 'sirenAcheteurValide', 'nomAcheteur',
                              'codeRegionAcheteur', 'libelleRegionAcheteur',
@@ -341,7 +341,7 @@ def enrichissement_type_entreprise(df):
         'lieuExecutionTypeCode': 'string',
         'lieuExecutionNom': 'string',
         'dureeMois': 'int64',
-        'montant': 'float64',
+        'montantCalcule': 'float64',
         'montantOriginal': 'float64',
         'formePrix': 'string',
         'typeIdentifiantEtablissement': 'object',
