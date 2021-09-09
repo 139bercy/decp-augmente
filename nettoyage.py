@@ -33,6 +33,8 @@ def main():
     df = manage_modifications(data)
     logger.info("Fin du traitement")
 
+    df = regroupement_marche_complet(df)
+
     logger.info("Début du traitement: Gestion des titulaires")
     df = manage_titulaires(df)
     logger.info("Fin du traitement")
@@ -174,16 +176,17 @@ def manage_amount(df):
     nb_montant_egal_zero = df.montant.value_counts()[0]
     borne_inf = 200.0
     borne_sup = 9.99e8
+    df["montant"] = df["montant"] / df["nbTitulairesSurCeMarche"]
     df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
     logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_inf))
     nb_montant_egal_zero = df.montant.value_counts()[0]
     df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
     logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
-
+    df = df.rename(columns = {"montant": "montantCalcule"})
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montant'] == 0, 'True', 'False')
+    df['montantEstime'] = np.where(df['montantCalcule'] != df.montantOriginal, True, False)
     # Ecriture dans la log
-    logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montant.value_counts()[0]))
+    logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(sum(df.montantEstime)))
     return df
 
 
@@ -320,15 +323,15 @@ def manage_date(df):
 def correct_date(df):
     """Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois"""
     # On cherche les éventuelles erreurs mois -> jours
-    mask = ((df['montant'] == df['dureeMois'])
-            | (df['montant'] / df['dureeMois'] < 100)
-            | (df['montant'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
-            | ((df['dureeMois'] == 30) & (df['montant'] < 200000))
-            | ((df['dureeMois'] == 31) & (df['montant'] < 200000))
-            | ((df['dureeMois'] == 360) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] == 365) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] == 366) & (df['montant'] < 10000000))
-            | ((df['dureeMois'] > 120) & (df['montant'] < 2000000)))
+    mask = ((df['montantCalcule'] == df['dureeMois'])
+            | (df['montantCalcule'] / df['dureeMois'] < 100)
+            | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
+            | ((df['dureeMois'] == 30) & (df['montantCalcule'] < 200000))
+            | ((df['dureeMois'] == 31) & (df['montantCalcule'] < 200000))
+            | ((df['dureeMois'] == 360) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] == 365) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] == 366) & (df['montantCalcule'] < 10000000))
+            | ((df['dureeMois'] > 120) & (df['montantCalcule'] < 2000000)))
 
     df['dureeMoisEstimee'] = np.where(mask, "True", "False")
 
@@ -343,7 +346,7 @@ def correct_date(df):
 
 def data_inputation(df):
     """Permet une estimation de la dureeMois (pour les durees évidemment fausses) grace au contenu de la commande (codeCPV)"""
-    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montant"]]
+    df_intermediaire = df[["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"]]
     # On fait un groupby sur la division des cpv (CPV_min) afin d'obtenir toutes les durees par division
     df_group = pd.DataFrame(df_intermediaire.groupby(["CPV_min"])["dureeMoisCalculee"])
     # On cherche à obtenir la médiane par division de CPV
@@ -366,9 +369,47 @@ def data_inputation(df):
 
 
 def replace_char(df):
-    """Fonction pour mettre en qualité le champ objetMarche"""
+    """Fonction pour mettre en qualité le champ objet"""
     # Remplacement brutal du caractère (?) par un espace
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
+    return df
+
+# Pour la PR
+# Cette fonction doit s'insérer après le traitement de la branche Add feature modifications
+
+def regroupement_marche_complet(df):
+    """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant 
+    les marchés en fonction de leur objets/date de publication des données et montant.
+    Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
+    # Creation du sub DF necessaire
+    df_titulaires = pd.DataFrame()
+    df_to_update = pd.DataFrame()
+    df_intermediaire = df[["objet", "datePublicationDonnees", "montant", "id"]] # "datePublicationDonnees",
+    # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais idMarche ne l'est pas non plus.
+    df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
+                                                      "datePublicationDonnees", "montant"])["id"])
+    # Initialisation du resultat sous forme de liste
+    # df_group a un multi_index objet-datePublicationDonnees
+    index = df_group.index
+    for i in range(len(df_group)):
+        # dataframe contenant les id d'un meme marche
+        ids_to_modify = df_group[1].iloc[i]
+        # Contient les index des lignes d'un meme marché. Utile pour le update
+        new_index = list(ids_to_modify.index)
+        # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
+        df_avec_bon_id = pd.DataFrame(len(new_index)*[max(ids_to_modify)], index=new_index, columns = ["id"])
+        # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
+        df_nbtitulaires = pd.DataFrame(len(new_index)*[len(new_index)], index=new_index, columns = ["nombreTitulaireSurMarchePresume"])
+        df_to_update = pd.concat([df_to_update, df_avec_bon_id])
+        # Dataframe permettant de faire la jointure pour ajouter la colonne nombreTitulaireSurMarchePresume dans le df initial
+        df_titulaires = pd.concat([df_titulaires, df_nbtitulaires])
+        # Arbitraire, faire un update a chaque étape rallonge le temps d'execution, un update final idem.
+        if len(df_to_update) > 50000:
+            df.update(df_to_update)
+            df_to_update = pd.DataFrame()
+    # Ajout effectif de nombreTitulaireSurMarchePresume
+    df = df.merge(df_titulaires, how='left', left_index=True, right_index=True)
+    df.update(df_to_update)
     return df
 
 

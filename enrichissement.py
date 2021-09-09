@@ -27,8 +27,9 @@ siren_len = 9
 def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
-
+        
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
+
     logger.info("Début du traitement: Enrichissement siret")
     df = enrichissement_siret(df)
     logger.info("Fin du traitement")
@@ -66,7 +67,7 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Detection des accords cadre")
-    df = detection_accord_cadre(df)
+    # df = detection_accord_cadre(df)
     logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Reorganisation du dataframe final")
@@ -94,7 +95,7 @@ def subset_liste_dataframe_dec_jan(df: pd.DataFrame) -> list:
         liste_dataframe += [df_sub]
     return liste_dataframe
 
-
+# On suppose que id permet d'identifier un marché
 def detection_accord_cadre_without_date(df, compteur):
     """On va chercher à detecter les accord cadres, qu'ils soient declares ou non.
     Accord cadre : Plusieurs Etablissements sur un meme marche
@@ -295,7 +296,6 @@ def enrichissement_type_entreprise(df):
     logger.info('début enrichissement_type_entreprise\n')
 
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
-
     # Recuperation de la base
     path = os.path.join(path_to_data, conf_data["base_ajout_type_entreprise"])
     # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
