@@ -29,7 +29,7 @@ venv/
 #Suppresion des logs
 *.log
 
-#Suppression des json 
+#Suppression de decp.json 
 decp.json
 
 #Suppression des zip
