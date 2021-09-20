@@ -52,6 +52,7 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    logger.info("Début du traitement: Reorganisation du dataframe final")
     with open(os.path.join("confs", "var_to_export.json")) as f:
         conf_export = json.load(f)
     colonne_to_export = []
@@ -112,6 +113,7 @@ def enrichissement_departement(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
     logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
     df_dep_reg = jointure_base_departement_region()
     logger.info("Fin de la jointure")
@@ -145,6 +147,7 @@ def enrichissement_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
     df = get_code_arrondissement(df)
     df = get_libelle_arrondissement(df)
     return df
@@ -194,7 +197,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
-    logger.info('début enrichissement_type_entreprise\n')
+    logger.info('début enrichissement_type_entreprise')
 
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
     # Recuperation de la base
@@ -261,6 +264,7 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
     # Application sur les siren des Acheteur
     df['siren1Acheteur'] = df["idAcheteur"].str[:9]
     df_SA = pd.DataFrame(df['siren1Acheteur'])
@@ -304,6 +308,7 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    logger.info("Début du traitement: Enrichissement siret")
     dfSIRET = get_siretdf_from_original_data(df)
     archiveErrorSIRET = getArchiveErrorSIRET()
 
@@ -585,9 +590,15 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
     return dfenrichissement
 
 
-def enrichissement_cpv(df):
-    """Récupération des codes CPV formatés."""
+def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Récupération des codes CPV formatés.
+    
+    Return:
+        - pd.Dataframe
+    """
     # Importation et mise en forme des codes/ref CPV
+    logger.info("Début du traitement: Enrichissement cpv")
     path = os.path.join(path_to_data, conf_data["cpv_2008_ver_2013"])
     refCPV = pd.read_excel(path, usecols=['CODE', 'FR'])
     refCPV.columns = ['CODE', 'refCodeCPV']
@@ -615,6 +626,7 @@ def enrichissement_acheteur(df):
     # Enrichissement des données des acheteurs #
     # Enrichissement des données via les codes siret/siren #
     # Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
+    logger.info("Début du traitement: Enrichissement acheteur")
     dfAcheteurId = df['acheteur.id'].to_frame()
     dfAcheteurId.columns = ['siret']
     dfAcheteurId = dfAcheteurId.drop_duplicates(keep='first')
@@ -643,8 +655,14 @@ def enrichissement_acheteur(df):
     return df
 
 
-def reorganisation(df):
-    """Mise en qualité du dataframe"""
+def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Mise en qualité du dataframe
+    
+    Return:
+        - pd.Dataframe
+    """
+    logger.info("Début du traitement: Reorganisation du dataframe")
     # Ajustement de certaines colonnes
     df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]
     df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
@@ -702,6 +720,7 @@ def fix_codegeo(code):
 
 def enrichissement_geo(df):
     """Ajout des géolocalisations des entreprises"""
+    logger.info("Début du traitement: Enrichissement geographique")
     # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
