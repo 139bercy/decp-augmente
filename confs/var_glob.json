@@ -56,7 +56,8 @@
     },
     "enrichissement": {
         "type_col_enrichissement": {
-                                    "id_source": "string",
+                                    "id": "string",
+                                    "idMarche": "int",
                                     "source": "string",
                                     "uid": "string",
                                     "uuid": "string",
@@ -69,7 +70,7 @@
                                     "lieuExecution.nom": "string",
                                     "dureeMois": "int64",
                                     "montantCalcule": "float64",
-                                    "montantOriginal": "float64",
+                                    "montant": "float64",
                                     "formePrix": "string",
                                     "idTitulaires": "object",
                                     "denominationSociale": "string",
@@ -83,6 +84,7 @@
                                    },
         "type_col_enrichissement_siret": {
                                           "id": "string",
+                                          "idMarche": "int",
                                           "source": "string",
                                           "type": "string",
                                           "objetMarche": "object",
@@ -92,7 +94,7 @@
                                           "lieuExecutionNom": "string",
                                           "dureeMois": "int64",
                                           "montantCalcule": "float64",
-                                          "montantOriginal": "float64",
+                                          "montant": "float64",
                                           "formePrix": "string",
                                           "typeIdentifiantEtablissement": "object",
                                           "siretEtablissement": "string",
