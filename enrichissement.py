@@ -429,8 +429,13 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str) -> list:
     return [enrichissementInsee, nanSiret]
 
 
-def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
-    # Enrichissement des données restantes
+def get_enrichissement_scrap(nanSiren: pd.DataFrame, archiveErrorSIRET: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données restantes et récupération des siret n'ayant aps de correspondance
+
+    Return:
+        - pd.DataFrame
+    """
 
     # ....... Solution complémentaire pour ceux non-identifié dans la BDD
     columns = [
@@ -482,51 +487,13 @@ def get_enrichissement_scrap(nanSiren, archiveErrorSIRET):
     return enrichissementScrap
 
 
-def get_scrap_dataframe(index, code):
-    url = 'https://www.infogreffe.fr/entreprise-societe/' + code
+def get_df_enrichissement(enrichissementScrap: pd.DataFrame, enrichissementInsee: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement géographique grace aux données Insee
 
-    page = requests.get(url)
-    tree = html.fromstring(page.content)
-
-    rueSiret = tree.xpath('//div[@class="identTitreValeur"]/text()')
-    infos = tree.xpath('//p/text()')
-    details = tree.xpath('//a/text()')
-
-    rue = rueSiret[1]
-    siret = rueSiret[5].replace(" ", "")
-    ville = infos[7]
-    typeEntreprise = infos[15]
-    codeType = infos[16].replace(" : ", "")
-    detailsType1 = details[28]
-    detailsType2 = details[29]
-
-    if len(code) == 9:
-        SIRETisMatched = siret[:9] == code
-    else:
-        SIRETisMatched = siret == code
-
-    if (detailsType1 == ' '):
-        detailsType = detailsType2
-    else:
-        detailsType = detailsType1
-
-    if not SIRETisMatched:
-        codeSiret = tree.xpath('//span[@class="data ficheEtablissementIdentifiantSiret"]/text()')
-        infos = tree.xpath('//span[@class="data"]/text()')
-
-        rue = infos[8]
-        siret = codeSiret[0].replace(" ", "")
-        ville = infos[9].replace(",\xa0", "")
-        typeEntreprise = infos[4]
-        detailsType = infos[11]
-        SIRETisMatched = (siret == code)
-
-    scrap = pd.DataFrame([index, rue, siret, ville, typeEntreprise, codeType, detailsType, SIRETisMatched]).T
-    scrap.columns = ['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched']
-    return scrap
-
-
-def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
+    Returns:
+        - pd.DataFrame
+    """
     # Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
@@ -593,7 +560,7 @@ def get_df_enrichissement(enrichissementScrap, enrichissementInsee):
 def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     """
     Récupération des codes CPV formatés.
-    
+
     Return:
         - pd.Dataframe
     """
@@ -622,10 +589,13 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def enrichissement_acheteur(df):
-    # Enrichissement des données des acheteurs #
-    # Enrichissement des données via les codes siret/siren #
-    # Utilisation d'un autre data frame pour traiter les Siret unique : acheteur.id
+def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Enrichissement des données des acheteurs via les codes siret/siren
+
+    Return:
+        - pd.DataFrame
+    """
     logger.info("Début du traitement: Enrichissement acheteur")
     dfAcheteurId = df['acheteur.id'].to_frame()
     dfAcheteurId.columns = ['siret']
@@ -658,7 +628,7 @@ def enrichissement_acheteur(df):
 def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
     """
     Mise en qualité du dataframe
-    
+
     Return:
         - pd.Dataframe
     """
@@ -708,9 +678,14 @@ def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def fix_codegeo(code):
-    """Correction de l'erreur ou le code 01244 soit considérer comme l'entier 1244
-    code doit etre un code commune/postal"""
+def fix_codegeo(code: str) -> str:
+    """
+    Correction de l'erreur ou le code 01244 soit considérer comme l'entier 1244
+    code doit etre un code commune/postal
+
+    Return:
+        - str
+    """
     if len(code) == 4:
         code = "0" + code
     if "." in code[:5]:
@@ -718,8 +693,13 @@ def fix_codegeo(code):
     return code[:5]
 
 
-def enrichissement_geo(df):
-    """Ajout des géolocalisations des entreprises"""
+def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Ajout des géolocalisations des entreprises
+
+    Return:
+        - pd.DataFrame
+    """
     logger.info("Début du traitement: Enrichissement geographique")
     # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
@@ -763,8 +743,13 @@ def enrichissement_geo(df):
     return df
 
 
-def get_df_villes():
-    """Récupération des informations sur les communes (superficie/population"""
+def get_df_villes() -> pd.DataFrame:
+    """
+    Récupération des informations sur les communes (superficie/population)
+
+    Return:
+        - pd.DataFrame
+    """
     path = os.path.join(path_to_data, conf_data["base_geoflar"])
     df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
                             usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
@@ -799,8 +784,13 @@ def get_df_villes():
     return df_villes
 
 
-def get_distance(row):
-    """Calcul des distances entre l'acheteur et l'établissement qui répond à l'offre"""
+def get_distance(row: pd.DataFrame) -> float:
+    """
+    Calcul des distances entre l'acheteur et l'établissement qui répond à l'offre
+
+    Return:
+        - float
+    """
     try:
         x = Point(row.longitudeCommuneAcheteur, row.latitudeCommuneAcheteur)
         y = Point(row.longitudeCommuneEtablissement, row.latitudeCommuneEtablissement)
