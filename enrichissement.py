@@ -5,10 +5,7 @@ import pickle
 import logging
 import numpy as np
 import pandas as pd
-import requests
 from geopy.distance import distance, Point
-from lxml import html
-
 
 logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
