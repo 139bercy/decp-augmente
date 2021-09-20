@@ -166,27 +166,26 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"])
-    df['montantOriginal'] = df["montant"]
-    df['montant'].fillna(0, inplace=True)
+    df['montantCalcule'] = df["montant"]
+    df['montantCalcule'].fillna(0, inplace=True)
     # variable témoin pour les logs
-    nb_montant_egal_zero = df.montant.value_counts()[0]
+    nb_montantCalcule_egal_zero = df.montantCalcule.value_counts()[0]
     # Détection des montants "1 chiffre"
-    df["montant"] = df["montant"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
+    df["montantCalcule"] = df["montantCalcule"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
 
-    logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montant.value_counts()[0] - nb_montant_egal_zero))
-    nb_montant_egal_zero = df.montant.value_counts()[0]
+    logger.info("{} montant(s) correspondaient à des suites d'un seul chiffre. Exemple: 9 999 999".format(df.montantCalcule.value_counts()[0] - nb_montantCalcule_egal_zero))
+    nb_montantCalcule_egal_zero = df.montantCalcule.value_counts()[0]
     # Définition des bornes inf et sup et traitement
     borne_inf = 200.0
     borne_sup = 9.99e8
-    df["montant"] = df["montant"] / df["nbTitulairesSurCeMarche"]
-    df['montant'] = np.where(df['montant'] <= borne_inf, 0, df['montant'])
-    logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_inf))
-    nb_montant_egal_zero = df.montant.value_counts()[0]
-    df['montant'] = np.where(df['montant'] >= borne_sup, 0, df['montant'])
-    logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montant.value_counts()[0] - nb_montant_egal_zero, borne_sup))
-    df = df.rename(columns={"montant": "montantCalcule"})
+    df["montantCalcule"] = df["montantCalcule"] / df["nbTitulairesSurCeMarche"]
+    df['montantCalcule'] = np.where(df['montantCalcule'] <= borne_inf, 0, df['montantCalcule'])
+    logger.info("{} montant(s) étaient inférieurs à la borne inf {}".format(df.montantCalcule.value_counts()[0] - nb_montantCalcule_egal_zero, borne_inf))
+    nb_montantCalcule_egal_zero = df.montantCalcule.value_counts()[0]
+    df['montantCalcule'] = np.where(df['montantCalcule'] >= borne_sup, 0, df['montantCalcule'])
+    logger.info("{} montant(s) étaient supérieurs à la borne sup: {}".format(df.montantCalcule.value_counts()[0] - nb_montantCalcule_egal_zero, borne_sup))
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montantCalcule'] != df.montantOriginal, True, False)
+    df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
     # Ecriture dans la log
     logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montantCalcule.value_counts()[0]))
     logger.info("Fin du traitement")
@@ -595,8 +594,7 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         df_to_concatene = pd.concat([df_to_concatene, marche_init], copy=False)
     df.update(df_to_concatene)
     # Attention aux id.
-    df.rename(columns={"id": "id_source"}, inplace=True)
-    df["id"] = np.where(df.idtech != "", df.idtech, df.id_technique)
+    df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
     return df
 
 

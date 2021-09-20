@@ -21,7 +21,6 @@ with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
 
 path_to_data = conf_data["path_to_data"]
-siren_len = 9
 
 
 def main():
@@ -40,45 +39,6 @@ def main():
           .pipe(enrichissement_arrondissement)
           .pipe(manage_column_final)
           )
-    # logger.info("Début du traitement: Enrichissement siret")
-    # df = enrichissement_siret(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Enrichissement cpv")
-    # df = enrichissement_cpv(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Enrichissement acheteur")
-    # df = enrichissement_acheteur(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Reorganisation du dataframe")
-    # df = reorganisation(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Enrichissement geographique")
-    # df = enrichissement_geo(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Enrichissement sur le type d'entreprise")
-    # df = enrichissement_type_entreprise(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
-    # df = apply_luhn(df)
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
-    # df = enrichissement_departement(df)  # il y a des na dans departements
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
-    # df = enrichissement_arrondissement(df)  # il y a des na dans departements
-    # logger.info("Fin du traitement")
-
-    # logger.info("Début du traitement: Reorganisation du dataframe final")
-    # df = manage_column_final(df)
-    # logger.info("Fin du traitement")
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
@@ -103,8 +63,6 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns={
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement",
-        "id": "idMarche",
-        "id_source": "id"
     })
     return df
 
@@ -390,7 +348,7 @@ def get_siretdf_from_original_data(df: pd.DataFrame) -> pd.DataFrame:
     dfSIRET.rename(columns={
         "idTitulaires": "siret",
         "typeIdentifiant": "siren"}, inplace=True)
-    dfSIRET.siren = dfSIRET.siret.str[:siren_len]
+    dfSIRET.siren = dfSIRET.siret.str[:9] # 9 = taille du Siren
     dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
     return dfSIRET
