@@ -567,6 +567,8 @@ def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_m
     """
     for col in col_modification:
         col_init = dict_modification[col]
+        # col_modification est la liste de toutes les variables modifiées.
+        # Une ligne peut donc avoir une variable de col_modification non modifiée (égal à "")
         if raw[col] != '':
             df_source[col_init].loc[raw.name] = raw[col]
     return df_source

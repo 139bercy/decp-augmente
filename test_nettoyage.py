@@ -19,6 +19,7 @@ L_data = data["marches"][:5000]
 data = {"marches": L_data}
 # Les 2 fonctions ci dessous sont testées
 df = nettoyage.manage_modifications(data)
+
 df = nettoyage.regroupement_marche_complet(df)
 
 
@@ -59,8 +60,58 @@ class TestNetoyageMethods:
         nettoyage.prise_en_compte_modifications(test_with_colonne_modification_input)
         assert_frame_equal(test_with_colonne_modification_input, test_with_colonne_modification_output)
 
+    def test_fusion_source_modification(self):
+        df_input = pd.DataFrame([["A", "B", "C", "D", "E"],
+                                 ["F", "G", "H", "I", "J"],
+                                 ["K", "L", "M", "N", ""]
+                                 ], columns=["col1", "col2", "col3", "col1Modification", "col3Modification"])
+        raw = df_input.iloc[0]
+        raw2 = df_input.iloc[2]
+        col_modification = ["col1Modification", "col3Modification"]
+        dic_modif = {"col1Modification": "col1",
+                     "col3Modification": "col3"
+                     }
+        _ = nettoyage.fusion_source_modification(raw, df_input, col_modification, dic_modif)
+        _ = nettoyage.fusion_source_modification(raw2, df_input, col_modification, dic_modif)
+        df_attendu = pd.DataFrame([["D", "B", "E", "D", "E"],
+                                   ["F", "G", "H", "I", "J"],
+                                   ["N", "L", "M", "N", ""]
+                                   ], columns=["col1", "col2", "col3", "col1Modification", "col3Modification"])
+        assert_frame_equal(df_input, df_attendu)
+
     def test_regroupement_marche(self):
-        pass
+        df_input = pd.DataFrame([["13456", "Objet1", "A", "B", "C", "D", "E", 1, "0", "Date="],
+                                 ["245", "Objet2", "F", "G", "H", "I", "J", 1, "1", "Date!="],
+                                 ["134567", "Objet1", "K", "L", "M", "N", "", 1, "2", "Date="],
+                                 ["15", "Objet3", "K", "L", "M", "", "", 0, "3", "Date!!="]
+                                 ], columns=["id", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees"])
+        dict_modification = {"col1Modification": "col1",
+                             "col3Modification": "col3"
+                             }
+        _ = nettoyage.regroupement_marche(df_input, dict_modification)
+        df_attendu = pd.DataFrame([["13456", "Objet1", "D", "B", "E", "D", "E", 1.0, "0", "Date=", "2", "2"],
+                                   ["245", "Objet2", "I", "G", "J", "I", "J", 1.0, "1", "Date!=", "1", "1"],
+                                   ["134567", "Objet1", "N", "L", "M", "N", "", 1.0, "2", "Date=", "2", "2"],
+                                   ["15", "Objet3", "K", "L", "M", "", "", 0.0, "3", "Date!!=", "", "3"]
+                                   ], columns=["id_source", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees", "idtech", "id"])
+        assert_frame_equal(df_attendu, df_input)
+
+    def test_regroupement_marche_complet(self):
+        df_input = pd.DataFrame([["Objet1", "2", "Date=", 2000, 1],
+                                 ["Objet2", "1", "Date!=", 2000, 2],
+                                 ["Objet1", "4", "Date=", 2000, 3],
+                                 ["Objet3", "3", "Date!!=", 3000, 4],
+                                 ["Objet3", "5", "Date!!=", 30001, 5]
+                                 ], columns=["objet", "id", "datePublicationDonnees", "montant", "useless"])
+
+        df_output = nettoyage.regroupement_marche_complet(df_input)
+        df_attendu = pd.DataFrame([["Objet1", "4", "Date=", 2000, 1, 2],
+                                   ["Objet2", "1", "Date!=", 2000, 2, 1],
+                                   ["Objet1", "4", "Date=", 2000, 3, 2],
+                                   ["Objet3", "3", "Date!!=", 3000, 4, 1],
+                                   ["Objet3", "5", "Date!!=", 30001, 5, 1]
+                                   ], columns=["objet", "id", "datePublicationDonnees", "montant", "useless", "nombreTitulaireSurMarchePresume"])
+        assert_frame_equal(df_output, df_attendu)
 
     def test_manage_titulaires(self):
         df_input = df.reset_index()
@@ -198,3 +249,6 @@ class TestNetoyageMethods:
             columns=["montantCalcule", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee"])
         df_output = nettoyage.correct_date(df_test)
         assert_frame_equal(df_attendu, df_output)
+
+    def test_data_inputation(self):
+        pass
