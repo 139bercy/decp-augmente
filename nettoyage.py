@@ -271,7 +271,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     df['codeDepartementExecution'].replace(listCorrespondance2, inplace=True)
 
     # Vérification si c'est bien un code département
-    listeCP = conf_glob["nettoyage"]["code_CP"].split(',') \
+    listeCP = conf_glob["nettoyage"]["code_CP"].split(', ') \
         + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(listeCP), np.NaN, df['codeDepartementExecution'])
 
@@ -293,11 +293,14 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
     # Vérification des codes région
-    listeReg = conf_glob["nettoyage"]["code_reg"].split(',')  # 98 = collectivité d'outre mer
+    listeReg = conf_glob["nettoyage"]["code_reg"].split(', ')  # 98 = collectivité d'outre mer
 
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
     # Identification du nom des régions
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
+    # Reconversion des np.nan
+    df['codeRegionExecution'] = np.where(df['codeRegionExecution'] == 'nan', np.NaN, df['codeRegionExecution'])
+    df['codeDepartementExecution'] = np.where(df['codeDepartementExecution'] == 'nan', np.NaN, df['codeDepartementExecution'])
 
     # Import de la base region de l'Insee
     logger.info("Ajout du libelle des regions d'execution")

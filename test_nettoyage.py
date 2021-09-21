@@ -145,7 +145,6 @@ class TestNetoyageMethods:
                         assert(valeur_initiale['denominationSociale'] == df_output.denominationSociale[i + compteur])
 
     def test_manage_duplicates(self):
-
         ligne = df[:5]
         ligne2 = df[:2]
         df_input = ligne.append(ligne2).append(ligne2).reset_index()  # il y a donc deux doublons de lignes
@@ -209,6 +208,26 @@ class TestNetoyageMethods:
         assert_frame_equal(df_attendu, df_output)
 
     def test_manage_region(self):
+        df_input = pd.DataFrame([["97130", "Code departement"],
+                                 ["75000", "Code"],
+                                 ["60000", "Code departement"],
+                                 ["1200", "Code departement"],
+                                 ["60000", "Code région"],
+                                 ["11", "Code région"]
+                                 ], columns=['lieuExecution.code', 'lieuExecution.typeCode'])
+        df_attendu = pd.DataFrame([["97130", "Code departement", "971", "01", "Guadeloupe", "Guadeloupe"],
+                                   ["75000", "Code", "75", "11", "Paris", "Île-de-France"],
+                                   ["60000", "Code departement", "60", "32", "Oise", "Hauts-de-France"],
+                                   ["1200", "Code departement", "12", "76", "Aveyron", "Occitanie"],
+                                   ["60000", "Code région", np.nan, np.nan, np.NaN, np.NaN],
+                                   ["11", "Code région", np.nan, "11", np.NaN, "Île-de-France"]
+                                   ], columns=['lieuExecution.code', 'lieuExecution.typeCode', "codeDepartementExecution", "codeRegionExecution",  "libelle", "libelleRegionExecution"])
+        df_output = nettoyage.manage_region(df_input)
+
+        # gestion des na qui font planter le test
+        df_attendu.fillna("Valeur manquante", inplace=True)
+        df_output.fillna("Valeur manquante", inplace=True)
+        assert_frame_equal(df_attendu, df_output)
         pass
 
     def test_manage_date(self):
@@ -251,4 +270,22 @@ class TestNetoyageMethods:
         assert_frame_equal(df_attendu, df_output)
 
     def test_data_inputation(self):
-        pass
+        df_input = pd.DataFrame([["Objet1", 12, False, 12, "45", 12200],
+                                 ["Objet2", 120, False, 120, "45", 12200],
+                                 ["Objet3", 1200, False, 1200, "45", 12200],
+                                 ["Objet4", 12, False, 12, "34", 12200],
+                                 ["Objet5", 120, False, 121, "34", 12200],
+                                 ["Objet6", 1200, False, 1200, "34", 12200],
+                                 ["Objet7", 11, False, 11, "34", 12200]
+                                 ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
+        mediane = np.median([11, 12, 121, 1200])
+        df_attendu = pd.DataFrame([["Objet1", 12, 'False', 12, "45", 12200],
+                                   ["Objet2", 120, 'False', 120, "45", 12200],
+                                   ["Objet3", 1200, 'False', 1200, "45", 12200],
+                                   ["Objet4", 12, 'False', 12, "34", 12200],
+                                   ["Objet5", 120, 'True', mediane, "34", 12200],
+                                   ["Objet6", 1200, 'True', mediane, "34", 12200],
+                                   ["Objet7", 11, 'False', 11, "34", 12200]
+                                   ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
+        df_output = nettoyage.data_inputation(df_input)
+        assert_frame_equal(df_output, df_attendu)
