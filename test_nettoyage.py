@@ -17,10 +17,6 @@ with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_
 L_data = data["marches"][:5000]
 # On reforme la bonne structure
 data = {"marches": L_data}
-# Les 2 fonctions ci dessous sont testées
-df = nettoyage.manage_modifications(data)
-
-df = nettoyage.regroupement_marche_complet(df)
 
 
 class TestNetoyageMethods:
@@ -114,9 +110,14 @@ class TestNetoyageMethods:
         assert_frame_equal(df_output, df_attendu)
 
     def test_manage_titulaires(self):
+        # Récupérationd des données réelles
+        # Les 2 fonctions ci dessous sont testées
+        df = nettoyage.manage_modifications(data)
+        df = nettoyage.regroupement_marche_complet(df)
+        # Début du test
         df_input = df.reset_index()
         taille_input = df_input.shape
-        nb_ligne_nulle = sum(df_input.titulaires.isna()&df_input.concessionnaires.isna())
+        nb_ligne_nulle = sum(df_input.titulaires.isna() & df_input.concessionnaires.isna())
         df_output = nettoyage.manage_titulaires(df_input)
         nb_ligne_finale = sum(df_input.titulaires.apply(len)) - nb_ligne_nulle
         # test sur la taille finale
@@ -145,6 +146,11 @@ class TestNetoyageMethods:
                         assert(valeur_initiale['denominationSociale'] == df_output.denominationSociale[i + compteur])
 
     def test_manage_duplicates(self):
+        # Récupérationd des données réelles
+        # Les 2 fonctions ci dessous sont testées
+        df = nettoyage.manage_modifications(data)
+        df = nettoyage.regroupement_marche_complet(df)
+        # Début du test
         ligne = df[:5]
         ligne2 = df[:2]
         df_input = ligne.append(ligne2).append(ligne2).reset_index()  # il y a donc deux doublons de lignes
@@ -221,14 +227,13 @@ class TestNetoyageMethods:
                                    ["1200", "Code departement", "12", "76", "Aveyron", "Occitanie"],
                                    ["60000", "Code région", np.nan, np.nan, np.NaN, np.NaN],
                                    ["11", "Code région", np.nan, "11", np.NaN, "Île-de-France"]
-                                   ], columns=['lieuExecution.code', 'lieuExecution.typeCode', "codeDepartementExecution", "codeRegionExecution",  "libelle", "libelleRegionExecution"])
+                                   ], columns=['lieuExecution.code', 'lieuExecution.typeCode', "codeDepartementExecution", "codeRegionExecution", "libelle", "libelleRegionExecution"])
         df_output = nettoyage.manage_region(df_input)
 
         # gestion des na qui font planter le test
         df_attendu.fillna("Valeur manquante", inplace=True)
         df_output.fillna("Valeur manquante", inplace=True)
         assert_frame_equal(df_attendu, df_output)
-        pass
 
     def test_manage_date(self):
         # aaaa-mm-jj

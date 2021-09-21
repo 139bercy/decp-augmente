@@ -1,15 +1,17 @@
-import unittest
+import pytest
 import enrichissement
 import json
 import pickle
 
 # Partie data
-with open("config.json") as f:
+# Partie recuperation de données.
+with open(os.path.join("confs", "config_data.json")) as f:
     conf = json.load(f)
 with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
-class TestEnrichissementMethods(unittest.TestCase):
+
+class TestEnrichissementMethods():
 
     def test_enrichissement_geo(self):
         pass
@@ -58,9 +60,3 @@ class TestEnrichissementMethods(unittest.TestCase):
 
     def test_manage_column_final(self):
         pass
-
-    def test_detection_accord_cadre(self):
-        pass
-
-if __name__ == '__main__':
-    unittest.main()
