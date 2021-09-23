@@ -2,6 +2,7 @@ import pytest
 import enrichissement
 import json
 import pickle
+import os
 
 # Partie data
 # Partie recuperation de données.

@@ -89,7 +89,7 @@ def manage_titulaires(df: pd.DataFrame):
     df.drop(columns=donneesInutiles, inplace=True)
 
     # Récupération des données titulaires
-    df.titulaires = df["titulaires"].fillna('0')
+    df["titulaires"] = df["titulaires"].fillna('0')
     df = df[df['titulaires'] != '0']
     # Création d'une colonne nbTitulairesSurCeMarche. Cette colonne sera retravaillé dans la fonction detection_accord_cadre
     df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))
@@ -120,7 +120,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
                        inplace=True)
     df.reset_index(inplace=True, drop=True)
     nb_ligne_apres_suppresion = len(df)
-
+    df.drop('index', axis=1, inplace=True)
     # Ecriture dans les logs
     logger.info("Nombre de lignes doublons supprimées: {}".format(nb_ligne_avant_suppression - nb_ligne_apres_suppresion))
 

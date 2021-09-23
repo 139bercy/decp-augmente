@@ -10,13 +10,6 @@ from pandas.testing import assert_frame_equal
 with open(os.path.join("confs", "config_data.json")) as f:
     conf = json.load(f)
 path_to_data = conf["path_to_data"]
-decp_file_name = conf["decp_file_name"]
-with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-    data = json.load(json_data)
-# On diminue la taille du fichier pour rendre le traitement plus rapide
-L_data = data["marches"][:5000]
-# On reforme la bonne structure
-data = {"marches": L_data}
 
 
 class TestNetoyageMethods:
@@ -36,140 +29,125 @@ class TestNetoyageMethods:
             nettoyage.check_reference_files(json_test2)
 
     def test_prise_en_compte_modifications(self):
-        test_no_colonne_modification = pd.DataFrame([1], columns=["test"])
-        test_with_colonne_modification_input = pd.DataFrame([[1, [{"col1Modification": "2",
-                                                                  "col2": "3"
-                                                                   }]
-                                                              ],
-                                                             [2, []]
-                                                             ], columns=["id", "modifications"])
-        test_with_colonne_modification_output = pd.DataFrame([[1, [{"col1Modification": "2",
+        test_with_colonne_modification_source = pd.DataFrame([[1, [{"col1Modification": "2",
+                                                                    "col2": "3"
+                                                                    }]
+                                                               ],
+                                                              [2, []]
+                                                              ], columns=["id", "modifications"])
+        test_with_colonne_modification_obtenu = pd.DataFrame([[1, [{"col1Modification": "2",
                                                                     "col2": "3"
                                                                     }
                                                                    ], 1, "2", "3"
                                                                ],
                                                               [2, [], 0, "", ""]
                                                               ], columns=["id", "modifications", "booleanModification", "col1Modification", "col2Modification"])
+        nettoyage.prise_en_compte_modifications(test_with_colonne_modification_source)
+        assert_frame_equal(test_with_colonne_modification_source, test_with_colonne_modification_obtenu)
+
+    def test_prise_en_compte_modifications_no_modifications(self):
+        test_no_colonne_modification = pd.DataFrame([1], columns=["test"])
         # Test du message d'erreur
         with pytest.raises(ValueError):
             nettoyage.prise_en_compte_modifications(test_no_colonne_modification)
-        nettoyage.prise_en_compte_modifications(test_with_colonne_modification_input)
-        assert_frame_equal(test_with_colonne_modification_input, test_with_colonne_modification_output)
 
     def test_fusion_source_modification(self):
-        df_input = pd.DataFrame([["A", "B", "C", "D", "E"],
-                                 ["F", "G", "H", "I", "J"],
-                                 ["K", "L", "M", "N", ""]
-                                 ], columns=["col1", "col2", "col3", "col1Modification", "col3Modification"])
-        raw = df_input.iloc[0]
-        raw2 = df_input.iloc[2]
+        df_source = pd.DataFrame([["A", "B", "C", "D", "E"],
+                                  ["F", "G", "H", "I", "J"],
+                                  ["K", "L", "M", "N", ""]
+                                  ], columns=["col1", "col2", "col3", "col1Modification", "col3Modification"])
+        raw = df_source.iloc[0]
+        raw2 = df_source.iloc[2]
         col_modification = ["col1Modification", "col3Modification"]
         dic_modif = {"col1Modification": "col1",
                      "col3Modification": "col3"
                      }
-        _ = nettoyage.fusion_source_modification(raw, df_input, col_modification, dic_modif)
-        _ = nettoyage.fusion_source_modification(raw2, df_input, col_modification, dic_modif)
+        nettoyage.fusion_source_modification(raw, df_source, col_modification, dic_modif)
+        nettoyage.fusion_source_modification(raw2, df_source, col_modification, dic_modif)
         df_attendu = pd.DataFrame([["D", "B", "E", "D", "E"],
                                    ["F", "G", "H", "I", "J"],
                                    ["N", "L", "M", "N", ""]
                                    ], columns=["col1", "col2", "col3", "col1Modification", "col3Modification"])
-        assert_frame_equal(df_input, df_attendu)
+        assert_frame_equal(df_source, df_attendu)
 
     def test_regroupement_marche(self):
-        df_input = pd.DataFrame([["13456", "Objet1", "A", "B", "C", "D", "E", 1, "0", "Date="],
-                                 ["245", "Objet2", "F", "G", "H", "I", "J", 1, "1", "Date!="],
-                                 ["134567", "Objet1", "K", "L", "M", "N", "", 1, "2", "Date="],
-                                 ["15", "Objet3", "K", "L", "M", "", "", 0, "3", "Date!!="]
-                                 ], columns=["id", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees"])
+        df_source = pd.DataFrame([["13456", "Objet1", "A", "B", "C", "D", "E", 1, "0", "Date="],
+                                  ["245", "Objet2", "F", "G", "H", "I", "J", 1, "1", "Date!="],
+                                  ["134567", "Objet1", "K", "L", "M", "N", "", 1, "2", "Date="],
+                                  ["15", "Objet3", "K", "L", "M", "", "", 0, "3", "Date!!="]
+                                  ], columns=["id", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees"])
         dict_modification = {"col1Modification": "col1",
                              "col3Modification": "col3"
                              }
-        _ = nettoyage.regroupement_marche(df_input, dict_modification)
+        nettoyage.regroupement_marche(df_source, dict_modification)
         df_attendu = pd.DataFrame([["13456", "Objet1", "D", "B", "E", "D", "E", 1.0, "0", "Date=", "2", "2"],
                                    ["245", "Objet2", "I", "G", "J", "I", "J", 1.0, "1", "Date!=", "1", "1"],
                                    ["134567", "Objet1", "N", "L", "M", "N", "", 1.0, "2", "Date=", "2", "2"],
                                    ["15", "Objet3", "K", "L", "M", "", "", 0.0, "3", "Date!!=", "", "3"]
                                    ], columns=["id_source", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees", "idtech", "id"])
-        assert_frame_equal(df_attendu, df_input)
+        assert_frame_equal(df_attendu, df_source)
 
     def test_regroupement_marche_complet(self):
-        df_input = pd.DataFrame([["Objet1", "2", "Date=", 2000, 1],
-                                 ["Objet2", "1", "Date!=", 2000, 2],
-                                 ["Objet1", "4", "Date=", 2000, 3],
-                                 ["Objet3", "3", "Date!!=", 3000, 4],
-                                 ["Objet3", "5", "Date!!=", 30001, 5]
-                                 ], columns=["objet", "id", "datePublicationDonnees", "montant", "useless"])
+        df_source = pd.DataFrame([["Objet1", "2", "Date=", 2000, 1],
+                                  ["Objet2", "1", "Date!=", 2000, 2],
+                                  ["Objet1", "4", "Date=", 2000, 3],
+                                  ["Objet3", "3", "Date!!=", 3000, 4],
+                                  ["Objet3", "5", "Date!!=", 30001, 5]
+                                  ], columns=["objet", "id", "datePublicationDonnees", "montant", "useless"])
 
-        df_output = nettoyage.regroupement_marche_complet(df_input)
+        df_obtenu = nettoyage.regroupement_marche_complet(df_source)
         df_attendu = pd.DataFrame([["Objet1", "4", "Date=", 2000, 1, 2],
                                    ["Objet2", "1", "Date!=", 2000, 2, 1],
                                    ["Objet1", "4", "Date=", 2000, 3, 2],
                                    ["Objet3", "3", "Date!!=", 3000, 4, 1],
                                    ["Objet3", "5", "Date!!=", 30001, 5, 1]
                                    ], columns=["objet", "id", "datePublicationDonnees", "montant", "useless", "nombreTitulaireSurMarchePresume"])
-        assert_frame_equal(df_output, df_attendu)
+        assert_frame_equal(df_obtenu, df_attendu)
 
     def test_manage_titulaires(self):
-        # Récupérationd des données réelles
-        # Les 2 fonctions ci dessous sont testées
-        df = nettoyage.manage_modifications(data)
-        df = nettoyage.regroupement_marche_complet(df)
-        # Début du test
-        df_input = df.reset_index()
-        taille_input = df_input.shape
-        nb_ligne_nulle = sum(df_input.titulaires.isna() & df_input.concessionnaires.isna())
-        df_output = nettoyage.manage_titulaires(df_input)
-        nb_ligne_finale = sum(df_input.titulaires.apply(len)) - nb_ligne_nulle
-        # test sur la taille finale
-        # Pour avoir le nombre de ligne finale, il faut connaitre le nombre de ligne ou titulaires est nulle
-        taille_output = df_output.shape
-        assert(nb_ligne_finale == taille_output[0])  # la taille finale correspond à la somme des len de titulaires
-        assert(taille_output[1] == taille_input[1] - 11 + 3)  # Ajout de 3 colonnes, suppressions de 11 colonnes
-        # test sur le contenu
-        # Premier test sur les nouvelles colonnes
-        compteur = 0
-        for i in range(len(df_input.titulaires)):
-            if df_input.titulaires[i] == '0':
-                compteur -= 1
-            else:
-                nb_tit = 0
-                for j in range(len(df_input.titulaires[i])):
-                    nb_tit += 1  # valeur nbTitulairesSurCeMarche théorique = jmax
-                    if j >= 1:
-                        compteur += 1
-                    valeur_initiale = df_input.titulaires[i][j]
-                    if 'typeIdentifiant' in valeur_initiale.keys():
-                        assert(valeur_initiale['typeIdentifiant'] == df_output.typeIdentifiant[i + compteur])
-                    if 'id' in valeur_initiale.keys():
-                        assert(valeur_initiale['id'] == df_output.idTitulaires[i + compteur])
-                    if 'denominationSociale' in valeur_initiale.keys():
-                        assert(valeur_initiale['denominationSociale'] == df_output.denominationSociale[i + compteur])
+        donnee_tit = [{"typeIdentifiant": "SIRET",
+                       "id": "39068118700014",
+                       "denominationSociale": "SEDI"
+                       },
+                      {"typeIdentifiant": "SIRET2",
+                       "id": "39068118700014",
+                       "denominationSociale": "SEDI2"
+                       }
+                      ]
+        df_source = pd.DataFrame([["To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", 0, "0", "0", donnee_tit],
+                                  ["To_del", "To_del", "200", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", np.NaN, "0", "0", [{"typeIdentifiant": "SIRET3",
+                                                                                                                                                                 "id": "39068118700014",
+                                                                                                                                                                 "denominationSociale": "SEDI3"
+                                                                                                                                                                 }]
+                                   ]],
+                                 columns=['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
+                                          'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom', 'idtech', "id_technique", "montant", "acheteur.id", "acheteur.nom", "titulaires"])
+
+        df_attendu = pd.DataFrame([[0, "0", "0", 2, "SIRET", "39068118700014", "SEDI"],
+                                   [0, "0", "0", 2, "SIRET2", "39068118700014", "SEDI2"],
+                                   ["200", "0", "0", 1, "SIRET3", "39068118700014", "SEDI3"]
+                                   ],
+                                  columns=["montant", "acheteur.id", "acheteur.nom", "nbTitulairesSurCeMarche", "typeIdentifiant", "idTitulaires", "denominationSociale"])
+        df_obtenu = nettoyage.manage_titulaires(df_source)
+        assert_frame_equal(df_obtenu, df_attendu)
 
     def test_manage_duplicates(self):
-        # Récupérationd des données réelles
-        # Les 2 fonctions ci dessous sont testées
-        df = nettoyage.manage_modifications(data)
-        df = nettoyage.regroupement_marche_complet(df)
-        # Début du test
-        ligne = df[:5]
-        ligne2 = df[:2]
-        df_input = ligne.append(ligne2).append(ligne2).reset_index()  # il y a donc deux doublons de lignes
-        df_input = df_input.append(df[df.procedure == 'Appel d’offres restreint']).reset_index()
-        df_input = nettoyage.manage_titulaires(df_input)  # Fonction testée
-        nb_ligne, nb_col = df_input.shape
-        nb_ligne_finale = nb_ligne - 4  # 4 doublons
-        df_output = nettoyage.manage_duplicates(df_input)
-        nb_ligne_output, nb_col_output = df_output.shape
-        # Test sur les tailles des entrées/sorties
-        assert(nb_ligne_finale == nb_ligne_output)
-        assert(nb_col == nb_col_output)
-        # Test sur les 3 np.where
-        # On vérifie que les formePrix sont correctement modifiés
-        nb_formePrix_a_modifier = len(df_input.formePrix[df_input.formePrix == "Ferme, actualisable"])
-        nb_formePrix_restant_a_modifier = len(df_output.formePrix[df_input.formePrix == "Ferme, actualisable"])
-        nb_formePrix_modifie = len(df_output.formePrix[df_input.formePrix == 'Ferme et actualisable'])
-        assert(nb_formePrix_a_modifier == nb_formePrix_modifie)
-        assert(0 == nb_formePrix_restant_a_modifier)
+        ligne1 = [1, 2, 3, 'Appel d’offres restreint', 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'Ferme, actualisable', 16, 17, 18, 19, 20]
+        ligne2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        colonne = ['source', '_type', 'nature', 'procedure', 'dureeMois',
+                   'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
+                   'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
+                   'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
+                   'denominationSociale']
+        df1 = pd.DataFrame([ligne1], columns=colonne)
+        df2 = pd.DataFrame([ligne2], columns=colonne)
+
+        df_source = pd.concat([df1, df2, df2]).reset_index()  # il y a donc deux doublons de lignes
+
+        df_obtenu = nettoyage.manage_duplicates(df_source)
+        ligne3 = [1, 2, 3, "Appel d'offres restreint", 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'Ferme et actualisable', 16, 17, 18, 19, 20]
+        df_attendu = pd.DataFrame([ligne3, ligne2], columns=colonne)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_is_false_amount(self):
         L = [567893256, 444444444, 3456.55555, 55555645.678, 55655655, 10000000]  # G, F, G, F, G
@@ -196,8 +174,8 @@ class TestNetoyageMethods:
                                   [float(50000), 2, 100000, True]],
                                   index=[0, 1, 2, 3, 4, 5],
                                   columns=['montantCalcule', 'nbTitulairesSurCeMarche', 'montantOriginal', 'montantEstime'])
-        df_output = nettoyage.manage_amount(df_test)
-        assert_frame_equal(df_attendu, df_output)
+        df_obtenu = nettoyage.manage_amount(df_test)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_manage_missing_code(self):
         df_test = pd.DataFrame([
@@ -210,30 +188,29 @@ class TestNetoyageMethods:
                                   ['0000000000000000', '46562345', 'SIRET', "4444455555", 'Services', np.nan, "55555", "46"]],
                                   index=[0, 1],
                                   columns=['id', 'codeCPV', 'typeIdentifiant', 'idTitulaires', 'natureObjet', 'denominationSociale', 'nic', "CPV_min"])
-        df_output = nettoyage.manage_missing_code(df_test)
-        assert_frame_equal(df_attendu, df_output)
+        df_obtenu = nettoyage.manage_missing_code(df_test)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_manage_region(self):
-        df_input = pd.DataFrame([["97130", "Code departement"],
-                                 ["75000", "Code"],
-                                 ["60000", "Code departement"],
-                                 ["1200", "Code departement"],
-                                 ["60000", "Code région"],
-                                 ["11", "Code région"]
-                                 ], columns=['lieuExecution.code', 'lieuExecution.typeCode'])
+        df_source = pd.DataFrame([["97130", "Code departement"],
+                                  ["75000", "Code"],
+                                  ["60000", "Code departement"],
+                                  ["1200", "Code departement"],
+                                  ["60000", "Code région"],
+                                  ["11", "Code région"]
+                                  ], columns=['lieuExecution.code', 'lieuExecution.typeCode'])
         df_attendu = pd.DataFrame([["97130", "Code departement", "971", "01", "Guadeloupe", "Guadeloupe"],
                                    ["75000", "Code", "75", "11", "Paris", "Île-de-France"],
                                    ["60000", "Code departement", "60", "32", "Oise", "Hauts-de-France"],
                                    ["1200", "Code departement", "12", "76", "Aveyron", "Occitanie"],
-                                   ["60000", "Code région", np.nan, np.nan, np.NaN, np.NaN],
-                                   ["11", "Code région", np.nan, "11", np.NaN, "Île-de-France"]
+                                   ["60000", "Code région", "Valeur manquante", "Valeur manquante", "Valeur manquante", "Valeur manquante"],
+                                   ["11", "Code région", "Valeur manquante", "11", "Valeur manquante", "Île-de-France"]
                                    ], columns=['lieuExecution.code', 'lieuExecution.typeCode', "codeDepartementExecution", "codeRegionExecution", "libelle", "libelleRegionExecution"])
-        df_output = nettoyage.manage_region(df_input)
+        df_obtenu = nettoyage.manage_region(df_source)
 
         # gestion des na qui font planter le test
-        df_attendu.fillna("Valeur manquante", inplace=True)
-        df_output.fillna("Valeur manquante", inplace=True)
-        assert_frame_equal(df_attendu, df_output)
+        df_obtenu.fillna("Valeur manquante", inplace=True)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_manage_date(self):
         # aaaa-mm-jj
@@ -251,8 +228,8 @@ class TestNetoyageMethods:
             [np.nan, np.nan, str(np.NaN), np.nan]],
             index=[0, 1, 2, 3],
             columns=["datePublicationDonnees", "dateNotification", "anneeNotification", "moisNotification"])
-        df_output = nettoyage.manage_date(df_test)
-        assert_frame_equal(df_attendu, df_output)
+        df_obtenu = nettoyage.manage_date(df_test)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_correct_date(self):
         df_test = pd.DataFrame([
@@ -271,18 +248,18 @@ class TestNetoyageMethods:
             [1, 1, str(True), 1.0]],
             index=[0, 1, 2, 3, 4],
             columns=["montantCalcule", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee"])
-        df_output = nettoyage.correct_date(df_test)
-        assert_frame_equal(df_attendu, df_output)
+        df_obtenu = nettoyage.correct_date(df_test)
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_data_inputation(self):
-        df_input = pd.DataFrame([["Objet1", 12, False, 12, "45", 12200],
-                                 ["Objet2", 120, False, 120, "45", 12200],
-                                 ["Objet3", 1200, False, 1200, "45", 12200],
-                                 ["Objet4", 12, False, 12, "34", 12200],
-                                 ["Objet5", 120, False, 121, "34", 12200],
-                                 ["Objet6", 1200, False, 1200, "34", 12200],
-                                 ["Objet7", 11, False, 11, "34", 12200]
-                                 ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
+        df_source = pd.DataFrame([["Objet1", 12, False, 12, "45", 12200],
+                                  ["Objet2", 120, False, 120, "45", 12200],
+                                  ["Objet3", 1200, False, 1200, "45", 12200],
+                                  ["Objet4", 12, False, 12, "34", 12200],
+                                  ["Objet5", 120, False, 121, "34", 12200],
+                                  ["Objet6", 1200, False, 1200, "34", 12200],
+                                  ["Objet7", 11, False, 11, "34", 12200]
+                                  ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
         mediane = np.median([11, 12, 121, 1200])
         df_attendu = pd.DataFrame([["Objet1", 12, 'False', 12, "45", 12200],
                                    ["Objet2", 120, 'False', 120, "45", 12200],
@@ -292,5 +269,5 @@ class TestNetoyageMethods:
                                    ["Objet6", 1200, 'True', mediane, "34", 12200],
                                    ["Objet7", 11, 'False', 11, "34", 12200]
                                    ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
-        df_output = nettoyage.data_inputation(df_input)
-        assert_frame_equal(df_output, df_attendu)
+        df_obtenu = nettoyage.data_inputation(df_source)
+        assert_frame_equal(df_obtenu, df_attendu)
