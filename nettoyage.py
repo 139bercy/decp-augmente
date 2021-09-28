@@ -280,35 +280,34 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
 
     # Récupération des codes régions via le département
     logger.info("Ajout des code regions pour le lieu d'execution")
-    path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
-    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
+    path_georef = os.path.join(path_to_data, conf_data["geo_ref"])
+    departement_region = pd.read_csv(path_georef, sep=",", usecols=['code_departement', 'nom_departement', 'code_region', 'nom_region'], dtype=str)
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
-    df = pd.merge(df, departement, how="left",
-                  left_on="codeDepartementExecution", right_on="dep")
-    df.rename(columns={"reg": "codeRegionExecution"}, inplace=True)
-    # On supprime la colonne dep, doublon avec codeDepartementExecution
-    del df["dep"]
+    df = pd.merge(df, departement_region[['code_departement', 'nom_departement', 'code_region']], how="left",
+                  left_on="codeDepartementExecution", right_on="code_departement")
+    df.rename(columns={"code_region": "codeRegionExecution"}, inplace=True)
+    # On supprime la colonne code_dep, doublon avec codeDepartementExecution
+    del df["code_departement"]
+
     # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
     df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
+
     # Vérification des codes région
     listeReg = conf_glob["nettoyage"]["code_reg"].split(',')  # 98 = collectivité d'outre mer
-
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(listeReg), np.NaN, df['codeRegionExecution'])
+
     # Identification du nom des régions
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
 
     # Import de la base region de l'Insee
     logger.info("Ajout du libelle des regions d'execution")
-    path_reg = os.path.join(path_to_data, conf_data["region-fr"])
-    region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
-    region.columns = ["reg", "libelle_reg"]
+    df = pd.merge(df, departement_region[["code_region", "nom_region"]], how="left",
+                  left_on="codeRegionExecution", right_on="code_region")
+    df.rename(columns={"nom_region": "libelleRegionExecution"}, inplace=True)
 
-    df = pd.merge(df, region, how="left",
-                  left_on="codeRegionExecution", right_on="reg")
-    df.rename(columns={"libelle_reg": "libelleRegionExecution"}, inplace=True)
-    # On supprime la colonne reg, doublon avec codeRegionExecution
-    del df["reg"]
+    # On supprime la colonne code_region, doublon avec codeRegionExecution
+    del df["code_region"]
     logger.info("Fin du traitement")
     return df
 

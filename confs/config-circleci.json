@@ -9,5 +9,6 @@
 	"departements-francais" : "departement2020.csv",
 	"region-fr" : "region2020.csv",
 	"commune-fr": "commune2021.csv",
-	"arrondissement-fr": "arrondissement2021.csv"
+	"arrondissement-fr": "arrondissement2021.csv",
+	"referentiel_geo": "geo_referential.csv"
 }
