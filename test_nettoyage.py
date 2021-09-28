@@ -271,4 +271,3 @@ class TestNetoyageMethods:
                                    ], columns=["objet", "dureeMois", "dureeMoisEstimee", "dureeMoisCalculee", "CPV_min", "montantCalcule"])
         df_obtenu = nettoyage.data_inputation(df_source)
         assert_frame_equal(df_obtenu, df_attendu)
-
