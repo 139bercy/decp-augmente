@@ -79,13 +79,13 @@ class TestNetoyageMethods:
         dict_modification = {"col1Modification": "col1",
                              "col3Modification": "col3"
                              }
-        nettoyage.regroupement_marche(df_source, dict_modification)
+        df_obtenu = nettoyage.regroupement_marche(df_source, dict_modification)
         df_attendu = pd.DataFrame([["13456", "Objet1", "D", "B", "E", "D", "E", 1.0, "0", "Date=", "2", "2"],
                                    ["245", "Objet2", "I", "G", "J", "I", "J", 1.0, "1", "Date!=", "1", "1"],
                                    ["134567", "Objet1", "N", "L", "M", "N", "", 1.0, "2", "Date=", "2", "2"],
                                    ["15", "Objet3", "K", "L", "M", "", "", 0.0, "3", "Date!!=", "", "3"]
-                                   ], columns=["id_source", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees", "idtech", "id"])
-        assert_frame_equal(df_attendu, df_source)
+                                   ], columns=["id", "objet", "col1", "col2", "col3", "col1Modification", "col3Modification", "booleanModification", "id_technique", "datePublicationDonnees", "idtech", "idMarche"])
+        assert_frame_equal(df_attendu, df_obtenu)
 
     def test_regroupement_marche_complet(self):
         df_source = pd.DataFrame([["Objet1", "2", "Date=", 2000, 1],
@@ -142,7 +142,7 @@ class TestNetoyageMethods:
         df1 = pd.DataFrame([ligne1], columns=colonne)
         df2 = pd.DataFrame([ligne2], columns=colonne)
 
-        df_source = pd.concat([df1, df2, df2]).reset_index()  # il y a donc deux doublons de lignes
+        df_source = pd.concat([df1, df2, df2]).reset_index(drop=True)  # il y a donc deux doublons de lignes
 
         df_obtenu = nettoyage.manage_duplicates(df_source)
         ligne3 = [1, 2, 3, "Appel d'offres restreint", 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'Ferme et actualisable', 16, 17, 18, 19, 20]
@@ -166,14 +166,14 @@ class TestNetoyageMethods:
                                index=[0, 1, 2, 3, 4, 5],
                                columns=['montant', 'nbTitulairesSurCeMarche'])
         df_attendu = pd.DataFrame([
-                                  [float(0), 1, 1, True],
-                                  [float(0), 1, 2000000000, True],
-                                  [float(56789), 1, 56789, False],
-                                  [float(0), 1, 555555, True],
-                                  [float(0), 1, 0, False],
-                                  [float(50000), 2, 100000, True]],
+                                  [1, 1, float(0), True],
+                                  [2000000000, 1, float(0), True],
+                                  [56789, 1, float(56789), False],
+                                  [555555, 1, float(0), True],
+                                  [0, 1, float(0), False],
+                                  [100000, 2, float(50000), True]],
                                   index=[0, 1, 2, 3, 4, 5],
-                                  columns=['montantCalcule', 'nbTitulairesSurCeMarche', 'montantOriginal', 'montantEstime'])
+                                  columns=['montant', 'nbTitulairesSurCeMarche', 'montantCalcule', 'montantEstime'])
         df_obtenu = nettoyage.manage_amount(df_test)
         assert_frame_equal(df_attendu, df_obtenu)
 
