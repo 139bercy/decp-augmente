@@ -287,7 +287,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                   left_on="codeDepartementExecution", right_on="code_departement")
     df.rename(columns={"code_region": "codeRegionExecution"}, inplace=True)
     # On supprime la colonne code_dep, doublon avec codeDepartementExecution
-    del df["code_departement"]
+    df.drop(columns=["code_departement"], inplace=True)
 
     # Ajout des codes régions qui existaient déjà dans la colonne lieuExecution.code
     df['codeRegionExecution'] = np.where(df['lieuExecution.typeCode'] == "Code région", df['lieuExecution.code'], df['codeRegionExecution'])
@@ -307,7 +307,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     df.rename(columns={"nom_region": "libelleRegionExecution"}, inplace=True)
 
     # On supprime la colonne code_region, doublon avec codeRegionExecution
-    del df["code_region"]
+    df.drop(columns=["code_region"], inplace=True)
     logger.info("Fin du traitement")
     return df
 
