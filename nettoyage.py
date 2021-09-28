@@ -43,7 +43,7 @@ def main():
           .pipe(data_inputation)
           .pipe(replace_char)
           )
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Gestion des titulaires")
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye', 'wb') as df_nettoye:
@@ -129,7 +129,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     df['formePrix'] = np.where('Ferme, actualisable' == df['formePrix'], 'Ferme et actualisable', df['formePrix'])
     df['procedure'] = np.where('Appel d’offres restreint' == df['procedure'], "Appel d'offres restreint", df['procedure'])
 
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Suppression des doublons")
     return df
 
 
@@ -188,7 +188,7 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
     # Ecriture dans la log
     logger.info("Au total, {} montant(s) ont été corrigé (on compte aussi les montants vides).".format(df.montantCalcule.value_counts()[0]))
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Détection et correction des montants aberrants")
     return df
 
 
@@ -243,7 +243,7 @@ def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
     df.denominationSociale = np.where(
         (df.denominationSociale == 'N/A') | (df.denominationSociale == 'null'),
         np.NaN, df.denominationSociale)
-    logger.info('Fin du traitement')
+    logger.info('Fin du traitement: Gestion des Id null')
 
     return df
 
@@ -279,7 +279,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN, df['codeDepartementExecution'])
 
     # Récupération des codes régions via le département
-    logger.info("Ajout des code regions pour le lieu d'execution")
+    logger.info("Ajout des codes regions pour le lieu d'execution")
     path_georef = os.path.join(path_to_data, conf_data["geo_ref"])
     departement_region = pd.read_csv(path_georef, sep=";", usecols=['code_departement', 'nom_departement', 'code_region', 'nom_region'], dtype=str)
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
@@ -308,7 +308,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
 
     # On supprime la colonne code_region, doublon avec codeRegionExecution
     df.drop(columns=["code_region"], inplace=True)
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Attribution et correction des régions/déprtements (code + libelle). Zone d'execution du marché")
     return df
 
 
@@ -342,7 +342,7 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     df['moisNotification'] = df.dateNotification.str[5:7]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
     logger.info("Au total, {} marchés n'ont pas de date de publication des données connue".format(sum(df["datePublicationDonnees"].isna())))
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Récupération de l'année et du mois du marché public + Correction des années aberrantes")
 
     return df
 
@@ -373,7 +373,7 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     # Comme certaines valeurs atteignent zero, on remplace par un mois
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])  # Il y a une valeur négative
     logger.info("Au total, {} duree de marché en mois ont été jugées rentrées en jour et non en mois.".format(sum(mask)))
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Correction de la variable dureeMois.")
 
     return df
 
@@ -408,7 +408,7 @@ def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
     # La mediane n'est pas utile dans le df final: on supprime
     df.drop("mediane_dureeMois_CPV", axis=1, inplace=True)
 
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Imputation de la variable dureeMois")
     return df
 
 
@@ -422,7 +422,7 @@ def replace_char(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Début du traitement: Remplacement des caractères mal converti")
     # Remplacement brutal du caractère (?) par XXXXX
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement: Remplacement des caractères mal converti")
     return df
 
 
