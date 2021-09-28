@@ -116,9 +116,9 @@ class TestNetoyageMethods:
                       ]
         df_source = pd.DataFrame([["To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", 0, "0", "0", donnee_tit],
                                   ["To_del", "To_del", "200", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", "To_del", np.NaN, "0", "0", [{"typeIdentifiant": "SIRET3",
-                                                                                                                                                                 "id": "39068118700014",
-                                                                                                                                                                 "denominationSociale": "SEDI3"
-                                                                                                                                                                 }]
+                                                                                                                                                                  "id": "39068118700014",
+                                                                                                                                                                  "denominationSociale": "SEDI3"
+                                                                                                                                                                  }]
                                    ]],
                                  columns=['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
                                           'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom', 'idtech', "id_technique", "montant", "acheteur.id", "acheteur.nom", "titulaires"])
