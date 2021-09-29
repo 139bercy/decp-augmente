@@ -284,7 +284,8 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     departement_region = pd.read_csv(path_georef, sep=";", usecols=['code_departement', 'nom_departement', 'code_region', 'nom_region'], dtype=str)
     departement_region.drop_duplicates(subset="code_departement", inplace=True)
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
-    df = df.merge(departement_region, how="left", left_on="codeDepartementExecution", right_on="code_departement")
+    df = pd.merge(df, departement_region[['code_departement', 'nom_departement', 'code_region']], how="left",
+                  left_on="codeDepartementExecution", right_on="code_departement")
     df.rename(columns={"code_region": "codeRegionExecution"}, inplace=True)
     # On supprime la colonne code_dep, doublon avec codeDepartementExecution
     df.drop(columns=["code_departement"], inplace=True)
