@@ -50,9 +50,9 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     dictCorrespondance = conf_glob["enrichissement"]["abrev2nom"]
     # Travail sur l'id des titulaires
     df_["idTitulaires"] = np.where(~df_["idTitulaires"].str.isdigit(), "", df_.idTitulaires)
-    df_ = df_.rename(columns={"idTitulaires": "siretEtablissement"})
+    df_ = df_.rename(columns={"idTitulaires": "siretEtablissement",
+                              "acheteur.id": "idAcheteur"})
     # Travail sur l'id des acheteurs
-    df_ = df_.rename(columns={"acheteur.id": "idAcheteur"})
     path = os.path.join(path_to_data, conf_data["geo_comp"])
     columns = [
         "siret",
@@ -295,12 +295,13 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.DataFrame
     """
+    df_ = df.copy()
     path = os.path.join(path_to_data, conf_data["geo_ref"])
     columns = ["SUPERFICIE", "POPULATION", "coordonnees_commune", "code_commune", "code_departement", "nom_departement", 'code_region', 'nom_region', "code_arrondissement", "nom_arrondissement"]
     geo_ref = pd.read_csv(path, sep=";", usecols=columns)
     # jointure sur communeEtablissement
-    df = pd.merge(df, geo_ref, how='left', left_on="codeCommuneEtablissement", right_on="code_commune", copy=False)
-    df = df.rename(columns={"SUPERFICIE": "superficieCommuneEtablissement",
+    df_ = pd.merge(df, geo_ref, how='left', left_on="codeCommuneEtablissement", right_on="code_commune", copy=False)
+    df_ = df_.rename(columns={"SUPERFICIE": "superficieCommuneEtablissement",
                             "POPULATION": "populationCommuneEtablissement",
                             "coordonnees_commune": "geolocCommuneEtablissement",
                             "code_departement": "codeDepartementEtablissement",
@@ -309,10 +310,10 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
                             'nom_region': "libelleRegionEtablissement",
                             "code_arrondissement": "codeArrondissementEtablissement",
                             "nom_arrondissement": "libelleArrondissementEtablissement"})
-    df.drop(columns="code_commune", inplace=True)
+    df_.drop(columns="code_commune", inplace=True)
     # jointure sur communeAcheteur
-    df = pd.merge(df, geo_ref, how='left', left_on="codeCommuneAcheteur", right_on="code_commune", copy=False)
-    df = df.rename(columns={"SUPERFICIE": "superficieCommuneAcheteur",
+    df_ = pd.merge(df_, geo_ref, how='left', left_on="codeCommuneAcheteur", right_on="code_commune", copy=False)
+    df_ = df_.rename(columns={"SUPERFICIE": "superficieCommuneAcheteur",
                             "POPULATION": "populationCommuneAcheteur",
                             "coordonnees_commune": "geolocCommuneAcheteur",
                             "code_departement": "codeDepartementAcheteur",
@@ -321,8 +322,8 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
                             'nom_region': "libelleRegionAcheteur",
                             "code_arrondissement": "codeArrondissementAcheteur",
                             "nom_arrondissement": "libelleArrondissementAcheteur"})
-    df.drop(columns="code_commune", inplace=True)
-    return df
+    df_.drop(columns="code_commune", inplace=True)
+    return df_
 
 
 def get_distance(row: pd.DataFrame) -> float:
