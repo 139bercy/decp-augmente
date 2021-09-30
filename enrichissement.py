@@ -21,16 +21,14 @@ path_to_data = conf_data["path_to_data"]
 
 
 def main():
-    with open('df_nettoye', 'rb') as df_nettoye:
+    with open("df_nettoye", "rb") as df_nettoye:
         df = pickle.load(df_nettoye)
 
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(enrichissement_siret)
           .pipe(enrichissement_cpv)
-          .pipe(enrichissement_acheteur)
           .pipe(reorganisation)
           .pipe(enrichissement_geo)
-          .pipe(enrichissement_type_entreprise)
           .pipe(apply_luhn)
           .pipe(enrichissement_departement)
           .pipe(enrichissement_arrondissement)
@@ -38,8 +36,62 @@ def main():
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
-    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    df.to_csv("enrichissement_arrondissementenrichissement_arrondissement.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     logger.info("Fin du traitement")
+
+
+def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
+    """ """
+    # Transformation de la colonne idTitulaire en colonne siret
+    df_ = df.copy()
+    dictCorrespondance = conf_glob["enrichissement"]["abrev2nom"]
+    # Travail sur l'id des titulaires
+    df_["idTitulaires"] = np.where(~df_["idTitulaires"].str.isdigit(), "", df_.idTitulaires)
+    df_ = df_.rename(columns={"idTitulaires": "siretTitulaires"})
+    # Travail sur l'id des acheteurs
+    df_ = df_.rename(columns={"acheteur.id": "idAcheteur"})
+    path = os.path.join(path_to_data, conf_data["geo_comp"])
+    columns = [
+        "siret",
+        "siren",
+        "codePostalEtablissement",
+        "libelleCommuneEtablissement",
+        "codeCommuneEtablissement",
+        "activitePrincipaleEtablissement",
+        "numeroVoieEtablissement",
+        "typeVoieEtablissement",
+        "libelleVoieEtablissement",
+        "nic",
+        "categorieEntreprise",
+        "nicSiegeUniteLegale"]  # Colonne à utiliser dans la base Siren
+
+    result = pd.DataFrame(columns=columns)
+    chunksize = 1000000
+    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=",", encoding="utf-8", usecols=columns, dtype=str):
+        resultTemp = pd.merge(df_, gm_chunk, left_on="siretTitulaires", right_on="siret", copy=False)
+        # rename les colonnes de gm_chunk
+        gm_chunk = gm_chunk.rename(columns={"codePostalEtablissement": "codePostalAcheteur",
+                                            "libelleCommuneEtablissement": "libelleCommuneAcheteur",
+                                            "codeCommuneEtablissement": "codeCommuneAcheteur"})
+        gm_chunk = gm_chunk.drop(columns=["activitePrincipaleEtablissement",
+                                          "numeroVoieEtablissement",
+                                          "typeVoieEtablissement",
+                                          "libelleVoieEtablissement",
+                                          "nic",
+                                          "nicSiegeUniteLegale",
+                                          "categorieEntreprise",
+                                          "siren"])
+        resultTemp = pd.merge(resultTemp, gm_chunk, left_on="idAcheteur", right_on="siret", copy=False)
+        # jointure entre resltTemp et gm_chunk
+        result = pd.concat([result, resultTemp], axis=0, copy=False)
+        del resultTemp
+    # Travail sur l'adresseEtablissement
+    result["typeVoieEtablissement"] = result["typeVoieEtablissement"].apply(lambda x: dictCorrespondance[x] if x in dictCorrespondance.keys() else x)
+    result["adresseEtablissement"] = result[["numeroVoieEtablissement", "typeVoieEtablissement", "libelleVoieEtablissement"]].astype(str).agg(" ".join, axis=1)
+    result = result.drop(columns=["siret", "numeroVoieEtablissement", "typeVoieEtablissement", "libelleVoieEtablissement", "siret_y"])
+    # Remplacement des null par NC dans la CatégorieEntreprise
+    result["categorieEntreprise"] = np.where(result["categorieEntreprise"].isnull(), "NC", result["categorieEntreprise"])
+    return result
 
 
 def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
@@ -187,49 +239,6 @@ def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrichissement des données avec la catégorie de l'entreprise. Utilisation de la base StockUniteLegale de l'Insee
-
-    Retour:
-        - pd.DataFrame
-    """
-    logger.info('début enrichissement_type_entreprise')
-
-    df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
-    # Recuperation de la base
-    path = os.path.join(path_to_data, conf_data["base_ajout_type_entreprise"])
-    # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
-    to_add = pd.DataFrame(columns=["siren", "categorieEntreprise"])
-    chunksize = 1000000
-    for to_add_chunk in pd.read_csv(
-        path,
-        chunksize=chunksize,
-        usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"],
-        dtype={"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string'}
-    ):
-        # On doit creer Siret
-        to_add_chunk["nicSiegeUniteLegale"] = to_add_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
-
-        #  À Partir d'ici le siren correspond à siretEtablissement
-        #  C'est la même colonne pour optimiser la mémoire
-        to_add_chunk["siren"] = to_add_chunk["siren"].astype(str).str\
-            .cat(to_add_chunk["nicSiegeUniteLegale"].astype(str), sep='')
-
-        # filtrer only existing siret
-        to_add = to_add.append(to_add_chunk[to_add_chunk['siren'].isin(df['siretEtablissement'])])
-        del to_add_chunk
-
-    to_add.rename(columns={"siren": "siretEtablissement"}, inplace=True)
-    # # Jointure sur le Siret entre df et to_add
-    df = df.merge(
-        to_add[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
-    df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
-    del to_add
-    logger.info('fin enrichissement_type_entreprise\n')
-    return df
-
-
 # Algorithme de Luhn
 
 def is_luhn_valid(x: int) -> bool:
@@ -298,262 +307,6 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrichissement des données via les codes siret/siren
-
-    Retour:
-        - pd.DataFrame
-    """
-    logger.info("Début du traitement: Enrichissement siret")
-    dfSIRET = get_siretdf_from_original_data(df)
-    archiveErrorSIRET = getArchiveErrorSIRET()
-
-    logger.info("Enrichissement insee en cours...")
-    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_data)
-    logger.info("Enrichissement insee fini")
-
-    logger.info("Enrichissement infogreffe en cours...")
-    enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
-    del archiveErrorSIRET
-    logger.info("enrichissement infogreffe fini")
-
-    logger.info("Concaténation des dataframes d'enrichissement...")
-    dfenrichissement = get_df_enrichissement(enrichissementScrap, enrichissementInsee)
-    del enrichissementScrap
-    del enrichissementInsee
-    logger.info("Fini")
-
-    # Ajout au df principal
-    df = pd.merge(df, dfenrichissement, how='outer', left_on="idTitulaires", right_on="siret", copy=False)
-    del dfenrichissement
-    return df
-
-
-def get_siretdf_from_original_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Utilisation d'un dataframe intermediaire pour traiter les Siret unique
-
-    Retour:
-        - pd.DataFrame
-    """
-
-    dfSIRET = pd.DataFrame.copy(df[['idTitulaires', 'typeIdentifiant', 'denominationSociale']])
-    dfSIRET = dfSIRET.drop_duplicates(subset=['idTitulaires'], keep='first')
-    dfSIRET.reset_index(inplace=True, drop=True)
-    dfSIRET.idTitulaires = dfSIRET.idTitulaires.astype(str)
-
-    dfSIRET["idTitulaires"] = np.where(~dfSIRET["idTitulaires"].str.isdigit(), '00000000000000', dfSIRET.idTitulaires)
-
-    dfSIRET.reset_index(inplace=True, drop=True)
-
-    dfSIRET.rename(columns={
-        "idTitulaires": "siret",
-        "typeIdentifiant": "siren"}, inplace=True)
-    dfSIRET.siren = dfSIRET.siret.str[:9] # 9 = taille du Siren
-    dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
-
-    return dfSIRET
-
-
-def getArchiveErrorSIRET() -> pd.DataFrame:
-    """
-    Récupération des siret erronés
-
-    Retour:
-        - pd.DataFrame
-    """
-    archiveErrorSIRET = pd.DataFrame(columns=['siret', 'siren', 'denominationSociale'])
-    logger.info('Aucune archive d\'erreur')
-    return archiveErrorSIRET
-
-
-def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str) -> list:
-    """
-    Ajout des informations Adresse/Activité des entreprises via la base siren Insee
-
-    Retour:
-        - list:
-            - list[0]: pd.DataFrame -- données principales
-            - list[1]: pd.DataFrame -- données ou le SIRET n'est pas renseigné
-    """
-    # dans StockEtablissement_utf8, il y a principalement : siren, siret, nom établissement, adresse, activité principale
-    path = os.path.join(path_to_data, conf_data["base_sirene_insee"])
-    columns = [
-        'siren',
-        'nic',
-        'siret',
-        'typeVoieEtablissement',
-        'libelleVoieEtablissement',
-        'codePostalEtablissement',
-        'libelleCommuneEtablissement',
-        'codeCommuneEtablissement',
-        'activitePrincipaleEtablissement',
-        'nomenclatureActivitePrincipaleEtablissement']  # Colonne à utiliser dans la base Siren
-    dtypes = {
-        'siret': 'string',
-        'typeVoieEtablissement': 'string',
-        'libelleVoieEtablissement': 'string',
-        'codePostalEtablissement': 'string',
-        'libelleCommuneEtablissement': 'string',
-    }
-
-    result = pd.DataFrame(columns=columns)
-    chunksize = 1000000
-    for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
-        resultTemp = pd.merge(dfSIRET['siret'], gm_chunk, on=['siret'], copy=False)
-        result = pd.concat([result, resultTemp], axis=0, copy=False)
-        del resultTemp
-    result = result.drop_duplicates(subset=['siret'], keep='first')
-
-    enrichissement_insee_siret = pd.merge(dfSIRET, result, how='outer', on=['siret'], copy=False)
-    enrichissement_insee_siret.rename(columns={"siren_x": "siren"}, inplace=True)
-    enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
-    nanSiret = enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()]
-    enrichissement_insee_siret = enrichissement_insee_siret[
-        enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
-    nanSiret = nanSiret.loc[:, ["siret", "siren", "denominationSociale"]]
-
-    # Concaténation des deux resultats
-    enrichissementInsee = enrichissement_insee_siret
-
-    temp_df = pd.merge(nanSiret, result, indicator=True, how="outer", on='siren', copy=False)
-    del result
-    nanSiret = temp_df[temp_df['activitePrincipaleEtablissement'].isnull()]
-    nanSiret = nanSiret.iloc[:, :3]
-    nanSiret.reset_index(inplace=True, drop=True)
-
-    return [enrichissementInsee, nanSiret]
-
-
-def get_enrichissement_scrap(nanSiren: pd.DataFrame, archiveErrorSIRET: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrichissement des données restantes et récupération des siret n'ayant aps de correspondance
-
-    Return:
-        - pd.DataFrame
-    """
-
-    # ....... Solution complémentaire pour ceux non-identifié dans la BDD
-    columns = [
-        'index',
-        'rue',
-        'siret',
-        'ville',
-        'typeEntreprise',
-        'codeType',
-        'detailsType',
-        'SIRETisMatched']
-
-    filter = 10
-    nanSiren = nanSiren.iloc[:filter, :]
-
-    df_scrap = pd.DataFrame(columns=columns)
-    # Récupération des résultats
-    nanSiren.reset_index(inplace=True)
-    resultat = pd.merge(nanSiren, df_scrap, on='index', copy=False)
-    resultatScrap1 = resultat[resultat.rue != ' ']
-
-    # Données encore manquantes
-    dfDS = resultat[resultat.rue == ' ']
-    dfDS = dfDS.iloc[:, 1:4]
-    dfDS.columns = ['siret', 'siren', 'denominationSociale']
-    dfDS.reset_index(inplace=True, drop=True)
-    df_scrap2 = pd.DataFrame(
-        columns=['index', 'rue', 'siret', 'ville', 'typeEntreprise', 'codeType', 'detailsType', 'SIRETisMatched'])
-
-    # Récupération des résultats
-    dfDS.reset_index(inplace=True)
-    resultat = pd.merge(dfDS, df_scrap2, on='index', copy=False)
-    resultatScrap2 = resultat[resultat.rue != ' ']
-
-    ###############################################################################
-    # Enregistrement des entreprises n'ayant aucune correspondance
-    errorSIRET = resultat[
-        (resultat.siret_y == '') | (resultat.siret_y == '') | (resultat.siret_y == ' ') | (resultat.siret_y.isnull())]
-    errorSIRET = errorSIRET[['siret_x', 'siren', 'denominationSociale']]
-    errorSIRET.columns = ['siret', 'siren', 'denominationSociale']
-    errorSIRET.reset_index(inplace=True, drop=True)
-    errorSIRET = pd.concat([errorSIRET, archiveErrorSIRET], axis=0, copy=False)
-    errorSIRET = errorSIRET.drop_duplicates(subset=['siret', 'siren', 'denominationSociale'], keep='first')
-    errorSIRET.to_csv('errorSIRET.csv', sep=';', index=False, header=True, encoding='utf-8')
-    ###############################################################################
-
-    # On réuni les résultats du scraping
-    enrichissementScrap = pd.concat([resultatScrap1, resultatScrap2], copy=False)
-    return enrichissementScrap
-
-
-def get_df_enrichissement(enrichissementScrap: pd.DataFrame, enrichissementInsee: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrichissement géographique grace aux données Insee
-
-    Returns:
-        - pd.DataFrame
-    """
-    # Arrangement des colonnes
-    # Gestion bdd insee
-    enrichissementInsee.reset_index(inplace=True, drop=True)
-    listCorrespondance = conf_glob["enrichissement"]["abrev2nom"]
-
-    enrichissementInsee['typeVoieEtablissement'].replace(listCorrespondance, inplace=True)
-    enrichissementInsee['rue'] = \
-        (enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement)
-
-    enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee[
-        'activitePrincipaleEtablissement'].str.replace(".", "")
-
-    # Gestion bdd scrap
-    enrichissementScrap.reset_index(inplace=True, drop=True)
-    enrichissementScrap["codePostal"] = np.nan
-    enrichissementScrap["commune"] = np.nan
-    enrichissementScrap.codePostal = enrichissementScrap.codePostal.astype(str)
-    enrichissementScrap.commune = enrichissementScrap.ville.astype(str)
-    enrichissementScrap.rue = enrichissementScrap.rue.astype(str)
-
-    enrichissementScrap["codePostal"] = enrichissementScrap.ville.str[0:7]
-    enrichissementScrap["codePostal"] = enrichissementScrap["codePostal"].str.replace(" ", "")
-    enrichissementScrap["commune"] = enrichissementScrap.ville.str[7:]
-
-    enrichissementScrap.drop(columns=["index", "siret_x", "ville", "typeEntreprise",
-                                      "detailsType", "SIRETisMatched", "siret_y"],
-                             inplace=True, errors="ignore")
-    enrichissementInsee.drop(columns=["nic", "typeVoieEtablissement", "libelleVoieEtablissement",
-                                      "nomenclatureActivitePrincipaleEtablissement"],
-                             inplace=True, errors="ignore")
-
-    # Renomme les colonnes
-    enrichissementScrap.rename(columns={
-        'rue': 'adresseEtablissement',
-        'codeType': 'codeTypeEtablissement',
-        'codePostal': 'codePostalEtablissement',
-        'commune': 'communeEtablissement'
-    }, inplace=True, errors="ignore")
-    enrichissementInsee.rename(columns={
-        'libelleCommuneEtablissement': 'communeEtablissement',
-        'activitePrincipaleEtablissement': 'codeTypeEtablissement',
-        'rue': 'adresseEtablissement'
-    }, inplace=True, errors="ignore")
-
-    enrichissementInsee = enrichissementInsee[[
-        'siret',
-        'siren',
-        'denominationSociale',
-        'codePostalEtablissement',
-        'communeEtablissement',
-        'codeCommuneEtablissement',
-        'codeTypeEtablissement',
-        'adresseEtablissement']]
-
-    # df final pour enrichir les données des entreprises
-    dfenrichissement = pd.concat([enrichissementInsee, enrichissementScrap], copy=False)
-    dfenrichissement = dfenrichissement.astype(str)
-    # On s'assure qu'il n'y ai pas de doublons
-    dfenrichissement = dfenrichissement.drop_duplicates(subset=['siret'], keep=False)
-
-    return dfenrichissement
-
-
 def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     """
     Récupération des codes CPV formatés.
@@ -583,42 +336,6 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     # Rename la variable CODE en codeCPV
     df.rename(columns={"codeCPV": "codeCPV_Original",
               "CODE": "codeCPV"}, inplace=True)
-    return df
-
-
-def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Enrichissement des données des acheteurs via les codes siret/siren
-
-    Return:
-        - pd.DataFrame
-    """
-    logger.info("Début du traitement: Enrichissement acheteur")
-    dfAcheteurId = df['acheteur.id'].to_frame()
-    dfAcheteurId.columns = ['siret']
-    dfAcheteurId = dfAcheteurId.drop_duplicates(keep='first')
-    dfAcheteurId.reset_index(inplace=True, drop=True)
-    dfAcheteurId = dfAcheteurId.astype(str)
-
-    # StockEtablissement_utf8
-    chemin = os.path.join(path_to_data, conf_data["base_sirene_insee"])
-    # chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
-    result = pd.DataFrame(columns=['siret', 'codePostalEtablissement',
-                                   'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
-    for gm_chunk in pd.read_csv(
-            chemin, chunksize=1000000, sep=',', encoding='utf-8',
-            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
-        gm_chunk['siret'] = gm_chunk['siret'].astype(str)
-        resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret", copy=False)
-        result = pd.concat([result, resultTemp], axis=0, copy=False)
-    result = result.drop_duplicates(subset=['siret'], keep='first')
-    enrichissementAcheteur = result
-    enrichissementAcheteur.columns = ['acheteur.id', 'codePostalAcheteur', 'libelleCommuneAcheteur',
-                                      'codeCommuneAcheteur']
-    enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
-
-    df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
-    del enrichissementAcheteur
     return df
 
 

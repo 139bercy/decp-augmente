@@ -1,6 +1,6 @@
 mkdir data && cd data
 wget 'https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O geoflar-communes-2015.csv
-#wget 'https://public.opendatasoft.com/explore/dataset/code-insee-postaux-geoflar/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O code-insee-postaux-geoflar.csv
+wget 'https://data.economie.gouv.fr/explore/dataset/georeferentielcomunnesbercyhub/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B' -O georef.csv
 wget https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip
 unzip cpv_2008_xls.zip
 wget https://www.insee.fr/fr/statistiques/fichier/4316069/departement2020-csv.zip

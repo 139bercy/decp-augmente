@@ -10,5 +10,6 @@
 	"region-fr" : "region2020.csv",
 	"commune-fr": "commune2021.csv",
 	"arrondissement-fr": "arrondissement2021.csv",
-	"geo_ref": "geo_referential.csv"
+	"geo_ref": "georef.csv",
+	"geo_comp": "company_ref.csv"
 }

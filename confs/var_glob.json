@@ -57,7 +57,7 @@
     "enrichissement": {
         "type_col_enrichissement": {
                                     "id": "string",
-                                    "idMarche": "int",
+                                    "idMarche": "string",
                                     "source": "string",
                                     "uid": "string",
                                     "uuid": "string",
@@ -84,7 +84,7 @@
                                    },
         "type_col_enrichissement_siret": {
                                           "id": "string",
-                                          "idMarche": "int",
+                                          "idMarche": "string",
                                           "source": "string",
                                           "type": "string",
                                           "objetMarche": "object",
