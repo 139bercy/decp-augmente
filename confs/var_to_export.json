@@ -28,7 +28,7 @@
                "codeRegionExecution": 1, 
                "libelleRegionExecution": 1, 
                "nature": 1, 
-               "accord-cadrePresume": 1, 
+               "accord-cadrePresume": 0, 
                "procedure": 1, 
                "idAcheteur": 1, 
                "sirenAcheteurValide": 1, 

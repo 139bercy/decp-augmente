@@ -30,8 +30,6 @@ def main():
           .pipe(reorganisation)
           .pipe(enrichissement_geo)
           .pipe(apply_luhn)
-          .pipe(enrichissement_departement)
-          .pipe(enrichissement_arrondissement)
           .pipe(manage_column_final)
           )
 
@@ -41,13 +39,18 @@ def main():
 
 
 def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
-    """ """
+    """
+    Enrichissement du dataFrame avec la base réferentiel entreprise pour les Acheteur ET les Etablissement
+
+    Return:
+        - pd.DataFrame
+    """
     # Transformation de la colonne idTitulaire en colonne siret
     df_ = df.copy()
     dictCorrespondance = conf_glob["enrichissement"]["abrev2nom"]
     # Travail sur l'id des titulaires
     df_["idTitulaires"] = np.where(~df_["idTitulaires"].str.isdigit(), "", df_.idTitulaires)
-    df_ = df_.rename(columns={"idTitulaires": "siretTitulaires"})
+    df_ = df_.rename(columns={"idTitulaires": "siretEtablissement"})
     # Travail sur l'id des acheteurs
     df_ = df_.rename(columns={"acheteur.id": "idAcheteur"})
     path = os.path.join(path_to_data, conf_data["geo_comp"])
@@ -68,7 +71,7 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     result = pd.DataFrame(columns=columns)
     chunksize = 1000000
     for gm_chunk in pd.read_csv(path, chunksize=chunksize, sep=",", encoding="utf-8", usecols=columns, dtype=str):
-        resultTemp = pd.merge(df_, gm_chunk, left_on="siretTitulaires", right_on="siret", copy=False)
+        resultTemp = pd.merge(df_, gm_chunk, left_on="siretEtablissement", right_on="siret", copy=False)
         # rename les colonnes de gm_chunk
         gm_chunk = gm_chunk.rename(columns={"codePostalEtablissement": "codePostalAcheteur",
                                             "libelleCommuneEtablissement": "libelleCommuneAcheteur",
@@ -114,128 +117,6 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement",
     })
-    return df
-
-
-def extraction_departement_from_code_postal(code_postal: str) -> str:
-    """
-    Renvoie le code postal en prenant en compte les territoires outre-mer
-    code_postal est un str
-
-    Retour:
-        str
-    """
-    try:
-        code = code_postal[:2]
-        if code == "97" or code == "98":
-            code = code_postal[:3]
-        return code
-    except IndexError:
-        return "00"
-
-
-def jointure_base_departement_region() -> pd.DataFrame:
-    """
-    Permet la jointure entre la base departement de l'Insee (dossier data) et la base region de l'Insee
-
-    Retour:
-        - pd.DataFrame
-    """
-    # Import de la base département
-    path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
-    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
-    # Import de la base Région
-    path_reg = os.path.join(path_to_data, conf_data["region-fr"])
-    region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
-    region.columns = ["reg", "libelle_reg"]
-    # Merge des deux bases
-    df_dep_reg = pd.merge(departement, region, how="left", left_on="reg", right_on="reg", copy=False)
-    df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
-    df_dep_reg.code_region = np.where(df_dep_reg.code_region.isin(["1", "2", "3", "4", "6"]), "0" + df_dep_reg.code_region, df_dep_reg.code_region)
-    return df_dep_reg
-
-
-def enrichissement_departement(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Ajout des variables région et departement dans decp. Ces deux variables concernent les acheteurs et les établissements
-
-    Retour:
-        - pd.DataFrame
-    """
-    logger.info("Début du traitement: Ajout des libelle departement/Region pour les acheteurs et les etabissements")
-    logger.info("Début de la jointure entre les deux csv Insee: Departements et Regions")
-    df_dep_reg = jointure_base_departement_region()
-    logger.info("Fin de la jointure")
-    # Creation de deux variables récupérant le numéro du departement
-    df["departementAcheteur"] = df["codePostalAcheteur"].apply(extraction_departement_from_code_postal)
-    df["departementEtablissement"] = df["codePostalEtablissement"].apply(extraction_departement_from_code_postal)
-    # Fusion entre Numero et numero de departement pour recuperer le nom et ou la region (pour etablissement)
-    df_dep_reg.code_departement = df_dep_reg.code_departement.astype(str)
-    df = pd.merge(df, df_dep_reg, how="left", left_on="departementAcheteur", right_on="code_departement", copy=False)
-    df = df.rename(columns={
-                   'Nom': "libelleDepartementAcheteur",
-                   'Region': "libelleRegionAcheteur",
-                   'code_region': "codeRegionAcheteur"
-                   })
-    df = df.drop(["code_departement"], axis=1)
-    df = pd.merge(df, df_dep_reg, how="left", left_on="departementEtablissement", right_on="code_departement", copy=False)
-    df = df.rename(columns={
-                   'Nom': "libelleDepartementEtablissement",
-                   'Region': "libelleRegionEtablissement",
-                   'code_region': "codeRegionEtablissement"
-                   })
-    df = df.drop(["code_departement"], axis=1)
-    return df
-
-
-def enrichissement_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Ajout du code Arrondissement à partir du code commune et du libelle du Arrondissement à partir de son code.
-    L'Arrondissement correspond à la zone géographique raccrochée à une sous-prefecture
-
-    Retour:
-        - pd.DataFrame
-    """
-    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
-    df = get_code_arrondissement(df)
-    df = get_libelle_arrondissement(df)
-    return df
-
-
-def get_code_arrondissement(df):
-    """
-    Ajout de la colonne code Arrondissement à partir du code commune
-
-    Retour:
-        - pd.DataFrame
-    """
-    path_to_commune = os.path.join(path_to_data, conf_data["commune-fr"])
-    commune = pd.read_csv(path_to_commune, sep=",", usecols=['TYPECOM', 'COM', 'ARR'], dtype={"COM": str, "ARR": str})
-    commune = commune[commune.TYPECOM == "COM"]
-    commune.drop(['TYPECOM'], axis=1)
-    df = df.merge(commune, how="left", left_on="codeCommuneAcheteur", right_on="COM", copy=False)
-    df = df.drop(["COM"], axis=1)
-    df = df.rename(columns={"ARR": "codeArrondissementAcheteur"})
-    df = pd.merge(df, commune, how="left", left_on="codeCommuneEtablissement", right_on="COM", copy=False)
-    df = df.drop(["COM"], axis=1)
-    df = df.rename(columns={"ARR": "codeArrondissementEtablissement"})
-    return df
-
-
-def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Ajout de la colonne libelle Arrondissement à partir du code Arrondissement
-
-    Retour:
-        - pd.DataFrame"""
-    path_to_arrondissement = os.path.join(path_to_data, conf_data["arrondissement-fr"])
-    arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
-    df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
-    df = df.drop(["ARR"], axis=1)
-    df = df.rename(columns={"LIBELLE": "libelleArrondissementAcheteur"})
-    df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementEtablissement", right_on="ARR", copy=False)
-    df = df.drop(["ARR"], axis=1)
-    df = df.rename(columns={"LIBELLE": "libelleArrondissementEtablissement"})
     return df
 
 
@@ -409,93 +290,39 @@ def fix_codegeo(code: str) -> str:
 
 def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Ajout des géolocalisations des entreprises
+    Enrichissement du dataFrame avec la base réferentiel géographique pour les Acheteur ET les Etablissement
 
     Return:
         - pd.DataFrame
     """
-    logger.info("Début du traitement: Enrichissement geographique")
-    # Enrichissement latitude & longitude avec adresse la ville
-    df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
-    df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(object)
-    df_villes = get_df_villes()
-    # Ajout des données Acheteur
-    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneAcheteur", right_on="codeCommune", copy=False)
-    df.rename(columns={"superficie": "superficieCommuneAcheteur",
-                       "population": "populationCommuneAcheteur",
-                       "latitude": "latitudeCommuneAcheteur",
-                       "longitude": "longitudeCommuneAcheteur"},
-              inplace=True)
-    df.drop(columns="codeCommune", inplace=True)
-    # Ajout des données Etablissements
-    df = pd.merge(df, df_villes, how='left', left_on="codeCommuneEtablissement", right_on='codeCommune', copy=False)
-    df.rename(columns={"superficie": "superficieCommuneEtablissement",
-                       "population": "populationCommuneEtablissement",
-                       "latitude": "latitudeCommuneEtablissement",
-                       "longitude": "longitudeCommuneEtablissement"},
-              inplace=True)
-    df.drop(columns="codeCommune", inplace=True)
-
-    # Calcul de la distance entre l'acheteur et l'etablissement
-    df['distanceAcheteurEtablissement'] = df.apply(get_distance, axis=1)
-
-    # Remise en forme des colonnes géo-spatiales
-    cols = ["longitudeCommuneAcheteur",
-            "latitudeCommuneAcheteur",
-            "longitudeCommuneEtablissement",
-            "latitudeCommuneEtablissement"]
-    df[cols] = df[cols].astype(str)
-    df['geolocCommuneAcheteur'] = df.latitudeCommuneAcheteur + ',' + df.longitudeCommuneAcheteur
-    df['geolocCommuneAcheteur'] = np.where(
-        df['geolocCommuneAcheteur'] == 'nan,nan', np.NaN, df['geolocCommuneAcheteur'])
-
-    df['geolocCommuneEtablissement'] = df.latitudeCommuneEtablissement + ',' + df.longitudeCommuneEtablissement
-    df['geolocCommuneEtablissement'] = np.where(
-        df['geolocCommuneEtablissement'] == 'nan,nan', np.NaN, df['geolocCommuneEtablissement'])
-    df.reset_index(inplace=True, drop=True)
-
+    path = os.path.join(path_to_data, conf_data["geo_ref"])
+    columns = ["SUPERFICIE", "POPULATION", "coordonnees_commune", "code_commune", "code_departement", "nom_departement", 'code_region', 'nom_region', "code_arrondissement", "nom_arrondissement"]
+    geo_ref = pd.read_csv(path, sep=";", usecols=columns)
+    # jointure sur communeEtablissement
+    df = pd.merge(df, geo_ref, how='left', left_on="codeCommuneEtablissement", right_on="code_commune", copy=False)
+    df = df.rename(columns={"SUPERFICIE": "superficieCommuneEtablissement",
+                            "POPULATION": "populationCommuneEtablissement",
+                            "coordonnees_commune": "geolocCommuneEtablissement",
+                            "code_departement": "codeDepartementEtablissement",
+                            "nom_departement": "libelleDepartementEtablissement",
+                            'code_region': "codeRegionEtablissement",
+                            'nom_region': "libelleRegionEtablissement",
+                            "code_arrondissement": "codeArrondissementEtablissement",
+                            "nom_arrondissement": "libelleArrondissementEtablissement"})
+    df.drop(columns="code_commune", inplace=True)
+    # jointure sur communeAcheteur
+    df = pd.merge(df, geo_ref, how='left', left_on="codeCommuneAcheteur", right_on="code_commune", copy=False)
+    df = df.rename(columns={"SUPERFICIE": "superficieCommuneAcheteur",
+                            "POPULATION": "populationCommuneAcheteur",
+                            "coordonnees_commune": "geolocCommuneAcheteur",
+                            "code_departement": "codeDepartementAcheteur",
+                            "nom_departement": "libelleDepartementAcheteur",
+                            'code_region': "codeRegionAcheteur",
+                            'nom_region': "libelleRegionAcheteur",
+                            "code_arrondissement": "codeArrondissementAcheteur",
+                            "nom_arrondissement": "libelleArrondissementAcheteur"})
+    df.drop(columns="code_commune", inplace=True)
     return df
-
-
-def get_df_villes() -> pd.DataFrame:
-    """
-    Récupération des informations sur les communes (superficie/population)
-
-    Return:
-        - pd.DataFrame
-    """
-    path = os.path.join(path_to_data, conf_data["base_geoflar"])
-    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
-                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
-
-    # Suppression des codes communes sans point geo
-    df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes['Geo Point'].notnull())]
-    df_villes.reset_index(inplace=True, drop=True)
-
-    # Séparation de la latitude et la longitude depuis les info géo
-    df_villes['Geo Point'] = df_villes['Geo Point'].astype(str)
-    df_sep = pd.DataFrame(df_villes['Geo Point'].str.split(',', 1, expand=True))
-    df_sep.columns = ['latitude', 'longitude']
-
-    # Fusion des lat/long dans le df
-    df_villes = df_villes.join(df_sep)
-
-    # Suppression des colonnes inutiles
-    df_villes.drop(columns=["Geo Point"], inplace=True, errors="ignore")
-
-    # Renommer les variables
-    df_villes.rename(columns={"INSEE_COM": 'codeCommune',
-                              "POPULATION": 'population',
-                              "SUPERFICIE": 'superficie'},
-                     inplace=True)
-
-    # Conversion des colonnes
-    df_villes.population = df_villes.population.astype(float)
-    df_villes.codeCommune = df_villes.codeCommune.astype(object)
-    df_villes.latitude = df_villes.latitude.astype(float)
-    df_villes.longitude = df_villes.longitude.astype(float)
-
-    return df_villes
 
 
 def get_distance(row: pd.DataFrame) -> float:

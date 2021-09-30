@@ -4,6 +4,7 @@ data/
 *.jq
 config.json
 df_*
+*.csv#
 
 # Fichier Mac
 .DS_Store
