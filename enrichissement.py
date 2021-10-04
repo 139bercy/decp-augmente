@@ -302,28 +302,27 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     # jointure sur communeEtablissement
     df_ = pd.merge(df, geo_ref, how='left', left_on="codeCommuneEtablissement", right_on="code_commune", copy=False)
     df_ = df_.rename(columns={"SUPERFICIE": "superficieCommuneEtablissement",
-                            "POPULATION": "populationCommuneEtablissement",
-                            "coordonnees_commune": "geolocCommuneEtablissement",
-                            "code_departement": "codeDepartementEtablissement",
-                            "nom_departement": "libelleDepartementEtablissement",
-                            'code_region': "codeRegionEtablissement",
-                            'nom_region': "libelleRegionEtablissement",
-                            "code_arrondissement": "codeArrondissementEtablissement",
-                            "nom_arrondissement": "libelleArrondissementEtablissement"})
+                              "POPULATION": "populationCommuneEtablissement",
+                              "coordonnees_commune": "geolocCommuneEtablissement",
+                              "code_departement": "codeDepartementEtablissement",
+                              "nom_departement": "libelleDepartementEtablissement",
+                              'code_region': "codeRegionEtablissement",
+                              'nom_region': "libelleRegionEtablissement",
+                              "code_arrondissement": "codeArrondissementEtablissement",
+                              "nom_arrondissement": "libelleArrondissementEtablissement"})
     df_.drop(columns="code_commune", inplace=True)
     # jointure sur communeAcheteur
     df_ = pd.merge(df_, geo_ref, how='left', left_on="codeCommuneAcheteur", right_on="code_commune", copy=False)
     df_ = df_.rename(columns={"SUPERFICIE": "superficieCommuneAcheteur",
-                            "POPULATION": "populationCommuneAcheteur",
-                            "coordonnees_commune": "geolocCommuneAcheteur",
-                            "code_departement": "codeDepartementAcheteur",
-                            "nom_departement": "libelleDepartementAcheteur",
-                            'code_region': "codeRegionAcheteur",
-                            'nom_region': "libelleRegionAcheteur",
-                            "code_arrondissement": "codeArrondissementAcheteur",
-                            "nom_arrondissement": "libelleArrondissementAcheteur"})
-    df_.drop(columns="code_commune", inplace=True)
-    return df_
+                              "POPULATION": "populationCommuneAcheteur",
+                              "coordonnees_commune": "geolocCommuneAcheteur",
+                              "code_departement": "codeDepartementAcheteur",
+                              "nom_departement": "libelleDepartementAcheteur",
+                              'code_region': "codeRegionAcheteur",
+                              'nom_region': "libelleRegionAcheteur",
+                              "code_arrondissement": "codeArrondissementAcheteur",
+                              "nom_arrondissement": "libelleArrondissementAcheteur"})
+    return df_.drop(columns="code_commune")
 
 
 def get_distance(row: pd.DataFrame) -> float:
