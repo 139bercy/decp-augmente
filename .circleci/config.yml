@@ -144,7 +144,8 @@ jobs:
       - run:
           name: Transfert des données vers data.economie
           command: |
-            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
+            echo -e $SSL_CERTIFICATE_LETS_ENCRYPT_HACK > ca-certs.crt
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ssl:ca-file ca-certs.crt ; set ftp:ssl-force true ; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
 
 workflows:
   version: 2
