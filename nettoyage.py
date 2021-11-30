@@ -504,6 +504,9 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
         - pd.DataFrame
     """
     logger.info("Début du traitement: Correction de la variable dureeMois.")
+
+    df['dureeMois'] = np.where(isinstance(df['dureeMois'], int), int(df['dureeMois']), 0)
+
     # On cherche les éventuelles erreurs mois -> jours
     df['montantCalcule'] = df['montantCalcule'].astype(np.int32) # 32 au lieu de 64 pour l'espace mémoire
     df['dureeMois'] = df['dureeMois'].astype(np.int32) # 32 au lieu de 64
