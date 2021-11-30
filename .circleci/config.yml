@@ -91,7 +91,7 @@ jobs:
            command: |
              bash get-data-weekly.sh
        - save_cache:
-          key: data-input-weekly-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          key: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
           paths:
             - "data"
 
@@ -111,7 +111,7 @@ jobs:
             - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
       - restore_cache:
           keys:
-            - data-input-weekly-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
       - run:
           name: Traitement des données
           no_output_timeout: 2h
