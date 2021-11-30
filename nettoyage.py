@@ -508,8 +508,8 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     df['montantCalcule'] = df['montantCalcule'].astype(np.int32) # 32 au lieu de 64 pour l'espace mémoire
     df['dureeMois'] = df['dureeMois'].astype(np.int32) # 32 au lieu de 64
     mask = ((df['montantCalcule'] == df['dureeMois'])
-            | (df['montantCalcule'] / df['dureeMois'] < 100)
-            | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
+            | (df['montantCalcule'] / (0.01 + df['dureeMois']) < 100)
+            | (df['montantCalcule'] / (0.01 + df['dureeMois']) < 1000) & (df['dureeMois'] >= 12)
             | ((df['dureeMois'] == 30) & (df['montantCalcule'] < 200000))
             | ((df['dureeMois'] == 31) & (df['montantCalcule'] < 200000))
             | ((df['dureeMois'] == 360) & (df['montantCalcule'] < 10000000))
