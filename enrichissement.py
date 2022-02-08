@@ -807,7 +807,7 @@ def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
         "data.gouv.fr_pes": "PES Marchés",
         "marches-publics.info": "AWS-Achat",
         "megalis-bretagne": "Megalis Bretagne",
-        "atexo-maximilien":	"Maximilien IdF",
+        "atexo-maximilien": "Maximilien IdF",
         "ternum-bfc": "Territoires numériques BFC",
         "e-marchespublics": "Dematis",
         "grandlyon": "Grand Lyon"
