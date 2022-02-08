@@ -35,6 +35,7 @@ def main():
           .pipe(enrichissement_departement)
           .pipe(enrichissement_arrondissement)
           .pipe(manage_column_final)
+          .pipe(change_sources_name)
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
@@ -795,6 +796,24 @@ def get_distance(row: pd.DataFrame) -> float:
         return distance(x, y).km
     except ValueError:
         return None
+
+
+def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Get a dataframe in input, and based on a dict will rename the source
+    """
+    dict_replace_name_source = {
+        "data.gouv.fr_aife": "API AIFE",
+        "data.gouv.fr_pes": "PES Marchés",
+        "marches-publics.info":	"AWS-Achat",
+        "megalis-bretagne": "Megalis Bretagne",
+        "atexo-maximilien":	"Maximilien IdF",
+        "ternum-bfc": "Territoires numériques BFC",
+        "e-marchespublics": "Dematis",
+        "grandlyon": "Grand Lyon"
+    }
+    df["source"].replace(dict_replace_name_source, inplace=True)
+    return df
 
 
 if __name__ == "__main__":
