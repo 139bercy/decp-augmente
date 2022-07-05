@@ -6,7 +6,7 @@ import logging.handlers
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
-
+pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
