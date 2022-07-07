@@ -88,16 +88,10 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-
-    useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
-                     "cache_not_in_bdd_insee",
-                     "cache_bdd_legale",
-                     "cache_not_in_bdd_legale"]
-
+    l_key_useless = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
-        if key not in useless_keys:
-
+        if key not in l_key_useless:
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
@@ -111,9 +105,9 @@ def manage_titulaires(df: pd.DataFrame):
                 f"Remplacé par la valeur du concessionnaire")
     logger.info(f"Nombre de marché sans montant: {sum(df['montant'].isnull())}. Remplacé par la valeur globale")
     logger.info(f"Nombre de marché sans identifiant acheteur: {sum(df['acheteur.id'].isnull())}. "
-                f"Remplacé par l'identifiant de l'autorité concédante")
+                f"Remplacé par l'identifiatn de l'autorité Concedante")
     logger.info(f"Nombre de marché sans nom d'acheteur: {sum(df['acheteur.nom'].isnull())}. "
-                f"Remplacé par le nom de l'autorité concédante")
+                f"Remplacé par le nom de l'autorité Concédante")
 
     # Gestion différences concessionnaires / titulaires
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
@@ -127,7 +121,6 @@ def manage_titulaires(df: pd.DataFrame):
 
     # Récupération des données titulaires
     df = df[~(df['titulaires'].isna())]
-
 
     # Création d'une colonne nbTitulairesSurCeMarche.
     # Cette colonne sera retravaillé dans la fonction detection_accord_cadre
@@ -703,7 +696,6 @@ def manage_modifications(data: dict) -> pd.DataFrame:
         pd.DataFrame
     """
     l_indice = indice_marche_avec_modification(data)
-
     dict_modification = recuperation_colonne_a_modifier(data, l_indice)
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
