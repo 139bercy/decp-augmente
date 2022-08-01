@@ -27,7 +27,7 @@ jobs:
       run: chmod +x get-data-weekly.sh && ./get-data-weekly.sh
     -
       name: Téléchargement de decp.json
-      run: wget -O data/decp.json https://data.economie.gouv.fr/api/v2/catalog/datasets/test_decp/exports/json
+      run: wget -O data/decp.json.json https://data.economie.gouv.fr/explore/dataset/test_decp/files/05d17e847b3245d2fe2318669f1a84c6/download/
     -
       name: Process
       run : python main.py 
