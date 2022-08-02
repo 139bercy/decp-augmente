@@ -27,7 +27,7 @@ jobs:
       run: chmod +x get-data-weekly.sh && ./get-data-weekly.sh
     -
       name: Téléchargement de decp.json
-      run: wget -O data/decp.json https://data.economie.gouv.fr/explore/dataset/test_decp/files/05d17e847b3245d2fe2318669f1a84c6/download/
+      run: cd data && lftp -u ${{ secrets.LOG }}:${{ secrets.MDP }} ${{ secrets.SERV }} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; cd test; get decp.json ; quit"
     -
       name: Process
       run : python main.py 
