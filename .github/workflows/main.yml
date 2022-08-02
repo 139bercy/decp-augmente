@@ -33,4 +33,4 @@ jobs:
       run : python main.py 
     -
       name: Publication
-      run: lftp -u ${{ secrets.LOG }}:${{ secrets.MDP }} ${{ secrets.SERV }} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; cd test; put results/decp_augmente.csv ; quit"
+      run: lftp -u ${{ secrets.LOG }}:${{ secrets.MDP }} ${{ secrets.SERV }} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; cd test; put decp_augmente.csv ; quit"
