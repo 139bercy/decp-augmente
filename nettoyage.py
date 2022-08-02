@@ -91,8 +91,7 @@ def manage_titulaires(df: pd.DataFrame):
     df.drop(columns=donnees_inutiles, inplace=True)
 
     # Récupération des données titulaires
-    df["titulaires"].fillna('0', inplace=True)
-    df = df[~(df['titulaires'].isna('0'))]
+    df = df[~(df['titulaires'].isna())]
 
     # Création d'une colonne nbTitulairesSurCeMarche.
     # Cette colonne sera retravaillé dans la fonction detection_accord_cadre
