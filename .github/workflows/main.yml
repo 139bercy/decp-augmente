@@ -22,12 +22,12 @@ jobs:
     -
       name: Installation des dépendances
       run: pip install pandas numpy geopy
-    -   
-      name: Téléchargement des références
-      run: chmod +x get-data-weekly.sh && ./get-data-weekly.sh
+#    -   
+#      name: Téléchargement des références
+#      run: chmod +x get-data-weekly.sh && ./get-data-weekly.sh
     -
       name: Téléchargement de decp.json
-      run: cd data && lftp -u ${{ secrets.LOG }}:${{ secrets.MDP }} ${{ secrets.SERV }} -e "cd decp; cd test; get decp.json; quit"
+      run: mkdir data && cd data && lftp -u ${{ secrets.LOG }}:${{ secrets.MDP }} ${{ secrets.SERV }} -e "cd decp; cd test; get decp.json; quit"
     -
       name: Process
       run : python main.py 
