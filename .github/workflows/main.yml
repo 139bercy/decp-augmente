@@ -21,7 +21,7 @@ jobs:
       uses: actions/checkout@v2
     -
       name: Installation des dépendances
-      run: pip install pandas numpy geopy
+      run: pip install pandas numpy geopy openpyxl
     -   
       name: Téléchargement des références
       run: chmod +x get-data-weekly.sh && ./get-data-weekly.sh
