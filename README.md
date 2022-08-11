@@ -154,7 +154,7 @@ Cette partie a pour objectif de décrire et préciser les tenants et aboutissant
 
 Il existe certaines modifications du code de nettoyage.py par exemple qu iont pour objectif de rendre le code plus lisible et de l'adapter au fichier en sortie de decp-rama-v2. La plupart des modifications servent à gérer des exeptions générées par des certaines colonnes dans certaines sources.
 
-## Modification de la CI
+### Modification de la CI
 
 La CI mise en place repose sur les mêmes outils que pour decp-rama-v2 (https://github.com/139bercy/decp-rama-v2) : 
 Dans l'objectif de remplacement de decp-rama, decp-rama-v2 dispose d'une CI qui permet de publier automatiquement le résultat de son script de manière journalière. Tous les jours, la CI va :
@@ -167,7 +167,7 @@ Dans l'objectif de remplacement de decp-rama, decp-rama-v2 dispose d'une CI qui 
 - Lancer main.py
 - Publier sur le serveur FTP de economie.gouv dans le dossier decp/test le résultat du script : decp_augmente.csv
 
-## Problèmes et pistes d'améliorations
+### Problèmes et pistes d'améliorations
 
 Decp-augmente feat_v2 n'est aujourd'hui pas en état pour faire tourner le script à partir du fichier produit par decp-rama-v2. En effet, des erreurs apparaissent et un travail de correction de bugs est nécessaire. Par la durée du téléchargement des données et du processus avant d'obtenir une erreur, il est difficile de repérer et tester des solutions. Voici les différentes pistes de solution de ces problèmes et d'améliorations possibles :
 
