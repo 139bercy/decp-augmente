@@ -145,3 +145,32 @@ La partie enrichissement des données va nous permettre d'ajouter, grâce à des
 
 ### Réalisation d'un dashboard 
    Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
+  
+## Decp-augmente-v2
+
+Cette partie a pour objectif de décrire et préciser les tenants et aboutissants de la branche feat_v2 du projet en PR. L'objectif principal est d'adapter le processus decp-augmente qui prenait en entrée le fichier créé par decp-rama pour qu'il soit capable de prendre en entrée le fichier fourni par decp-rama-v2.
+
+### Modifications de traitement
+
+Il existe certaines modifications du code de nettoyage.py par exemple qu iont pour objectif de rendre le code plus lisible et de l'adapter au fichier en sortie de decp-rama-v2. La plupart des modifications servent à gérer des exeptions générées par des certaines colonnes dans certaines sources.
+
+## Modification de la CI
+
+La CI mise en place repose sur les mêmes outils que pour decp-rama-v2 (https://github.com/139bercy/decp-rama-v2) : 
+Dans l'objectif de remplacement de decp-rama, decp-rama-v2 dispose d'une CI qui permet de publier automatiquement le résultat de son script de manière journalière. Tous les jours, la CI va :
+
+- Lancer un docker via Github Action qui s'appuie sur une image publiée sur DockerHub. Cette image est générée via le DockerFile dans le dossier docker/ et publiée grâce au script publish_docker.sh dans decp-rama-v2.
+- Récuperer le dossier github via actions/checkout@v2.
+- Installer les dépendances nécessaires aux scripts de decp-augmente.
+- Téléchargement des références qui serviront à l'enrichissement.
+- Téléchargement du fichier decp.json produit par decp.json présent sur le serveur ftp de data.eco.
+- Lancer main.py
+- Publier sur le serveur FTP de economie.gouv dans le dossier decp/test le résultat du script : decp_augmente.csv
+
+## Problèmes et pistes d'améliorations
+
+Decp-augmente feat_v2 n'est aujourd'hui pas en état pour faire tourner le script à partir du fichier produit par decp-rama-v2. En effet, des erreurs apparaissent et un travail de correction de bugs est nécessaire. Par la durée du téléchargement des données et du processus avant d'obtenir une erreur, il est difficile de repérer et tester des solutions. Voici les différentes pistes de solution de ces problèmes et d'améliorations possibles :
+
+- Travail d'optimisation des performances de decp-augmente feat_v2. Même en utilisant un fichier témoin decp.json de 30 marches seulement, la durée de traitement reste importante. Il est donc nécessaire d'opérer à des changements sur decp-augmente afin de réduire la longueur des traitements.
+- Mise en cache des références et des dépendances afin de gagner en performance et en répidité d'exécution.
+- Publication des résultats qui ne seraient présents que sur le serveur ftp si le script arrivait à tourner entièrement.
