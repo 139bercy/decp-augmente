@@ -445,9 +445,9 @@ def regroupement_marche_complet(df):
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
-        df_avec_bon_id = pd.DataFrame(len(new_index) * [max(ids_to_modify)], index=new_index, columns=["id"])
+        df_avec_bon_id = pd.DataFrame(max(ids_to_modify), index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
-        df_nbtitulaires = pd.DataFrame(len(new_index) * [len(new_index)], index=new_index, columns=["nombreTitulaireSurMarchePresume"])
+        df_nbtitulaires = pd.DataFrame(len(new_index), index=new_index, columns=["nombreTitulaireSurMarchePresume"])
         df_to_update = pd.concat([df_to_update, df_avec_bon_id])
         # Dataframe permettant de faire la jointure pour ajouter la colonne nombreTitulaireSurMarchePresume dans le df initial
         df_titulaires = pd.concat([df_titulaires, df_nbtitulaires])
