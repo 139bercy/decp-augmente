@@ -445,8 +445,15 @@ def regroupement_marche_complet(df):
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
         value_number = max(ids_to_modify)
-        if pd.isna(new_index):
-            new_index = pd.NA
+        if pd.isna(new_index).any():
+            a = []
+            for i in new_index:
+                if pd.isna(i):
+                    a.append(pd.NA)
+                else:
+                    a.append(i)
+            new_index = a
+
         if pd.isna(value_number):
             value_number = pd.NA
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
