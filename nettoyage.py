@@ -49,8 +49,8 @@ def main():
     with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
-    df.to_csv("decp_nettoye.csv")
-    logger.info("Ecriture du csv terminé")
+    # df.to_csv("decp_nettoye.csv")
+    # logger.info("Ecriture du csv terminé")
 
 
 def check_reference_files(conf_data: dict):
