@@ -435,27 +435,22 @@ def regroupement_marche_complet(df):
     df_titulaires = pd.DataFrame()
     df_to_update = pd.DataFrame()
     df_intermediaire = df[["objet", "datePublicationDonnees", "montant", "id"]]  # "datePublicationDonnees",
-    # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais idMarche ne l'est pas non plus.
+    # On regroupe selon l objet du marché. Attention, objet n est pas forcément unique mais
+    # idMarche ne l est pas non plus.
     df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
                                                       "datePublicationDonnees", "montant"])["id"])
     # Initialisation du resultat sous forme de liste
+
     for i in range(len(df_group)):
         # dataframe contenant les id d'un meme marche
         ids_to_modify = df_group[1].iloc[i]
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
-        value_number = max(ids_to_modify)
-        if pd.isna(new_index).any():
-            a = []
-            for i in new_index:
-                if pd.isna(i):
-                    a.append(pd.NA)
-                else:
-                    a.append(i)
-            new_index = a
-
-        if pd.isna(value_number):
+        if ids_to_modify.isna().any():
+            # ids_to_modify.max() crash la ci si il y à des null
             value_number = pd.NA
+        else:
+            value_number = ids_to_modify.max()
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         df_avec_bon_id = pd.DataFrame(data=value_number, index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
