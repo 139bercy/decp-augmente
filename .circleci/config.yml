@@ -98,7 +98,7 @@ jobs:
   compute:
     docker:
       - image: 139bercy/decp-rama
-    resource_class: large
+    resource_class: xlarge
     steps:
       - checkout
       - restore_cache:
