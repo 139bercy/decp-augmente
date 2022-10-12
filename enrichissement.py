@@ -218,7 +218,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
             .cat(to_add_chunk["nicSiegeUniteLegale"].astype(str), sep='')
 
         # filtrer only existing siret
-        to_add = to_add.append(to_add_chunk[to_add_chunk['siren'].isin(df['siretEtablissement'])])
+        to_add = pd.concat([to_add, to_add_chunk[to_add_chunk['siren'].isin(df['siretEtablissement'])]])
         del to_add_chunk
 
     to_add.rename(columns={"siren": "siretEtablissement"}, inplace=True)
