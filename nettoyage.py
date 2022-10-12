@@ -4,8 +4,11 @@ import pickle
 import logging.handlers
 import numpy as np
 import pandas as pd
+import time
 from pandas import json_normalize
 
+
+start_time_nettoyage = time.time()
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
@@ -29,13 +32,13 @@ def main():
     df = manage_modifications(data)
     logger.info("Fin du traitement")
 
-    df = regroupement_marche_complet(df)
+    df = regroupement_marche_complet(df)  # vraiment lent
 
     logger.info("Début du traitement: Gestion des titulaires")
     df = (df.pipe(manage_titulaires)
           .pipe(manage_duplicates)
           .pipe(manage_amount)
-          .pipe(manage_missing_code)  # break ci here
+          .pipe(manage_missing_code)
           .pipe(manage_region)
           .pipe(manage_date)
           .pipe(correct_date)
@@ -48,8 +51,8 @@ def main():
     with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
-    # df.to_csv("decp_nettoye.csv")
-    # logger.info("Ecriture du csv terminé")
+    logger.info("Ecriture du pickle terminé")
+    logger.info("Fin du nettoyage en {} minutes".format((time.time() - start_time_nettoyage) / 60))
 
 
 def check_reference_files(conf_data: dict):
@@ -591,7 +594,7 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     liste_objet = list(subdata_modif.objet.unique())
     df_to_concatene = pd.DataFrame()  # df vide pour la concaténation
     logger.info("Au total, {} marchés sont concernés par au moins une modification".format(len(liste_objet)))
-    for objet_marche in liste_objet:
+    for objet_marche in liste_objet:  # très lent voir si on peu ameliorer
         # Récupération du dataframe modification et du dataframe source
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         for j in range(len(marche)):

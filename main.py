@@ -1,6 +1,6 @@
 import nettoyage
 import enrichissement
-import logging
+import time
 import logging.config
 
 
@@ -18,12 +18,12 @@ logger.addHandler(fh)
 
 
 def main():
-    logger.info("Début du script de nettoyage")
+    start_time = time.time()
+    logger.info("Decp-augmente")
     nettoyage.main()
-    logger.info("Fin du script de nettoyage")
     logger.info("Début du script d'enrichissement des données")
     enrichissement.main()
-    logger.info("Fin du script d'enrichissement")
+    logger.info("Fin de l'execution de decp-augmente en {} minutes".format((time.time() - start_time) / 60))
 
 
 if __name__ == "__main__":

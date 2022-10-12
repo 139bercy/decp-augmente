@@ -3,6 +3,7 @@ import json
 import os
 import pickle
 import logging
+import time
 import numpy as np
 import pandas as pd
 from geopy.distance import distance, Point
@@ -21,6 +22,8 @@ path_to_data = conf_data["path_to_data"]
 
 
 def main():
+    start_time_enrichissement = time.time()
+
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
@@ -38,9 +41,9 @@ def main():
           .pipe(change_sources_name)
           )
 
-    logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
+    logger.info("Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
-    logger.info("Fin du traitement")
+    logger.info("Fin de l'enrichissement en {} minutes".format((time.time() - start_time_enrichissement) / 60))
 
 
 def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
