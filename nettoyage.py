@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import logging
 import logging.handlers
 import numpy as np
 import pandas as pd
@@ -43,7 +42,7 @@ def main():
           .pipe(data_inputation)
           .pipe(replace_char)
           )
-    logger.info("Fin du traitement")
+    logger.info("Fin du traitement, sauvegarde du fichier nettoyé...")
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye', 'wb') as df_nettoye:
@@ -532,8 +531,8 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
                     col += "Modification"
                 if col not in df.columns:  # Cas ou on tombe sur le premier marche qui modifie un champ
                     df[col] = ""  # Initialisation dans le df initial
-                df[col][i] = json_modification[0][col_init]
-                df["booleanModification"][i] = 1  # Création d'une booléenne pour simplifier le subset pour la suite
+                df.at[i, col] = json_modification[0][col_init]
+                df.at[i, "booleanModification"] = 1  # Création d'une booléenne pour simplifier le subset pour la suite
 
 
 def split_dataframe(df: pd.DataFrame, sub_data: pd.DataFrame, modalite: str) -> tuple:
@@ -572,7 +571,7 @@ def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_m
     for col in col_modification:
         col_init = dict_modification[col]
         if raw[col] != '':
-            df_source[col_init].loc[raw.name] = raw[col]
+            df_source.at[raw.name, col_init] = raw[col]
     return df_source
 
 
