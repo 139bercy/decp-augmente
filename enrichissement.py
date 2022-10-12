@@ -507,7 +507,7 @@ def get_df_enrichissement(enrichissementScrap: pd.DataFrame, enrichissementInsee
         (enrichissementInsee.typeVoieEtablissement + ' ' + enrichissementInsee.libelleVoieEtablissement)
 
     enrichissementInsee['activitePrincipaleEtablissement'] = enrichissementInsee[
-        'activitePrincipaleEtablissement'].str.replace(".", "")
+        'activitePrincipaleEtablissement'].str.replace(".", "", regex=True)
 
     # Gestion bdd scrap
     enrichissementScrap.reset_index(inplace=True, drop=True)
