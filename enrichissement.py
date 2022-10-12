@@ -392,11 +392,16 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str) -> list:
         'activitePrincipaleEtablissement',
         'nomenclatureActivitePrincipaleEtablissement']  # Colonne à utiliser dans la base Siren
     dtypes = {
+        'siren': 'string',
+        'nic': 'string',
         'siret': 'string',
         'typeVoieEtablissement': 'string',
         'libelleVoieEtablissement': 'string',
         'codePostalEtablissement': 'string',
         'libelleCommuneEtablissement': 'string',
+        'codeCommuneEtablissement': 'string',
+        'activitePrincipaleEtablissement': 'string',
+        'nomenclatureActivitePrincipaleEtablissement': 'string'
     }
 
     result = pd.DataFrame(columns=columns)
@@ -606,9 +611,14 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     # chemin = 'dataEnrichissement/StockEtablissement_utf8.csv'
     result = pd.DataFrame(columns=['siret', 'codePostalEtablissement',
                                    'libelleCommuneEtablissement', 'codeCommuneEtablissement'])
+    dtypes = {'siret': 'string',
+              'codePostalEtablissement': 'string',
+              'libelleCommuneEtablissement': 'string',
+              'codeCommuneEtablissement': 'string'}
     for gm_chunk in pd.read_csv(
             chemin, chunksize=1000000, sep=',', encoding='utf-8',
-            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']):
+            usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement'],
+            dtype=dtypes):
         gm_chunk['siret'] = gm_chunk['siret'].astype(str)
         resultTemp = pd.merge(dfAcheteurId, gm_chunk, on="siret", copy=False)
         result = pd.concat([result, resultTemp], axis=0, copy=False)
