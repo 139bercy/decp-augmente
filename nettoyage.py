@@ -51,7 +51,7 @@ def main():
     with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
-    logger.info("Ecriture du pickle terminé")
+    logger.info("Écriture du pickle terminé")
     logger.info("Fin du nettoyage en {} minutes".format((time.time() - start_time_nettoyage) / 60))
 
 
