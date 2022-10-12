@@ -754,13 +754,17 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
 def get_df_villes() -> pd.DataFrame:
     """
     Récupération des informations sur les communes (superficie/population)
+    base_geoflar = geoflar-communes-2015.csv
+
+    INSEE_COM, code insee de la commune
 
     Return:
         - pd.DataFrame
     """
     path = os.path.join(path_to_data, conf_data["base_geoflar"])
-    df_villes = pd.read_csv(path, sep=';', header=0, error_bad_lines=False,
-                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'])
+    df_villes = pd.read_csv(path, sep=';', header=0, on_bad_lines='skip',
+                            usecols=['INSEE_COM', 'Geo Point', 'SUPERFICIE', 'POPULATION'],
+                            dtype={'INSEE_COM': str, 'SUPERFICIE': int, 'POPULATION': int})
 
     # Suppression des codes communes sans point geo
     df_villes = df_villes[(df_villes['INSEE_COM'].notnull()) & (df_villes['Geo Point'].notnull())]
