@@ -527,8 +527,8 @@ def regroupement_marche_complet(df):
             value_number = ids_to_modify.max()
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         if ids_to_modify.isna().any():
-            value_number = pd.NA  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
-        else:
+            value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        else :
             value_number = max(ids_to_modify)
         df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
