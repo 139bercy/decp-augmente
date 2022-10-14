@@ -2,6 +2,7 @@ import json
 import os
 import pickle
 import logging.handlers
+from random import random
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
@@ -24,6 +25,25 @@ def main():
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
+
+    # Modification pour un prendre subset de données 
+    subset = True
+    if subset :
+        n_data = len(data["marches"])
+        n_subset = 15000
+        logger.info("Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(n_subset))
+        debug = True # Pour debug on ne va évidemment pas prendre de l'aléatoire
+        if debug :
+            logger.info("Mode debug, pas d'alea")
+            seed = 20
+            np.random.seed(seed)
+            random_i = list(np.random.choice(n_data, n_subset))
+        else :
+            random_i = list(np.random.choice(n_data, n_subset))
+        accessed_mapping = map(data['marches'].__getitem__, random_i)
+        accessed_list = list(accessed_mapping)
+        data['marches'] = accessed_list
+
 
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(data)
@@ -486,11 +506,16 @@ def regroupement_marche_complet(df):
     # Initialisation du resultat sous forme de liste
     for i in range(len(df_group)):
         # dataframe contenant les id d'un meme marche
+        # UP : il arrive que parfois on n'ait pas d'ID (ex aife 675 , ctrl-f "Acquisition d acce")
         ids_to_modify = df_group[1].iloc[i]
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
-        df_avec_bon_id = pd.DataFrame(len(new_index) * [max(ids_to_modify)], index=new_index, columns=["id"])
+        if ids_to_modify.isna().any():
+            value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        else :
+            value_number = max(ids_to_modify)
+        df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
         df_nbtitulaires = pd.DataFrame(len(new_index) * [len(new_index)], index=new_index,
                                        columns=["nombreTitulaireSurMarchePresume"])
@@ -515,7 +540,7 @@ def indice_marche_avec_modification(data: dict) -> list:
         - list
     """
     liste_indices = []
-    for i in range(len(data["marches"])):
+    for i in range(len(data)):
         # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
         data["marches"][i]["id_technique"] = i
         if data["marches"][i]["modifications"]:
