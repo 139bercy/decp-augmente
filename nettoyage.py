@@ -46,7 +46,6 @@ def main():
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
 
-    input('C bon')
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(data)
     logger.info("Fin du traitement")
