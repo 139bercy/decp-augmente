@@ -24,6 +24,7 @@ def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
+    
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(enrichissement_siret)
           .pipe(enrichissement_cpv)
@@ -40,6 +41,11 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    debug = True
+    if debug : # Mise en pkl par sûreté
+        with open('df_augmente', 'wb') as df_augmente:
+        # Export présent pour faciliter la comparaison
+            pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
 
 
