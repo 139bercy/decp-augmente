@@ -16,6 +16,9 @@ decp_file_name = conf_data["decp_file_name"]
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
 
+with open(os.path.join("confs", "var_debug.json")) as f:
+    conf_debug = json.load(f)["nettoyage"]
+
 logger = logging.getLogger("main.nettoyage")
 logger.setLevel(logging.DEBUG)
 
@@ -27,15 +30,14 @@ def main():
         data = json.load(json_data)
 
     # Modification pour un prendre subset de données 
-    subset = True
-    if subset :
+    
+    if conf_debug["subset"] :
         n_data = len(data["marches"])
-        n_subset = 15000
+        n_subset = conf_debug["n_subset"]
         logger.info("Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(n_subset))
-        debug = True # Pour debug on ne va évidemment pas prendre de l'aléatoire
-        if debug :
+        if conf_debug["debug"] :
             logger.info("Mode debug, pas d'alea")
-            seed = 20
+            seed = conf_debug["seed"]
             np.random.seed(seed)
             random_i = list(np.random.choice(n_data, n_subset))
         else :
@@ -44,7 +46,7 @@ def main():
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
 
-
+    input('C bon')
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(data)
     logger.info("Fin du traitement")
