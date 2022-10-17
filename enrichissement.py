@@ -17,6 +17,9 @@ with open(os.path.join("confs", "config_data.json")) as f:
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
 
+with open(os.path.join("confs", "var_debug.json")) as f:
+    conf_debug = json.load(f)["enrichissement"]
+
 path_to_data = conf_data["path_to_data"]
 
 
@@ -41,8 +44,7 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
-    debug = True
-    if debug : # Mise en pkl par sûreté
+    if conf_debug["debug"] : # Mise en pkl par sûreté
         with open('df_augmente', 'wb') as df_augmente:
         # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
