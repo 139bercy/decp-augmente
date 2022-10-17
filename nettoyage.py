@@ -540,7 +540,7 @@ def indice_marche_avec_modification(data: dict) -> list:
         - list
     """
     liste_indices = []
-    for i in range(len(data)):
+    for i in range(len(data['marches'])):
         # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
         data["marches"][i]["id_technique"] = i
         if data["marches"][i]["modifications"]:
@@ -681,6 +681,7 @@ def manage_modifications(data: dict) -> pd.DataFrame:
         pd.DataFrame
     """
     l_indice = indice_marche_avec_modification(data)
+
     dict_modification = recuperation_colonne_a_modifier(data, l_indice)
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
