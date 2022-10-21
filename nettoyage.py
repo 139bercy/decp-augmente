@@ -413,8 +413,8 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("Début du traitement: Correction de la variable dureeMois.")
     # On cherche les éventuelles erreurs mois -> jours
-    df['montantCalcule'] = df['montantCalcule'].astype(np.int64)
-    df['dureeMois'] = df['dureeMois'].astype(np.int64)
+    df['montantCalcule'] = df['montantCalcule'].astype(np.int32) # 32 au lieu de 64 pour l'espace mémoire
+    df['dureeMois'] = df['dureeMois'].astype(np.int32) # 32 au lieu de 64
     mask = ((df['montantCalcule'] == df['dureeMois'])
             | (df['montantCalcule'] / df['dureeMois'] < 100)
             | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
