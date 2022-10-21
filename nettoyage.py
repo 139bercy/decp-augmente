@@ -194,52 +194,47 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     df['montantCalcule'] = df["montant"]
     df['montantCalcule'].fillna(0, inplace=True)
     # variable témoin pour les logs
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
+
     # Détection des montants "1 chiffre"
     df["montantCalcule"] = df["montantCalcule"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero} montant(s) correspondaient à des"
+
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) correspondaient à des"
                 f"suites d'un seul chiffre. Exemple: 9 999 999")
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+    
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
+
     # Définition des bornes inf et sup et traitement
     borne_inf = 200.0
     borne_sup = 9.99e8
     df["montantCalcule"] = df["montantCalcule"] / df["nbTitulairesSurCeMarche"]
     df['montantCalcule'] = np.where(df['montantCalcule'] <= borne_inf, 0, df['montantCalcule'])
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero}"
+    
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero}"
                 f" montant(s) étaient inférieurs à la borne inf {borne_inf}")
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
     df['montantCalcule'] = np.where(df['montantCalcule'] >= borne_sup, 0, df['montantCalcule'])
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero} montant(s) étaient supérieurs à "
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) étaient supérieurs à "
                 f"la borne sup: {borne_sup}")
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
     # Ecriture dans la log
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"Au total, {nb_montant_calcul_egal_zero_2} montant(s) "
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"Au total, {n_montant_calcul_equal_zero_2} montant(s) "
                 f"ont été corrigé (on compte aussi les montants vides).")
     logger.info("Fin du traitement")
     return df
