@@ -110,7 +110,7 @@ def manage_titulaires(df: pd.DataFrame):
     df.drop(columns=useless_columns, inplace=True)
 
     # Récupération des données titulaires
-    #df = df[~(df['titulaires'].isna())]
+    df = df[~(df['titulaires'].isna())]
 
 
     # Création d'une colonne nbTitulairesSurCeMarche.
