@@ -29,19 +29,17 @@ def main():
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-    # Modification pour un prendre subset de données 
-    
-    if conf_debug["subset"] :
+    # Modification pour un prendre subset de données en mode debug 
+    if conf_debug["debug"] :
+        
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
         logger.info("Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(n_subset))
-        if conf_debug["debug"] :
-            logger.info("Mode debug, pas d'alea")
-            seed = conf_debug["seed"]
-            np.random.seed(seed)
-            random_i = list(np.random.choice(n_data, n_subset))
-        else :
-            random_i = list(np.random.choice(n_data, n_subset))
+            
+        logger.info("Mode debug, pas d'alea")
+        seed = conf_debug["seed"]
+        np.random.seed(seed)
+        random_i = list(np.random.choice(n_data, n_subset))
         accessed_mapping = map(data['marches'].__getitem__, random_i)
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
@@ -80,10 +78,10 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-    l_key_useless = ["path_to_project", "path_to_data"]
+    useless_keys = ["path_to_project", "path_to_data"]
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
-        if key not in l_key_useless:
+        if key not in useless_keys:
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
@@ -97,22 +95,23 @@ def manage_titulaires(df: pd.DataFrame):
                 f"Remplacé par la valeur du concessionnaire")
     logger.info(f"Nombre de marché sans montant: {sum(df['montant'].isnull())}. Remplacé par la valeur globale")
     logger.info(f"Nombre de marché sans identifiant acheteur: {sum(df['acheteur.id'].isnull())}. "
-                f"Remplacé par l'identifiatn de l'autorité Concedante")
+                f"Remplacé par l'identifiant de l'autorité concédante")
     logger.info(f"Nombre de marché sans nom d'acheteur: {sum(df['acheteur.nom'].isnull())}. "
-                f"Remplacé par le nom de l'autorité Concédante")
+                f"Remplacé par le nom de l'autorité concédante")
 
     # Gestion différences concessionnaires / titulaires
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
-    donnees_inutiles = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
+    useless_columns = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
                         'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom',
                         'idtech', "id_technique"]
-    df.drop(columns=donnees_inutiles, inplace=True)
+    df.drop(columns=useless_columns, inplace=True)
 
     # Récupération des données titulaires
-    df = df[~(df['titulaires'].isna())]
+    #df = df[~(df['titulaires'].isna())]
+
 
     # Création d'une colonne nbTitulairesSurCeMarche.
     # Cette colonne sera retravaillé dans la fonction detection_accord_cadre
@@ -160,7 +159,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
 def is_false_amount(x: float, threshold: int = 5) -> bool:
     """
-    On cherche à vérifier si les parties entières des montants sont composés d'au moins 5 threshold fois le meme chiffre
+    On cherche à vérifier si les parties entières des montants sont composées d'au moins 5 threshold fois le meme chiffre
     (hors 0).
     Exemple pour threshold = 5: 999 999 ou 222 262.
     Ces montants seront considérés comme faux
@@ -191,7 +190,7 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
-    df["montant"] = pd.to_numeric(df["montant"])
+    df["montant"] = pd.to_numeric(df["montant"], downcast='float') # Passage en float32 plutôt que 64
     df['montantCalcule'] = df["montant"]
     df['montantCalcule'].fillna(0, inplace=True)
     # variable témoin pour les logs
