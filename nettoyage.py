@@ -80,7 +80,7 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-    l_key_useless = ["path_to_project", "path_to_data"]
+    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache"]
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
         if key not in l_key_useless:
