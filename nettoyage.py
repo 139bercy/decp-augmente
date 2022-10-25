@@ -6,6 +6,7 @@ from random import random
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
+
 pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -30,17 +31,19 @@ def main():
         data = json.load(json_data)
 
     # Modification pour un prendre subset de données 
-    
-    if conf_debug["subset"] :
+
+    if conf_debug["subset"]:
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
-        logger.info("Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(n_subset))
-        if conf_debug["debug"] :
+        logger.info(
+            "Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(
+                n_subset))
+        if conf_debug["debug"]:
             logger.info("Mode debug, pas d'alea")
             seed = conf_debug["seed"]
             np.random.seed(seed)
             random_i = list(np.random.choice(n_data, n_subset))
-        else :
+        else:
             random_i = list(np.random.choice(n_data, n_subset))
         accessed_mapping = map(data['marches'].__getitem__, random_i)
         accessed_list = list(accessed_mapping)
@@ -80,7 +83,10 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache"]
+    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
+                     "cache_not_in_bdd_insee",
+                     "cache_bdd_legale",
+                     "cache_not_in_bdd_legale"]
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
         if key not in l_key_useless:
@@ -195,19 +201,19 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     df['montantCalcule'] = df["montant"]
     df['montantCalcule'].fillna(0, inplace=True)
     # variable témoin pour les logs
-    try :
+    try:
         nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero = 0
     # Détection des montants "1 chiffre"
     df["montantCalcule"] = df["montantCalcule"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
-    try :
+    try:
         nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero_2 = 0
     logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero} montant(s) correspondaient à des"
                 f"suites d'un seul chiffre. Exemple: 9 999 999")
-    try :
+    try:
         nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero = 0
@@ -216,18 +222,18 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     borne_sup = 9.99e8
     df["montantCalcule"] = df["montantCalcule"] / df["nbTitulairesSurCeMarche"]
     df['montantCalcule'] = np.where(df['montantCalcule'] <= borne_inf, 0, df['montantCalcule'])
-    try :
+    try:
         nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero_2 = 0
     logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero}"
                 f" montant(s) étaient inférieurs à la borne inf {borne_inf}")
-    try :
+    try:
         nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero = 0
     df['montantCalcule'] = np.where(df['montantCalcule'] >= borne_sup, 0, df['montantCalcule'])
-    try :
+    try:
         nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero_2 = 0
@@ -236,7 +242,7 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
     # Ecriture dans la log
-    try :
+    try:
         nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
     except:
         nb_montant_calcul_egal_zero_2 = 0
@@ -327,7 +333,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
 
     # Vérification si c'est bien un code département
     liste_cp = conf_glob["nettoyage"]["code_CP"].split(',') \
-        + [str(i) for i in list(np.arange(10, 96, 1))]
+               + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(liste_cp), np.NaN,
                                               df['codeDepartementExecution'])
 
@@ -513,8 +519,8 @@ def regroupement_marche_complet(df):
         new_index = list(ids_to_modify.index)
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         if ids_to_modify.isna().any():
-            value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
-        else :
+            value_number = pd.NA  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        else:
             value_number = max(ids_to_modify)
         df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
