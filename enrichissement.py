@@ -49,7 +49,7 @@ def main():
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     if conf_debug["debug"] : # Mise en pkl par sûreté
-        with open('df_augmente', 'wb') as df_augmente:
+        with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente:
         # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
@@ -240,7 +240,6 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     # Recuperation de la base
     path = os.path.join(path_to_data, conf_data["base_ajout_type_entreprise"])
     # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
-    to_add = pd.DataFrame(columns=["siren", "categorieEntreprise"])
     usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale"]
     dtype={"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string'}
     path_cache = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
@@ -250,7 +249,6 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         list_siret_not_found = loading_cache(path_cache_not_in_bdd)
     else:
         list_siret_not_found = []
-    chunksize = 1000000
     mask_siren_valid_not_found = df.siretEtablissement.isin(list_siret_not_found)
     dfSIRET_valide_notfound = df[mask_siren_valid_not_found]
     # On retire les siret valides mais non trouvés lors des précédents passages du df.
@@ -538,6 +536,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     df_keys = df_keys.to_frame().rename(columns={0: "siret"})
     mask_siret_not_valid = (~df_keys.siret.apply(is_luhn_valid)) | (df_keys.siret == '00000000000000')
     dfSIRET_siret_not_valid = df_keys[mask_siret_not_valid]
+    dfSIRET_siret_not_valid['sirenAcheteurValide'] = False
     df_keys = df_keys[~mask_siret_not_valid]
     #Le second cache des siret valide not found est traité en premier.
     cache_siret_not_found_exists = os.path.isfile(path_to_cache_not_in_insee)
@@ -578,7 +577,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
 def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str, path_to_cache_not_in_bdd: str) -> list:
     """
     Ajout des informations Adresse/Activité des entreprises via la base siren Insee par un système de double cache.
-    Pour bien comprendre la fonction il y a plusieurs cas possibles concernant un SIRET. Il y a le cas où le siret est valide et match avec la bdd insee (on gère ça avec le premier cache)
+    Pour bien comprendre la fonction, il y a plusieurs cas possibles concernant un SIRET. Il y a le cas où le siret est valide et match avec la bdd insee (on gère ça avec le premier cache)
     Le cas où le siret est invalide ou OOOOOOOO (siret artificiel inscrit en amont dans enrichissement.py) il n'y a aucune chance de trouver ça dans la bdd insee donc.
     Le dernier cas où un siret est valide mais pas présent en bdd, pour ceux-ci on créé un second cache.
     Dans un cache (dfcache) sont stockés les informations en rpovenance de la bdD insee que l'on gère 
@@ -599,26 +598,6 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
             - list[1]: pd.DataFrame -- données où le SIRET n'est pas renseigné/invalide/pas trouvé
 
     """
-    columns = [
-        'siren',
-        'nic',
-        'siret',
-        'typeVoieEtablissement',
-        'libelleVoieEtablissement',
-        'codePostalEtablissement',
-        'libelleCommuneEtablissement',
-        'codeCommuneEtablissement',
-        'activitePrincipaleEtablissement',
-        'nomenclatureActivitePrincipaleEtablissement']  # Colonne à utiliser dans la base Siren
-    dtypes = {
-        'siret': 'string',
-        'typeVoieEtablissement': 'string',
-        'libelleVoieEtablissement': 'string',
-        'codePostalEtablissement': 'string',
-        'libelleCommuneEtablissement': 'string',
-        'codeCommuneEtablissement': 'object',
-    }
-    
     # Traitement pour le cache. Si le siret n'est pas valide ou non renseigné, on va aller chercher dans le cache. Or on veut pas ça, donc on le gère en amont du cache.
     # Ceux qui ont un siret non valide on les vire de df SIRET, on les récupèrera plus tard.
     mask_siret_not_valid = (~dfSIRET.siret.apply(is_luhn_valid)) | (dfSIRET.siret == '00000000000000')
@@ -931,7 +910,6 @@ def fix_codegeo(code: str) -> str:
     if "." in code[:5]:
         return "0" + code[:4]
     return code[:5]
-
 
 def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     """
