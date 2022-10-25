@@ -12,5 +12,7 @@
 	"commune-fr": "commune2021.csv",
 	"arrondissement-fr": "arrondissement2021.csv",
 	"cache_bdd_insee" : "cache_StockEtablissement_utf8.csv",
-	"cache_not_in_bdd_insee" : "cache_NOTIN_StockEtablissement_utf8.csv"
+	"cache_not_in_bdd_insee" : "cache_NOTIN_StockEtablissement_utf8.csv",
+	"cache_bdd_legale" : "cache_StockUniteLegale_utf8.csv",
+	"cache_not_in_bdd_legale" : "cache_NOTIN_StockUniteLegale_utf8.csv"
 }
