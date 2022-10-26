@@ -7,9 +7,12 @@ import numpy as np
 import pandas as pd
 from pandas import json_normalize
 
+<<<<<<< HEAD
 import cProfile
 import pstats
 
+=======
+>>>>>>> 2d1ebb1 (V2 feat cache (#63))
 pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -88,7 +91,16 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
+<<<<<<< HEAD
     l_key_useless = ["path_to_project", "path_to_data"]
+=======
+
+    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
+                     "cache_not_in_bdd_insee",
+                     "cache_bdd_legale",
+                     "cache_not_in_bdd_legale"]
+
+>>>>>>> 2d1ebb1 (V2 feat cache (#63))
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
         if key not in l_key_useless:
@@ -527,8 +539,8 @@ def regroupement_marche_complet(df):
             value_number = ids_to_modify.max()
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         if ids_to_modify.isna().any():
-            value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
-        else :
+            value_number = pd.NA  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        else:
             value_number = max(ids_to_modify)
         df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
