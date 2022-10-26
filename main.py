@@ -2,7 +2,9 @@ import nettoyage
 import enrichissement
 import logging
 import logging.config
-
+import cProfile
+import pstats
+import pickle
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.DEBUG)

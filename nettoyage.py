@@ -6,6 +6,8 @@ from random import random
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
+import cProfile
+import pstats
 pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -83,6 +85,7 @@ def check_reference_files():
     l_key_useless = ["path_to_project", "path_to_data", "path_to_cache"]
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
+        print(key)
         if key not in l_key_useless:
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
@@ -687,9 +690,24 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
-    df = regroupement_marche(df, dict_modification)
+    df["idtech"] = df["id_technique"].copy()
+    df['idMarche'] = df["id_technique"].copy()
+    #df = regroupement_marche(df, dict_modification)
     return df
 
 
 if __name__ == "__main__":
-    main()
+    if conf_debug["debug"]:
+        profiler = cProfile.Profile()
+        profiler.enable()
+        main()
+        profiler.disable()
+        with open('df_nettoye', 'rb') as df_nettoye:
+            df = pickle.load(df_nettoye)
+            init_len = len(df)
+        with open("profilingSnettoyage_size{}.txt".format(init_len), "w") as f:
+            ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
+            ps.sort_stats('cumulative')
+            ps.print_stats()
+    else:
+        main()
