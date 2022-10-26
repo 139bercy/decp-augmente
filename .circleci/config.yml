@@ -145,7 +145,7 @@ jobs:
       - run:
           name: Condition pour les branches
           command: |
-            if [ "$CIRCLE_BRANCH" != "master" ]; then
+            if [ "$CIRCLE_BRANCH" != "master"] || ["$CIRCLE_BRANCH"  != "v2_augmente_fix"]; then
                 if [ $(git log -1 | grep "\[send\]" | wc -l) = 0 ]; then
                   circleci-agent step halt
                 fi
