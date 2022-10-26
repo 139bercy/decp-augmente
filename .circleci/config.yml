@@ -164,9 +164,6 @@ workflows:
             - install_requirements
             - get_data_daily
             - get_data_weekly
-      - send:
-          requires:
-            - compute
 
   daily-data:
     jobs:
