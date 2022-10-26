@@ -3,7 +3,7 @@ jobs:
   install_requirements:
     docker:
       - image: 139bercy/decp-rama
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       - restore_cache:
@@ -26,7 +26,7 @@ jobs:
   linter:
     docker:
       - image: 139bercy/decp-rama
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       - restore_cache:
@@ -42,7 +42,7 @@ jobs:
   get_data_daily:
       docker:
         - image: 139bercy/decp-rama
-      resource_class: xlarge
+      resource_class: large
       steps:
         - checkout
         - run: date +%F > date
@@ -71,7 +71,7 @@ jobs:
   get_data_weekly:
      docker:
        - image: 139bercy/decp-rama
-     resource_class: xlarge
+     resource_class: large
      steps:
        - checkout
        - run: date +%G-%V > date
@@ -100,7 +100,7 @@ jobs:
   compute:
     docker:
       - image: 139bercy/decp-rama
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       - restore_cache:
@@ -130,7 +130,7 @@ jobs:
   send:
     docker:
       - image: 139bercy/decp-rama
-    resource_class: xlarge
+    resource_class: large
     steps:
       - checkout
       - run: date +%F > date
