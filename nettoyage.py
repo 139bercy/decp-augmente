@@ -67,8 +67,8 @@ def main():
     with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
-    df.to_csv("decp_nettoye.csv")
-    logger.info("Ecriture du csv terminé")
+    # df.to_csv("decp_nettoye.csv")
+    # logger.info("Ecriture du csv terminé")
 
 
 def check_reference_files():
@@ -499,12 +499,18 @@ def regroupement_marche_complet(df):
     df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
                                                       "datePublicationDonnees", "montant"])["id"])
     # Initialisation du resultat sous forme de liste
+
     for i in range(len(df_group)):
         # dataframe contenant les id d'un meme marche
         # UP : il arrive que parfois on n'ait pas d'ID (ex aife 675 , ctrl-f "Acquisition d acce")
         ids_to_modify = df_group[1].iloc[i]
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
+        if ids_to_modify.isna().any():
+            # ids_to_modify.max() crash la ci si il y à des null
+            value_number = pd.NA
+        else:
+            value_number = ids_to_modify.max()
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         if ids_to_modify.isna().any():
             value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
