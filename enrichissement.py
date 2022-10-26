@@ -310,6 +310,55 @@ def is_luhn_valid(x: int) -> bool:
     except:
         return False
 
+def apply_luhn_up(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Application de la formule de Luhn sur les siren/siret
+
+    Retour:
+        - pd.DataFrame
+    """
+    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
+    # Application sur les siren des Acheteur
+    df['siren1Acheteur'] = df["acheteur.id"].str[:9]
+    df_SA = pd.DataFrame(df['siren1Acheteur'])
+    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
+    df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
+    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
+    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide)))
+    del df['siren1Acheteur']
+    del df_SA
+
+
+    # Les SIREN soont extraits de la BdD Insee, ils peuvent être invalides ? 
+    # Application sur les siren des établissements
+    df['siren2Etablissement'] = df["siren"].str[:]
+    df_SE = pd.DataFrame(df['siren2Etablissement'])
+    df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
+    df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
+    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
+    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide)))
+    del df['siren2Etablissement']
+    
+
+
+    # Application sur les siret des établissements
+    df['siret2Etablissement'] = df["siret2Etablissement"].str[:]
+    df_SE2 = pd.DataFrame(df['siret2Etablissement'])
+    df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
+    df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
+    # Merge avec le df principal
+    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
+    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
+    del df["siret2Etablissement"]
+    #del df_SE2enrichissement_siret
+    del df_SE2
+
+    # On rectifie pour les codes non-siret
+    df.siretEtablissementValide = np.where(
+        (df.typeIdentifiantEtablissement != 'SIRET'),
+        "Non valable",
+        df.siretEtablissementValide)
+    return df
 
 def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -326,6 +375,7 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
     df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
     logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide)))
+    print(("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide))))
     del df['siren1Acheteur']
     del df_SA
     # Application sur les siren des établissements
@@ -335,6 +385,8 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
     df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
     logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide)))
+    print(("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide))))
+    print(sum(df.sirenEtablissementValide))
     del df['siren2Etablissement']
     del df_SE
     # Application sur les siret des établissements
@@ -345,10 +397,11 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     # Merge avec le df principal
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
+    print("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
     del df["siret2Etablissement"]
     #del df_SE2enrichissement_siret
     del df_SE2
-
+    input('Lire les logs')
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
         (df.typeIdentifiantEtablissement != 'SIRET'),
