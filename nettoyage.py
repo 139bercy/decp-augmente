@@ -89,7 +89,7 @@ def check_reference_files():
     """
     path_data = conf_data["path_to_data"]
 
-    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
+    useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
                      "cache_not_in_bdd_legale"]
