@@ -4,7 +4,7 @@ data/
 *.jq
 config.json
 df_*
-
+profiling*.txt
 # Fichier Mac
 .DS_Store
 *.icloud
