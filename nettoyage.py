@@ -6,8 +6,10 @@ from random import random
 import numpy as np
 import pandas as pd
 from pandas import json_normalize
+
 import cProfile
 import pstats
+
 pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -31,19 +33,23 @@ def main():
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
+
     # Modification pour un prendre subset de données 
-    
-    if conf_debug["subset"] :
+
+    if conf_debug["subset"]:
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
-        logger.info("Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(n_subset))
-        if conf_debug["debug"] :
+        logger.info(
+            "Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(
+                n_subset))
+        if conf_debug["debug"]:
             logger.info("Mode debug, pas d'alea")
             seed = conf_debug["seed"]
             np.random.seed(seed)
             random_i = list(np.random.choice(n_data, n_subset))
-        else :
+        else:
             random_i = list(np.random.choice(n_data, n_subset))
+
         accessed_mapping = map(data['marches'].__getitem__, random_i)
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
@@ -71,8 +77,8 @@ def main():
     with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
-    df.to_csv("decp_nettoye.csv")
-    logger.info("Ecriture du csv terminé")
+    # df.to_csv("decp_nettoye.csv")
+    # logger.info("Ecriture du csv terminé")
 
 
 def check_reference_files():
@@ -82,11 +88,16 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache"]
+
+    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
+                     "cache_not_in_bdd_insee",
+                     "cache_bdd_legale",
+                     "cache_not_in_bdd_legale"]
+
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
-        print(key)
-        if key not in l_key_useless:
+        if key not in useless_keys:
+
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
@@ -100,22 +111,23 @@ def manage_titulaires(df: pd.DataFrame):
                 f"Remplacé par la valeur du concessionnaire")
     logger.info(f"Nombre de marché sans montant: {sum(df['montant'].isnull())}. Remplacé par la valeur globale")
     logger.info(f"Nombre de marché sans identifiant acheteur: {sum(df['acheteur.id'].isnull())}. "
-                f"Remplacé par l'identifiatn de l'autorité Concedante")
+                f"Remplacé par l'identifiant de l'autorité concédante")
     logger.info(f"Nombre de marché sans nom d'acheteur: {sum(df['acheteur.nom'].isnull())}. "
-                f"Remplacé par le nom de l'autorité Concédante")
+                f"Remplacé par le nom de l'autorité concédante")
 
     # Gestion différences concessionnaires / titulaires
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
-    donnees_inutiles = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
+    useless_columns = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
                         'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom',
                         'idtech', "id_technique"]
-    df.drop(columns=donnees_inutiles, inplace=True)
+    df.drop(columns=useless_columns, inplace=True)
 
     # Récupération des données titulaires
     df = df[~(df['titulaires'].isna())]
+
 
     # Création d'une colonne nbTitulairesSurCeMarche.
     # Cette colonne sera retravaillé dans la fonction detection_accord_cadre
@@ -163,7 +175,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
 
 def is_false_amount(x: float, threshold: int = 5) -> bool:
     """
-    On cherche à vérifier si les parties entières des montants sont composés d'au moins 5 threshold fois le meme chiffre
+    On cherche à vérifier si les parties entières des montants sont composées d'au moins 5 threshold fois le meme chiffre
     (hors 0).
     Exemple pour threshold = 5: 999 999 ou 222 262.
     Ces montants seront considérés comme faux
@@ -194,56 +206,56 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
-    df["montant"] = pd.to_numeric(df["montant"])
+    df["montant"] = pd.to_numeric(df["montant"], downcast='float') # Passage en float32 plutôt que 64
     df['montantCalcule'] = df["montant"]
     df['montantCalcule'].fillna(0, inplace=True)
     # variable témoin pour les logs
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
+
     # Détection des montants "1 chiffre"
     df["montantCalcule"] = df["montantCalcule"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero} montant(s) correspondaient à des"
+
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) correspondaient à des"
                 f"suites d'un seul chiffre. Exemple: 9 999 999")
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+    
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
+
     # Définition des bornes inf et sup et traitement
     borne_inf = 200.0
     borne_sup = 9.99e8
     df["montantCalcule"] = df["montantCalcule"] / df["nbTitulairesSurCeMarche"]
     df['montantCalcule'] = np.where(df['montantCalcule'] <= borne_inf, 0, df['montantCalcule'])
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero}"
+
+    
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero}"
                 f" montant(s) étaient inférieurs à la borne inf {borne_inf}")
-    try :
-        nb_montant_calcul_egal_zero = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero = 0
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
     df['montantCalcule'] = np.where(df['montantCalcule'] >= borne_sup, 0, df['montantCalcule'])
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"{nb_montant_calcul_egal_zero_2 - nb_montant_calcul_egal_zero} montant(s) étaient supérieurs à "
+    #Actualisation de la variable après la modification de df
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) étaient supérieurs à "
+
                 f"la borne sup: {borne_sup}")
     # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
     df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
     # Ecriture dans la log
-    try :
-        nb_montant_calcul_egal_zero_2 = df.montantCalcule.value_counts()[0]
-    except:
-        nb_montant_calcul_egal_zero_2 = 0
-    logger.info(f"Au total, {nb_montant_calcul_egal_zero_2} montant(s) "
+
+    values_montant_calcul2 = df.montantCalcule.value_counts()
+    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
+    logger.info(f"Au total, {n_montant_calcul_equal_zero_2} montant(s) "
+
                 f"ont été corrigé (on compte aussi les montants vides).")
     logger.info("Fin du traitement")
     return df
@@ -330,7 +342,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
 
     # Vérification si c'est bien un code département
     liste_cp = conf_glob["nettoyage"]["code_CP"].split(',') \
-        + [str(i) for i in list(np.arange(10, 96, 1))]
+               + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(liste_cp), np.NaN,
                                               df['codeDepartementExecution'])
 
@@ -422,8 +434,8 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("Début du traitement: Correction de la variable dureeMois.")
     # On cherche les éventuelles erreurs mois -> jours
-    df['montantCalcule'] = df['montantCalcule'].astype(np.int64)
-    df['dureeMois'] = df['dureeMois'].astype(np.int64)
+    df['montantCalcule'] = df['montantCalcule'].astype(np.int32) # 32 au lieu de 64 pour l'espace mémoire
+    df['dureeMois'] = df['dureeMois'].astype(np.int32) # 32 au lieu de 64
     mask = ((df['montantCalcule'] == df['dureeMois'])
             | (df['montantCalcule'] / df['dureeMois'] < 100)
             | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
@@ -508,16 +520,22 @@ def regroupement_marche_complet(df):
     df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
                                                       "datePublicationDonnees", "montant"])["id"])
     # Initialisation du resultat sous forme de liste
+
     for i in range(len(df_group)):
         # dataframe contenant les id d'un meme marche
         # UP : il arrive que parfois on n'ait pas d'ID (ex aife 675 , ctrl-f "Acquisition d acce")
         ids_to_modify = df_group[1].iloc[i]
         # Contient les index des lignes d'un meme marché. Utile pour le update
         new_index = list(ids_to_modify.index)
+        if ids_to_modify.isna().any():
+            # ids_to_modify.max() crash la ci si il y à des null
+            value_number = pd.NA
+        else:
+            value_number = ids_to_modify.max()
         # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
         if ids_to_modify.isna().any():
-            value_number = pd.NA # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
-        else :
+            value_number = pd.NA  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        else:
             value_number = max(ids_to_modify)
         df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
         # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume

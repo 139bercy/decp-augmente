@@ -21,7 +21,7 @@ logger.addHandler(fh)
 
 def main():
     logger.info("Début du script de nettoyage")
-    nettoyage.main() # debug
+    nettoyage.main() 
     logger.info("Fin du script de nettoyage")
     logger.info("Début du script d'enrichissement des données")
     enrichissement.main()
