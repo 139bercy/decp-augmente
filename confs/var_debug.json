@@ -1,11 +1,11 @@
 {
     "nettoyage" : {
-        "debug" :  1,
-        "subset" : 1,
-        "n_subset" : 10000,
-        "seed" : 95
+        "debug" :  0,
+        "subset" : 0,
+        "n_subset" : 0,
+        "seed" : 0
     },
     "enrichissement" : {
-        "debug" : 1
+        "debug" : 0
     }
 }
