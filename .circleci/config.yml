@@ -122,6 +122,7 @@ jobs:
           no_output_timeout: 2h
           command: |
             . venv/bin/activate
+            mkdir cache
             python main.py
       - save_cache:
          key: data-out-{{ .Branch }}-{{ checksum "date" }}
