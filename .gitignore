@@ -4,6 +4,9 @@ data/
 *.jq
 config.json
 df_*
+profiling*
+opti_*
+opit_*
 
 # Fichier Mac
 .DS_Store
