@@ -1,0 +1,204 @@
+version: 2
+jobs:
+  install_requirements:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: xlarge
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies-master-{{ checksum "requirements.txt"}}
+      - run: cp confs/config-circleci.json confs/config_data.json
+      - run:
+          name: Installation des requirements
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r requirements.txt
+      - save_cache:
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+          paths:
+            - "venv"
+            - "confs/config_data.json"
+
+  linter:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: xlarge
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+      - run:
+          name: Linter
+          command: |
+            . venv/bin/activate
+            pip install pylint
+            PYTHON_FILE="$(ls *.py)"
+            pylint $PYTHON_FILE
+  get_data_daily:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: xlarge
+      steps:
+        - checkout
+        - run: date +%F > date
+        - run:
+            name: Condition pour les branches
+            command: |
+              if [ "$CIRCLE_BRANCH" != "master" ]; then
+                  if [ $(git diff --name-only master..${CIRCLE_BRANCH} | grep "get-data-daily.sh" | wc -l) = 0 ]; then
+                    commit_id_head=$(git log -n1 --format=format:"%H")
+                    commit_id_head1=$(git log -n2 --format=format:"%H" | tail -1)
+                    if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data-daily.sh" | wc -l) = 0 ]; then
+                      circleci-agent step halt
+                    fi
+                  fi
+              fi
+        - run:
+            name: Récupération des données utiles
+            no_output_timeout: 1h
+            command: |
+              bash get-data-daily.sh
+        - save_cache:
+           key: data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+           paths:
+             - "data"
+
+  get_data_weekly:
+     docker:
+       - image: 139bercy/decp-rama
+     resource_class: xlarge
+     steps:
+       - checkout
+       - run: date +%G-%V > date
+       - run:
+           name: Condition pour les branches
+           command: |
+             if [ "$CIRCLE_BRANCH" != "master" ]; then
+                 if [ $(git diff --name-only master..${CIRCLE_BRANCH} | grep "get-data-weekly.sh" | wc -l) = 0 ]; then
+                   commit_id_head=$(git log -n1 --format=format:"%H")
+                   commit_id_head1=$(git log -n2 --format=format:"%H" | tail -1)
+                   if [ $(git diff --name-only ${commit_id_head1} ${commit_id_head} | grep "get-data-weekly.sh" | wc -l) = 0 ]; then
+                     circleci-agent step halt
+                   fi
+                 fi
+             fi
+       - run:
+           name: Récupération des données utiles
+           no_output_timeout: 1h
+           command: |
+             bash get-data-weekly.sh
+       - save_cache:
+          key: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          paths:
+            - "data"
+
+  compute:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: xlarge
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies
+      - run: date +%F > date
+      - run: date +%G-%V > date-weekly
+      - restore_cache:
+          keys:
+            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+      - restore_cache:
+          keys:
+            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+      - run:
+          name: Traitement des données
+          no_output_timeout: 2h
+          command: |
+            . venv/bin/activate
+            python main.py
+      - save_cache:
+         key: data-out-{{ .Branch }}-{{ checksum "date" }}
+         paths:
+           - "decp_nettoye.csv"
+           - "decp_augmente.csv"
+
+  send:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run: date +%F > date
+      - restore_cache:
+          keys:
+            - data-out-{{ .Branch }}-{{ checksum "date" }}
+      - run:
+          name: Condition pour les branches
+          command: |
+            if [ "$CIRCLE_BRANCH" != "master" ]; then
+                if [ $(git log -1 | grep "\[send\]" | wc -l) = 0 ]; then
+                  circleci-agent step halt
+                fi
+            fi
+      - run:
+          name: Transfert des données vers data.economie
+          command: |
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
+workflows:
+  version: 2
+  main:
+    jobs:
+      - get_data_daily
+      - get_data_weekly
+      - install_requirements
+      - compute:
+          requires:
+            - install_requirements
+            - get_data_daily
+            - get_data_weekly
+      - send:
+          requires:
+            - compute
+
+  daily-data:
+    jobs:
+      - get_data_daily
+    triggers:
+      - schedule:
+          cron: 0 4 * * 1-6
+          filters:
+            branches:
+              only:
+                - master
+  weekly-data:
+    jobs:
+      - get_data_weekly
+    triggers:
+      - schedule:
+          cron: 0 4 * * 1
+          filters:
+            branches:
+              only:
+                - master
+
+  daily-prod:
+    jobs:
+      - install_requirements
+      - compute:
+          requires:
+            - install_requirements
+      - send:
+          requires:
+            - compute
+    triggers:
+      - schedule:
+          cron: 0 6 * * 2-6
+          filters:
+            branches:
+              only:
+                - master
