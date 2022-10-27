@@ -5,6 +5,7 @@ import logging.handlers
 from random import random
 import numpy as np
 import pandas as pd
+import itertools
 from pandas import json_normalize
 
 <<<<<<< HEAD
@@ -513,49 +514,45 @@ def replace_char(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def regroupement_marche_complet(df):
-    """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
-    les marchés en fonction de leur objets/date de publication des données et montant.
-    Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
-    # Creation du sub DF necessaire
-    df_titulaires = pd.DataFrame()
-    df_to_update = pd.DataFrame()
-    df_intermediaire = df[["objet", "datePublicationDonnees", "montant", "id"]]  # "datePublicationDonnees",
-    # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
-    df_group = pd.DataFrame(df_intermediaire.groupby(["objet",
-                                                      "datePublicationDonnees", "montant"])["id"])
-    # Initialisation du resultat sous forme de liste
+def create_value_number(x):
+    """Retourne le max parmis les élements de l'obejt d'entrée, si il y a un Nan, retourne Nan 
+    """
+    if x.isna().any():
+        value_number = 0  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+    else:
+        value_number = max(x)
+    return value_number
 
-    for i in range(len(df_group)):
-        # dataframe contenant les id d'un meme marche
-        # UP : il arrive que parfois on n'ait pas d'ID (ex aife 675 , ctrl-f "Acquisition d acce")
-        ids_to_modify = df_group[1].iloc[i]
-        # Contient les index des lignes d'un meme marché. Utile pour le update
-        new_index = list(ids_to_modify.index)
-        if ids_to_modify.isna().any():
-            # ids_to_modify.max() crash la ci si il y à des null
-            value_number = pd.NA
-        else:
-            value_number = ids_to_modify.max()
-        # Création du dataframe avec id en seule colonne et comme index les index dans le df initial
-        if ids_to_modify.isna().any():
-            value_number = pd.NA  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
-        else:
-            value_number = max(ids_to_modify)
-        df_avec_bon_id = pd.DataFrame(len(new_index) * [value_number], index=new_index, columns=["id"])
-        # Création d'un dataframe intermédiaire avec comme colonne nombreTitulaireSurMarchePresume
-        df_nbtitulaires = pd.DataFrame(len(new_index) * [len(new_index)], index=new_index,
-                                       columns=["nombreTitulaireSurMarchePresume"])
-        df_to_update = pd.concat([df_to_update, df_avec_bon_id])
-        # Df permettant de faire la jointure pour ajouter la colonnenombreTitulaireSurMarchePresume dans le df initial
-        df_titulaires = pd.concat([df_titulaires, df_nbtitulaires])
-        # Arbitraire, faire un update a chaque étape rallonge le temps d'execution, un update final idem.
-        if len(df_to_update) > 50000:
-            df.update(df_to_update)
-            df_to_update = pd.DataFrame()
-    # Ajout effectif de nombreTitulaireSurMarchePresume
-    df = df.merge(df_titulaires, how='left', left_index=True, right_index=True)
-    df.update(df_to_update)
+def create_nbTitulaires(x):
+    """
+    Retourne la longueur de l'obejt en entrée
+    """
+    return len(x)
+
+def create_new_index(x):
+    return list(x.index)
+
+
+def regroupement_marche_complet(df):
+    # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
+    df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]] .groupby(["objet",
+                                                    "datePublicationDonnees", "montant"])["id"])
+    df_group['new_index'] = df_group[1].apply(create_new_index)
+    df_group["nbTit"] = df_group[1].apply(lambda x: len(x)) # On compte le nombre d'id dans chaque ligne df group et ainsi on a le nombre de titulaires
+    df_group['bon_id'] = df_group[1].apply(create_value_number) # On récupère l'ID le plus haut parmis les doublons (au sens objet et datePublicationDonnees)
+    flat_indx = list(itertools.chain(*df_group['new_index'].values))
+    flat_nbtit = list(itertools.chain(*[[x]*x for x in df_group["nbTit"].values])) # On applati la liste, si on a 2 titulaires il faut donc avoir deux 2 à la suite dans la liste d'où le itertools.chain
+    flat_id = list(itertools.chain(*[[x]*y for (x,y) in zip(df_group["bon_id"].values, df_group["nbTit"].values)]))
+    dict_data = {"nombreTitulaireSurMarchePresume" : flat_nbtit, "id": flat_id}
+    df_reconstruct = pd.DataFrame(index=flat_indx, data=dict_data)
+    
+    df_reconstruct['id'].replace(0, pd.NA, inplace=True) # On renomme remplace ici les 0 par des Nan, pas plus tôt pour deux raisons 
+    # Lorsqu'on flat les listes les Nan ne sont pas itérables
+    # Cependant on a bien besoin de forcer le typage en pd.NA pour la suite de la pipeline
+    df["nombreTitulaireSurMarchePresume"] = False # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
+    df.update(df_reconstruct)
+    df['nombreTitulaireSurMarchePresume'].replace(0,np.nan, inplace=True) # Ajout artificiel pour se caler sur le format de la fonction regroupement_marche_complet() initiale
+
     return df
 
 
@@ -712,9 +709,7 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
-    df["idtech"] = df["id_technique"].copy()
-    df['idMarche'] = df["id_technique"].copy()
-    #df = regroupement_marche(df, dict_modification)
+    df = regroupement_marche(df, dict_modification)
     return df
 
 
