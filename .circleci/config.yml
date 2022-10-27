@@ -125,7 +125,7 @@ jobs:
             mkdir cache
             python main.py
       - store_artifacts:
-          path: decp_augmente.csv
+          path: decp_augmente.log
       - save_cache:
          key: data-out-{{ .Branch }}-{{ checksum "date" }}
          paths:
