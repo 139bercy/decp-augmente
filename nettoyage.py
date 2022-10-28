@@ -122,7 +122,8 @@ def manage_titulaires(df: pd.DataFrame):
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
     df['acheteur.nom'] = np.where(df['acheteur.nom'].isnull(), df['autoriteConcedante.nom'], df['acheteur.nom'])
     useless_columns = ['dateSignature', 'dateDebutExecution', 'valeurGlobale', 'donneesExecution', 'concessionnaires',
-                        'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom']
+                        'montantSubventionPublique', 'modifications', 'autoriteConcedante.id', 'autoriteConcedante.nom',
+                        'idtech', "id_technique"]
     df.drop(columns=useless_columns, inplace=True)
 
     # Récupération des données titulaires
@@ -696,6 +697,8 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
+    df["idtech"] = df["id_technique"].copy()
+    df['idMarche'] = df["id_technique"].copy()
     #df = regroupement_marche(df, dict_modification)
     return df
 
