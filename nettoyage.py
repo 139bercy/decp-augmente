@@ -8,12 +8,10 @@ import pandas as pd
 import itertools
 from pandas import json_normalize
 
-<<<<<<< HEAD
 import cProfile
 import pstats
 
-=======
->>>>>>> 2d1ebb1 (V2 feat cache (#63))
+
 pd.options.mode.chained_assignment = None  # default='warn'
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -92,16 +90,12 @@ def check_reference_files():
         departement2020.csv, region2020.csv, StockUniteLegale_utf8.csv
     """
     path_data = conf_data["path_to_data"]
-<<<<<<< HEAD
-    l_key_useless = ["path_to_project", "path_to_data"]
-=======
 
     l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
                      "cache_not_in_bdd_legale"]
 
->>>>>>> 2d1ebb1 (V2 feat cache (#63))
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
         if key not in l_key_useless:
