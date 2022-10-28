@@ -523,12 +523,6 @@ def create_value_number(x):
         value_number = max(x)
     return value_number
 
-def create_nbTitulaires(x):
-    """
-    Retourne la longueur de l'obejt en entrée
-    """
-    return len(x)
-
 def create_new_index(x):
     return list(x.index)
 
@@ -722,7 +716,7 @@ if __name__ == "__main__":
         with open('df_nettoye', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
             init_len = len(df)
-        with open("profilingSnettoyage_size{}.txt".format(init_len), "w") as f:
+        with open("profilingSnettoyage_opti_size{}.txt".format(init_len), "w") as f:
             ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
             ps.sort_stats('cumulative')
             ps.print_stats()
