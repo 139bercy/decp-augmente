@@ -697,7 +697,7 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
-    df = regroupement_marche(df, dict_modification)
+    #df = regroupement_marche(df, dict_modification)
     return df
 
 
