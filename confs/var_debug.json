@@ -2,13 +2,8 @@
     "nettoyage" : {
         "debug" :  0,
         "subset" : 0,
-<<<<<<< HEAD
         "n_subset" : 0,
         "seed" : 0
-=======
-        "n_subset" : 10000,
-        "seed" : 95
->>>>>>> MAJ fichier confs en mode prod
     },
     "enrichissement" : {
         "debug" : 0
