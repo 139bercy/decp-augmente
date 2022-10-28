@@ -1,5 +1,6 @@
 # Data
 data/
+cache/
 *.csv
 *.jq
 config.json
