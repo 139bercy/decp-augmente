@@ -27,16 +27,14 @@ logger = logging.getLogger("main.nettoyage")
 logger.setLevel(logging.DEBUG)
 
 
-def main():
+def main(test_check=False):
     check_reference_files()
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-
-    # Modification pour un prendre subset de données 
-
-    if conf_debug["subset"]:
+    if test_check:
+        # Modification pour prendre un subset de données
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
         logger.info(
@@ -715,17 +713,4 @@ def manage_modifications(data: dict) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    if conf_debug["debug"]:
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        with open('df_nettoye', 'rb') as df_nettoye:
-            df = pickle.load(df_nettoye)
-            init_len = len(df)
-        with open("profilingSnettoyage_size{}.txt".format(init_len), "w") as f:
-            ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
-            ps.sort_stats('cumulative')
-            ps.print_stats()
-    else:
         main()

@@ -48,10 +48,10 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
-    if conf_debug["debug"] : # Mise en pkl par sûreté
-        with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente:
-        # Export présent pour faciliter la comparaison
-            pickle.dump(df, df_augmente)
+    # if conf_debug["debug"] : # Mise en pkl par sûreté
+    #    with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente :
+    #        # Export présent pour faciliter la comparaison
+    #        pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
 
 
