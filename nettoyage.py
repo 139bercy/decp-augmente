@@ -20,7 +20,7 @@ decp_file_name = conf_data["decp_file_name"]
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
 
-with open(os.path.join("confs", "var_debug.json")) as f:
+with open(os.path.join("confs", "confs/var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
 logger = logging.getLogger("main.nettoyage")
