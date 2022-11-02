@@ -123,7 +123,11 @@ jobs:
           command: |
             . venv/bin/activate
             mkdir cache
-            python main.py
+            if [ "$CIRCLE_BRANCH" == "master"]; then
+              python3 main.py
+            else
+              python3 main.py -t True
+            fi
       - store_artifacts:
           path: decp_augmente.log
       - save_cache:
