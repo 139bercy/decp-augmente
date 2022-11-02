@@ -63,7 +63,7 @@ def main():
     df = regroupement_marche_complet(df)
 
     logger.info("Début du traitement: Gestion des titulaires")
-    df = (df.pipe(manage_titulaires_new_version)
+    df = (df.pipe(manage_titulaires)
           .pipe(manage_duplicates)
           .pipe(manage_amount)
           .pipe(manage_missing_code)
@@ -91,14 +91,14 @@ def check_reference_files():
     """
     path_data = conf_data["path_to_data"]
 
-    l_key_useless = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
+    useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
                      "cache_not_in_bdd_legale"]
 
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
-        if key not in l_key_useless:
+        if key not in useless_keys:
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
@@ -107,15 +107,14 @@ def check_reference_files():
 
 
 def found_values_in_dic(x, name:str):
-    if type(x) == dict:
-        if name in x.keys():
-            return x[name]
-    else :
+    try:
+        return x.get(name)
+    except: # Parfois il arrive que x soit un Nan, mais c'est un cas assez rare d'où le try except.
         return None
 def create_columns_titulaires_fast(df, column="titulaires"):
     """
-    -- [QUICK WAY] -- 
     Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
+    Nécessite une unicité des index
     
     Arguments
     ---------
@@ -127,36 +126,16 @@ def create_columns_titulaires_fast(df, column="titulaires"):
     Le même dataframe avec les informations extraites de la colonne column
     
     """
-    a = df[column].explode() # Very quick
-    a['typeIdentifiant'] = a.apply(found_values_in_dic, args=(["typeIdentifiant"]))
-    a['id'] = a.apply(found_values_in_dic, args=(["id"]))
-    a['denominationSociale'] = a.apply(found_values_in_dic, args=(["denominationSociale"]))
-    df_int = pd.DataFrame(columns=['typeIdentifiant', 'idTitulaires', 'denominationSociale'])
-    df_int['typeIdentifiant'] = a['typeIdentifiant']
-    df_int['idTitulaires'] = a['id']
-    df_int['denominationSociale'] = a['denominationSociale']
-    df = df.merge(df_int, left_index=True, right_index=True)
+    df_explode = df[column].explode() # Very quick
+    df_explode['typeIdentifiant'] = df_explode.apply(found_values_in_dic, args=(["typeIdentifiant"]))
+    df_explode['id'] = df_explode.apply(found_values_in_dic, args=(["id"]))
+    df_explode['denominationSociale'] = df_explode.apply(found_values_in_dic, args=(["denominationSociale"]))
+    # On converti en dataframe pour faciliter le merge
+    df_explode = pd.DataFrame(data={"typeIdentifiant" : df_explode["typeIdentifiant"], \
+                                'idTitulaires' : df_explode['id'].iloc[:-1], \
+                                'denominationSociale' : df_explode['denominationSociale'].iloc[:-2]})
+    df = df.merge(df_explode, left_index=True, right_index=True)
     return df
-    
-
-
-def create_columns_titulaires(df : pd.DataFrame, column='titulaires'):
-    """
-    -- [SLOW WAY] -- 
-    Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
-    
-    Arguments
-    ---------
-    df 
-    column (strign) colonne dans laquelle se trouve l'objet à exploser pour créer les colonnes
-
-    Returns
-    --------
-    Le même dataframe avec les informations extraites de la colonne column
-    
-    """
-
-    return df.merge(df[column].explode().apply(pd.Series), left_index=True, right_index=True)
 
 def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
     """
@@ -182,9 +161,9 @@ def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
         df_with_cotitulaires_and_columns = df_with_cotitulaires_and_columns.loc[mask_duplicated] # On ne récupère que les doublons sans la première occurence. Le cotitulaire 1 est alors le premier duplicata 
         mask_duplicated = df_with_cotitulaires_and_columns.duplicated(subset=['index'], keep='first') # La première occurence est False, les autres sont True
         df_with_cotitulaires_c = df_with_cotitulaires_and_columns.loc[~mask_duplicated, ["typeIdentifiant", "id", "denominationSociale"]]
-        df_with_cotitulaires_c = df_with_cotitulaires_c.rename(columns={"id": "id_cotitulaire{}".format(c_cotitulaires),\
-                                                                        "denominationSociale" : "denominationSociale_cotitulaire{}".format(c_cotitulaires),\
-                                                                        "typeIdentifiant":"typeIdentifiant_cotitulaire{}".format(c_cotitulaires)})
+        df_with_cotitulaires_c = df_with_cotitulaires_c.rename(columns={"id": f"id_cotitulaire{c_cotitulaires}",\
+                                                                        "denominationSociale" : f"denominationSociale_cotitulaire{c_cotitulaires}",\
+                                                                        "typeIdentifiant":f"typeIdentifiant_cotitulaire{c_cotitulaires}"})
         dict_df_with_cotitulaires[c_cotitulaires] = df_with_cotitulaires_c
         c_cotitulaires += 1
 
@@ -192,7 +171,7 @@ def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
 
 
 
-def manage_titulaires_new_version(df: pd.DataFrame):
+def manage_titulaires(df: pd.DataFrame):
     """
     Cette fonction gère les titulaires des marchés qu'ils soient uniques ou multiples. 
     D'un point de vue métier/data : Les titulaires d'un marchés sont sous formes de JSON (dictionnaire) dans la colonne titulaires. 
@@ -230,9 +209,7 @@ def manage_titulaires_new_version(df: pd.DataFrame):
     df_with_cotitulaires = pd.concat([df_with_cotitulaires, df_cotitulaires], axis=1)
 
     ### Reconstruction du datframe final qui est l'aggrégration des df_one_titulaires et dfcotitulaires
-    dfout = pd.concat([df_one_titulaires, df_with_cotitulaires], axis=0)
-
-    return dfout
+    return pd.concat([df_one_titulaires, df_with_cotitulaires], axis=0)
 
 
 def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
@@ -603,16 +580,13 @@ def replace_char(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_value_number(x):
-    """Retourne le max parmis les élements de l'obejt d'entrée, si il y a un Nan, retourne Nan 
+    """Retourne le max parmis les élements de l'objet d'entrée, si il y a un Nan, retourne Nan 
     """
     if x.isna().any():
-        value_number = 0  # Essentiel pour la construction de df_avec_bon_id. Sinon ça crash
+        value_number = 0  # Essentiel pour la construction de df_avec_valid_id. Sinon ça crash
     else:
         value_number = max(x)
     return value_number
-
-def create_new_index(x):
-    return list(x.index)
 
 
 def regroupement_marche_complet(df):
@@ -622,19 +596,19 @@ def regroupement_marche_complet(df):
     # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]] .groupby(["objet",
                                                     "datePublicationDonnees", "montant"])["id"])
-    df_group['new_index'] = df_group[1].apply(create_new_index)
+    df_group['new_index'] = df_group[1].apply(lambda x:list(x.index))
     df_group["nbTit"] = df_group[1].apply(lambda x: len(x)) # On compte le nombre d'id dans chaque ligne df group et ainsi on a le nombre de titulaires
-    df_group['bon_id'] = df_group[1].apply(create_value_number) # On récupère l'ID le plus haut parmis les doublons (au sens objet et datePublicationDonnees)
+    df_group['valid_id'] = df_group[1].apply(create_value_number) # On récupère l'ID le plus haut parmis les doublons (au sens objet et datePublicationDonnees)
     flat_indx = list(itertools.chain(*df_group['new_index'].values))
     flat_nbtit = list(itertools.chain(*[[x]*x for x in df_group["nbTit"].values])) # On applati la liste, si on a 2 titulaires il faut donc avoir deux 2 à la suite dans la liste d'où le itertools.chain
-    flat_id = list(itertools.chain(*[[x]*y for (x,y) in zip(df_group["bon_id"].values, df_group["nbTit"].values)]))
+    flat_id = list(itertools.chain(*[[x]*y for (x,y) in zip(df_group["valid_id"].values, df_group["nbTit"].values)]))
     dict_data = {"nombreTitulaireSurMarchePresume" : flat_nbtit, "id": flat_id}
     df_reconstruct = pd.DataFrame(index=flat_indx, data=dict_data)
     
     df_reconstruct['id'].replace(0, pd.NA, inplace=True) # On renomme remplace ici les 0 par des Nan, pas plus tôt pour deux raisons 
     # Lorsqu'on flat les listes les Nan ne sont pas itérables
     # Cependant on a bien besoin de forcer le typage en pd.NA pour la suite de la pipeline
-    df["nombreTitulaireSurMarchePresume"] = False # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
+    df["nombreTitulaireSurMarchePresume"] = 0 # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
     df.update(df_reconstruct)
     df['nombreTitulaireSurMarchePresume'].replace(0,np.nan, inplace=True) # Ajout artificiel pour se caler sur le format de la fonction regroupement_marche_complet() initiale
 
@@ -809,7 +783,7 @@ if __name__ == "__main__":
         with open('df_nettoye', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
             init_len = len(df)
-        with open("profilingSnettoyage_opti_size{}.txt".format(init_len), "w") as f:
+        with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:
             ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
             ps.sort_stats('cumulative')
             ps.print_stats()
