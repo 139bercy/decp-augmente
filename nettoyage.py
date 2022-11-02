@@ -63,7 +63,7 @@ def main():
     df = regroupement_marche_complet(df)
 
     logger.info("Début du traitement: Gestion des titulaires")
-    df = (df.pipe(manage_titulaires)
+    df = (df.pipe(manage_titulaires_new_version)
           .pipe(manage_duplicates)
           .pipe(manage_amount)
           .pipe(manage_missing_code)
@@ -106,17 +106,104 @@ def check_reference_files():
                 raise ValueError(f"Le fichier data: {conf_data[key]} n'a pas été trouvé")
 
 
-def manage_titulaires(df: pd.DataFrame):
-    # Ecriture dans les logs
-    logger.info(f"Nombre de marché sans titulaires: {sum(df['titulaires'].isnull())}. "
-                f"Remplacé par la valeur du concessionnaire")
-    logger.info(f"Nombre de marché sans montant: {sum(df['montant'].isnull())}. Remplacé par la valeur globale")
-    logger.info(f"Nombre de marché sans identifiant acheteur: {sum(df['acheteur.id'].isnull())}. "
-                f"Remplacé par l'identifiatn de l'autorité Concedante")
-    logger.info(f"Nombre de marché sans nom d'acheteur: {sum(df['acheteur.nom'].isnull())}. "
-                f"Remplacé par le nom de l'autorité Concédante")
+def found_values_in_dic(x, name:str):
+    if type(x) == dict:
+        if name in x.keys():
+            return x[name]
+    else :
+        return None
+def create_columns_titulaires_fast(df, column="titulaires"):
+    """
+    -- [QUICK WAY] -- 
+    Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
+    
+    Arguments
+    ---------
+    df 
+    column (strign) colonne dans laquelle se trouve l'objet à exploser pour créer les colonnes
 
-    # Gestion différences concessionnaires / titulaires
+    Returns
+    --------
+    Le même dataframe avec les informations extraites de la colonne column
+    
+    """
+    a = df[column].explode() # Very quick
+    a['typeIdentifiant'] = a.apply(found_values_in_dic, args=(["typeIdentifiant"]))
+    a['id'] = a.apply(found_values_in_dic, args=(["id"]))
+    a['denominationSociale'] = a.apply(found_values_in_dic, args=(["denominationSociale"]))
+    df_int = pd.DataFrame(columns=['typeIdentifiant', 'idTitulaires', 'denominationSociale'])
+    df_int['typeIdentifiant'] = a['typeIdentifiant']
+    df_int['idTitulaires'] = a['id']
+    df_int['denominationSociale'] = a['denominationSociale']
+    df = df.merge(df_int, left_index=True, right_index=True)
+    return df
+    
+
+
+def create_columns_titulaires(df : pd.DataFrame, column='titulaires'):
+    """
+    -- [SLOW WAY] -- 
+    Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
+    
+    Arguments
+    ---------
+    df 
+    column (strign) colonne dans laquelle se trouve l'objet à exploser pour créer les colonnes
+
+    Returns
+    --------
+    Le même dataframe avec les informations extraites de la colonne column
+    
+    """
+
+    return df.merge(df[column].explode().apply(pd.Series), left_index=True, right_index=True)
+
+def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
+    """
+    Cette fonction renvoie un dictionnaire. Chaque élément du dictionnaire est un dataframe composé des informations du cotitulaires numéro n, n étant la clef du dictionnaire.
+    Cette fonction peut être amélioré temporellement, le .apply(pd.series) est très long. Prendre exemple sur create_columns_titulaires_fast, même si c'est plus compliqué dû au doublon
+    Peut être suffit il simplement de remonter le mask de duplicated.
+
+    Arguments
+    ----------
+    df un Dataframe avec les marchés présentants plusieurs cotitulaires
+    n_cotit (int) , nombe de cotitulaires dont il faut extraire les informations
+    """
+    df_with_cotitulaires_and_columns = df_with_cotitulaires['titulaires'].explode().apply(pd.Series) # On explose les lignes
+    df_with_cotitulaires_and_columns['index'] = df_with_cotitulaires_and_columns.index # On créé la colonne index pour pouvoir ne récupérer que le premier 
+    mask_duplicated = df_with_cotitulaires_and_columns.duplicated(subset=['index'], keep='first') # La première occurence est False, les autres sont True
+    df_with_cotitulaires_titulaires = df_with_cotitulaires_and_columns.loc[~mask_duplicated, ["id", "denominationSociale", "typeIdentifiant"]]
+    df_with_cotitulaires_titulaires.rename(columns={"id": "idTitulaires"}, inplace=True)
+    dict_df_with_cotitulaires = {}
+    dict_df_with_cotitulaires[0] = df_with_cotitulaires_titulaires
+    # Récupérer les titulaires secondes et recommencer l'opération de dedoublonnage sur l'index pour cotitulaires 1, 2 et 3
+    c_cotitulaires = 1
+    while c_cotitulaires <=3: # 3 cotitulaires max : règle métier
+        df_with_cotitulaires_and_columns = df_with_cotitulaires_and_columns.loc[mask_duplicated] # On ne récupère que les doublons sans la première occurence. Le cotitulaire 1 est alors le premier duplicata 
+        mask_duplicated = df_with_cotitulaires_and_columns.duplicated(subset=['index'], keep='first') # La première occurence est False, les autres sont True
+        df_with_cotitulaires_c = df_with_cotitulaires_and_columns.loc[~mask_duplicated, ["typeIdentifiant", "id", "denominationSociale"]]
+        df_with_cotitulaires_c = df_with_cotitulaires_c.rename(columns={"id": "id_cotitulaire{}".format(c_cotitulaires),\
+                                                                        "denominationSociale" : "denominationSociale_cotitulaire{}".format(c_cotitulaires),\
+                                                                        "typeIdentifiant":"typeIdentifiant_cotitulaire{}".format(c_cotitulaires)})
+        dict_df_with_cotitulaires[c_cotitulaires] = df_with_cotitulaires_c
+        c_cotitulaires += 1
+
+    return dict_df_with_cotitulaires
+
+
+
+def manage_titulaires_new_version(df: pd.DataFrame):
+    """
+    Cette fonction gère les titulaires des marchés qu'ils soient uniques ou multiples. 
+    D'un point de vue métier/data : Les titulaires d'un marchés sont sous formes de JSON (dictionnaire) dans la colonne titulaires. 
+    L'immense majorité des JSON titulaires est ainsi : {'typeIndentifiant' : value, 'id': value, 'denominationSociale': value}
+    On veut éclater cette colonne, c-à-d ne plus avoir une colonne avec un JSON mais créer de nouvelles colonnes avec les valeurs de ce JSON
+
+    L'autre point de cette fonction est de gérer les marchés lorsqu'il y a plusieurs titulaires. Avant on créait des lignes pour chaque nouveau titulaire, maintenant
+    on a des nvls colonnes pour les cotitulaires. On garde l'unicité de 1 ligne = 1 marché qui était perdu avant.
+    """
+    
+    df = df[~(df['titulaires'].isna() & df['concessionnaires'].isna())]
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
     df['acheteur.id'] = np.where(df['acheteur.id'].isnull(), df['autoriteConcedante.id'], df['acheteur.id'])
@@ -126,19 +213,26 @@ def manage_titulaires(df: pd.DataFrame):
                         'idtech', "id_technique"]
     df.drop(columns=useless_columns, inplace=True)
 
-    # Récupération des données titulaires
-    df = df[~(df['titulaires'].isna())]
-
     # Création d'une colonne nbTitulairesSurCeMarche.
     # Cette colonne sera retravaillé dans la fonction detection_accord_cadre
     df.loc[:, "nbTitulairesSurCeMarche"] = df['titulaires'].apply(lambda x: len(x))
 
-    df_titulaires = pd.concat([pd.DataFrame.from_records(x) for x in df['titulaires']],
-                              keys=df.index).reset_index(level=1, drop=True)
-    df_titulaires.rename(columns={"id": "idTitulaires"}, inplace=True)
-    df = df.drop('titulaires', axis=1).join(df_titulaires).reset_index(drop=True)
+    # Gérer le cas pour un seul titulaires
+    df_one_titulaires = df[df['nbTitulairesSurCeMarche']==1].copy()
+    df_one_titulaires = create_columns_titulaires_fast(df_one_titulaires)
+    df_one_titulaires.rename(columns={"id_y": "idTitulaires", "id_x": "id"}, inplace=True)
 
-    return df
+    # Dans le cas de plusieurs titulaires
+    df_with_cotitulaires = df[df["nbTitulairesSurCeMarche"]>1].copy() # On ne garde que les dataframes avec des cotitulaires 
+    dict_df_with_cotitulaires = deal_with_many_titulaires(df_with_cotitulaires) # Cette fonction peut être amélioré, cependant comme 
+    df_cotitulaires = pd.concat([x for x in dict_df_with_cotitulaires.values()], axis=1) # On recolle les différents co titulaires d'un même marché
+
+    df_with_cotitulaires = pd.concat([df_with_cotitulaires, df_cotitulaires], axis=1)
+
+    ### Reconstruction du datframe final qui est l'aggrégration des df_one_titulaires et dfcotitulaires
+    dfout = pd.concat([df_one_titulaires, df_with_cotitulaires], axis=0)
+
+    return dfout
 
 
 def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
@@ -522,6 +616,9 @@ def create_new_index(x):
 
 
 def regroupement_marche_complet(df):
+    """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
+    les marchés en fonction de leur objets/date de publication des données et montant.
+    Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
     # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]] .groupby(["objet",
                                                     "datePublicationDonnees", "montant"])["id"])
@@ -697,9 +794,9 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
-    df["idtech"] = df["id_technique"].copy()
-    df['idMarche'] = df["id_technique"].copy()
-    #df = regroupement_marche(df, dict_modification)
+    #df["idtech"] = df["id_technique"].copy()
+    #df['idMarche'] = df["id_technique"].copy()
+    df = regroupement_marche(df, dict_modification)
     return df
 
 
