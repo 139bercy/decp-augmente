@@ -6,10 +6,16 @@ from random import random
 import numpy as np
 import pandas as pd
 import itertools
+import argparse
 from pandas import json_normalize
 
 import cProfile
 import pstats
+
+# Initialize parser
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -134,6 +140,7 @@ def create_columns_titulaires_fast(df, column="titulaires"):
                                 'denominationSociale' : df_explode['denominationSociale'].iloc[:-2]})
     df = df.merge(df_explode, left_index=True, right_index=True)
     return df
+
 
 def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
     """
@@ -773,17 +780,8 @@ def manage_modifications(data: dict) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    if conf_debug["debug"]:
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        with open('df_nettoye', 'rb') as df_nettoye:
-            df = pickle.load(df_nettoye)
-            init_len = len(df)
-        with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:
-            ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
-            ps.sort_stats('cumulative')
-            ps.print_stats()
+    # vérification des arguments fournis en entrée de script, si l'argument -t est présent on lance les tests
+    if args.test:
+        main(True)
     else:
         main()
