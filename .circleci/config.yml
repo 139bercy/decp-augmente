@@ -279,11 +279,13 @@ workflows:
               - install_requirements
       triggers:
         - schedule:
-            cron: 0 6 * * 2-6
+            cron: 40 11 * * 2-6
             filters:
               branches:
                 only:
                   - master
+                  - ci_cache
+
     daily-prod-enrichissement:
       jobs:
         - compute-enrichissement
@@ -292,8 +294,9 @@ workflows:
               - compute-enrichissement
       triggers:
         - schedule:
-            cron: 30 7 * * 2-6
+            cron: 30 12 * * 2-6
             filters:
               branches:
                 only:
                   - master
+                  - ci_cache
