@@ -279,7 +279,7 @@ workflows:
               - install_requirements
       triggers:
         - schedule:
-            cron: 40 11 * * 2-6
+            cron: 45 11 * * 2-6
             filters:
               branches:
                 only:
@@ -294,7 +294,7 @@ workflows:
               - compute-enrichissement
       triggers:
         - schedule:
-            cron: 30 12 * * 2-6
+            cron: 45 12 * * 2-6
             filters:
               branches:
                 only:
