@@ -271,32 +271,32 @@ workflows:
               only:
                 - master
 
-    daily-prod-nettoyage:
-      jobs:
-        - install_requirements
-        - compute-nettoyage:
-            requires:
-              - install_requirements
-      triggers:
-        - schedule:
-            cron: 45 11 * * 2-6
-            filters:
-              branches:
-                only:
-                  - master
-                  - ci_cache
+  daily-prod-nettoyage:
+    jobs:
+      - install_requirements
+      - compute-nettoyage:
+          requires:
+            - install_requirements
+    triggers:
+      - schedule:
+          cron: 45 11 * * 2-6
+          filters:
+            branches:
+              only:
+                - master
+                - ci_cache
 
-    daily-prod-enrichissement:
-      jobs:
-        - compute-enrichissement
-        - send:
-            requires:
-              - compute-enrichissement
-      triggers:
-        - schedule:
-            cron: 45 12 * * 2-6
-            filters:
-              branches:
-                only:
-                  - master
-                  - ci_cache
+  daily-prod-enrichissement:
+    jobs:
+      - compute-enrichissement
+      - send:
+          requires:
+            - compute-enrichissement
+    triggers:
+      - schedule:
+          cron: 45 12 * * 2-6
+          filters:
+            branches:
+              only:
+                - master
+                - ci_cache
