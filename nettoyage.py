@@ -76,7 +76,7 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
-    with open('df_nettoye_new_regroupement_marche', 'wb') as df_nettoye:
+    with open('df_nettoye', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py
         pickle.dump(df, df_nettoye)
     df.to_csv("decp_nettoye.csv")
