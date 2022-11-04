@@ -783,6 +783,7 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         marches_init.append(marche_init)
     df_to_concatene = pd.concat([x for x in marches_init], copy=False)
     df.update(df_to_concatene)
+    df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
     df = fusion_source_modification_whole_dataset(df, dict_modification)
     return df
 
