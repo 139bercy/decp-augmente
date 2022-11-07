@@ -13,7 +13,7 @@ wget https://www.insee.fr/fr/statistiques/fichier/5057840/arrondissement2021-csv
 unzip arrondissement2021-csv.zip
 wget https://files.data.gouv.fr/insee-sirene/StockEtablissement_utf8.zip
 unzip StockEtablissement_utf8.zip
-wget https://static.data.gouv.fr/resources/base-sirene-des-entreprises-et-de-leurs-etablissements-siren-siret/20210301/StockUniteLegale_utf8.zip
+wget https://files.data.gouv.fr/insee-sirene/StockUniteLegale_utf8.zip
 unzip StockUniteLegale_utf8.zip
 # Supprimer les archives que l'on a extraite
 rm -rf *.zip
