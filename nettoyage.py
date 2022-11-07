@@ -672,7 +672,7 @@ def concat_modifications(dictionaries : list):
 
     """
     dict_original = dictionaries[0]
-    for dict in x: # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
+    for dict in dictionaries: # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
         dict_original.update(dict)
     return [dict_original]
 
