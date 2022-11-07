@@ -656,14 +656,22 @@ def recuperation_colonne_a_modifier(data: dict, liste_indices: list) -> dict:
             colonne_to_modify[col] = col
     return colonne_to_modify
 
-def creation_dict_whole_modifications(x):
+def concat_modifications(dictionaries : list):
     """
-    Parfois, cette marché ont plusieurs modifications ( la colonne modification est une liste de dictionnaire)
-    Jusqu'alors, seul la première modification était intégré. Nous on veut ré écrire proprement l'onglet modifications
-    pour n'avoir qu'un seul dictionnaire à jour avec les dernières informations
-    Cette fonction retourne donc une liste composé d'un dictionnaire actualisé.
+    Parfois, certains marché ont plusieurs modifications (la colonne modification est une liste de dictionnaire).
+    Jusqu'alors, seul le premier élément de la liste (et donc la première modification) était pris en compte. 
+    Cette fonction met à jour le premier dictionnaire de la liste. Ainsi les modifications considérées par la suite seront bien les dernières.
+
+    Arguments
+    ------------
+    dictionnaries (list) liste des dictionnaires de modifications
+
+    Returns
+    ----------
+    Une liste d'un élément : le dictionnaire des modifications à considérer.
+
     """
-    dict_original = x[0]
+    dict_original = dictionaries[0]
     for dict in x: # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
         dict_original.update(dict)
     return [dict_original]
@@ -681,7 +689,7 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
         raise ValueError(f"Il n'y a aucune colonne du nom de {col_to_normalize} dans le dataframe entrée en paramètre")
     
     mask_multiples_modifications = df.modifications.apply(lambda x:len(x)>1)
-    df.loc[mask_multiples_modifications, col_to_normalize] = df.loc[mask_multiples_modifications, col_to_normalize].apply(creation_dict_whole_modifications)
+    df.loc[mask_multiples_modifications, col_to_normalize] = df.loc[mask_multiples_modifications, col_to_normalize].apply(concat_modifications)
     df["HowManyModification"] = df[col_to_normalize].apply(lambda x:len(x))
     df["booleanModification"] = df["HowManyModification"].apply(lambda x:1 if x>0 else 0)
     
