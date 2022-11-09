@@ -31,6 +31,8 @@ logger.setLevel(logging.DEBUG)
 
 def main():
     check_reference_files()
+
+    # Chargement du fichier flux
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)

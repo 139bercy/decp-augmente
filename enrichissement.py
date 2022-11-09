@@ -48,6 +48,8 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    # Concaténer avec le df de la veille
+    # Dédoublonner 
     if conf_debug["debug"] : # Mise en pkl par sûreté
         with open('df_new_augmente', 'wb') as df_augmente:
         # Export présent pour faciliter la comparaison
