@@ -1,5 +1,6 @@
 import nettoyage
 import enrichissement
+import gestion_flux
 import logging
 import logging.config
 
@@ -18,6 +19,8 @@ logger.addHandler(fh)
 
 
 def main():
+    logger.info("Début du script de gestion de flux")
+    gestion_flux.main()
     logger.info("Début du script de nettoyage")
     nettoyage.main() 
     logger.info("Fin du script de nettoyage")

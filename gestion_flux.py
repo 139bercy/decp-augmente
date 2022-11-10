@@ -6,6 +6,8 @@ import json
 import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
+from pandas import json_normalize
+
 
 
 with open(os.path.join("confs", "config_data.json")) as f:
@@ -28,7 +30,7 @@ def main():
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
     
-    df_decp = pd.DataFrame(data=data['marches'])
+    df_decp = json_normalize(data['marches'])
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
@@ -50,10 +52,6 @@ def main():
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open("df_flux", "wb") as file:
         pickle.dump(df_to_process, file)
-    
-    
-
-
     return None
 
 
@@ -126,19 +124,23 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     """
     df_decp_modif['modif_up'] = df_decp_modif.modifications.apply(concat_modifications) # On rassemble les modifications 
     columns_modification = df_decp_modif.modif_up.apply(lambda x:list(x[0].keys())).explode().unique() # Permet de récupérer toutes les clefs possibles même si le format évolue
+    # On sauvegarde coluns_modification pour le réutiliser dans nettoyage
+    with open("columns_modifications", "wb") as file_modif:
+        pickle.dump(columns_modification, file_modif)
     df_modification_explode = explode_according_to_keys(df_decp_modif.modif_up, columns_modification)
     # A ce stade, les titulaires sont encore des listes de dictionnaires, donc non hashables. Transformons-les.
     df_modification_explode['titulaires_transfo'] = df_modification_explode.loc[:, "titulaires"].apply(transform_titulaires)
-    subset_to_hash_modif = ["objetModification", "dateNotificationModification", "montant", "datePublicationDonneesModification", "dureeMois", "dateSignatureModification", "valeurGlobale", "titulaires_transfo"]
+    subset_to_hash_modif = conf_glob["gestion_flux"]["subset_for_hash_modifications"]
     # Mettre le subset_to_hash_modif dans un JSON externable ?
     hash_modif = hash_pandas_object(df_modification_explode.loc[:, subset_to_hash_modif], index=False) # index doit toujours rester à False, sinon la clef de hash prends en compte l'index (ce qu'on ne veut pas)
     df_decp_modif['hash_key'] = hash_modif
-    
+
     return df_decp_modif
 
 def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash_column="hash_key"):
     """
     Cette fonction permet de différencier les nouvelles lignes en comparant les clefs de hash calculées pour le decp actuellement récupéré avec les clefs de hash déjà en mémoire.
+    Elle ré-écrit également le cache de mémoire avec l'ensemble des clefs (anciennes+nouvelles).
 
     Arguments
     ----------
@@ -151,6 +153,10 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     with open(os.path.join(path_to_data, path_to_hash_pickle), "rb") as file_hash_modif:
         hash_processed = pickle.load(file_hash_modif)
     mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
+
+    # Sauvegarde des clefs de hash rencontrés
+    with open(os.path.join(path_to_data, path_to_hash_pickle), "wb") as file_hash_modif:
+        pickle.dump(df['hash_key'],file_hash_modif)
 
     return df[~mask_hash_to_process], df[mask_hash_to_process]
 
@@ -165,7 +171,6 @@ def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
     Contenu qui a un format particulier donc on souhaitait le traiter à part.
 
     """
-
     mask_modifications = df_decp.modifications.apply(len)>0
     df_decp_modif = df_decp[mask_modifications]
     df_decp_no_modif = df_decp[~mask_modifications]
@@ -184,11 +189,7 @@ def create_hash_key_for_no_modification(df : pd.DataFrame):
     ---------
     le dataframe d'entrée enrichi de la colonne contenant les clefs de hachage
     """
-
-    # Le mettre dans un JSON externe ?
-    subset_to_hash_no_modif = ["id", "source", "objet", "codeCPV", "nature", "montant", "valeurGlobale", "datePublicationDonnees", "acheteur_tuple" ]
-    # Il se peut que parfois la seule différence entre deux marchés soit l'acheteur. Il est alors nécessaire de transformer l'acheteur en non mutable (ie tuple)
-    df["acheteur_tuple"] = df.acheteur.apply(lambda x:tuple(x.values()) if type(x)==dict else x)
+    subset_to_hash_no_modif = conf_glob["gestion_flux"]["subset_for_hash_no_modifications"]
     hash_keys = hash_pandas_object(df.loc[:, subset_to_hash_no_modif], index=False)
     df['hash_key'] = hash_keys
 

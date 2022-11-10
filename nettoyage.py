@@ -33,10 +33,9 @@ def main():
     check_reference_files()
 
     # Chargement du fichier flux
-    logger.info("Ouverture du fichier decp.json")
-    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-        data = json.load(json_data)
-
+    logger.info("Récupération du flux")
+    with open("df_flux", "rb") as flux_file:
+        df_flux = pickle.load(flux_file)
 
     # Modification pour un prendre subset de données 
 
@@ -59,7 +58,7 @@ def main():
         data['marches'] = accessed_list
 
     logger.info("Début du traitement: Conversion des données en pandas")
-    df = manage_modifications(data)
+    df = manage_modifications(df_flux)
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
@@ -617,45 +616,33 @@ def regroupement_marche_complet(df):
     return df
 
 
-def indice_marche_avec_modification(data: dict) -> list:
-    """
-    Renvoie la liste des indices des marchés contenant une modification
-
-    Retour:
-        - list
-    """
-    liste_indices = []
-    for i in range(len(data['marches'])):
-        # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
-        data["marches"][i]["id_technique"] = i
-        if data["marches"][i]["modifications"]:
-            liste_indices += [i]
-    return liste_indices
-
-
-def recuperation_colonne_a_modifier(data: dict, liste_indices: list) -> dict:
+def recuperation_colonne_a_modifier() -> dict:
     """
     Renvoie les noms des differentes colonnes recevant une modification
-    sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification}
+    sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification}.
+    Les colonnes qui sont concernés ont déjà été détectés dans gestion_flux.
 
     Retour:
         dict
     """
-    liste_colonne = []
-    colonne_to_modify = {}
-    for indice in liste_indices:
-        # colonne_modifiees = list(data["marches"][indice]["modifications"][0].keys())
-        for col in data["marches"][indice]["modifications"][0].keys():
-            if "Modification" not in col:
-                col += "Modification"
-            if col not in liste_colonne:
-                liste_colonne += [col]
-    for col in liste_colonne:
-        if "Modification" in col and col != "objetModification":
-            name_col = col.replace("Modification", "")
-            colonne_to_modify[col] = name_col
+    colonne_to_modify = dict()
+    # On récupère les colonnes détectés dans gestion_flux
+    with open("columns_modifications", "rb") as file_modif:
+        columns_modifications = pickle.load(file_modif)
+    for column in columns_modification:
+        if "Modification" in column:
+            key = column
+            value = column.replace("Modification", "")
         else:
-            colonne_to_modify[col] = col
+            key = column + "Modification"
+            value = column
+        colonne_to_modify[key] = value
+
+    colonne_to_modify = {'objetModification': 'objetModification'} # Cette colonne est un cas particulier.
+    # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
+    # Le mapping suivra la forme "xxxModification" : "xxx".
+    # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.
+    # Donc "objetModification" ne doit pas remplacer l'objet du marché.
     return colonne_to_modify
 
 def concat_modifications(dictionaries : list):
@@ -758,7 +745,7 @@ def fusion_source_modification_whole_dataset(df_source : pd.DataFrame, dict_modi
     """
     # Maintenant toutes les modifications sont uniques.
     for column_modif in dict_modification.keys():
-        column_to_change = dict_modification[column_modif]# Les colonnes auquelles il y a des modifications à apporter 
+        column_to_change = dict_modification[column_modif]# Les colonnes auxquelles il y a des modifications à apporter 
         # ont été construites ainsi nomcolonne+"Modification". 
         # Donc on retire Modificaiton pour pointer vers la bonne colonne                            
         mask_raw_to_change = df_source[column_modif].apply(lambda x:x!='').fillna(False)
@@ -798,16 +785,14 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     return df
 
 
-def manage_modifications(data: dict) -> pd.DataFrame:
+def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     Conversion du json en pandas et incorporation des modifications
 
     Retour:
         pd.DataFrame
     """
-    l_indice = indice_marche_avec_modification(data)
-    dict_modification = recuperation_colonne_a_modifier(data, l_indice)
-    df = json_normalize(data['marches'])
+    dict_modification = recuperation_colonne_a_modifier()
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
     df = regroupement_marche(df, dict_modification)
