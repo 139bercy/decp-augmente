@@ -46,7 +46,12 @@ def main():
     df_no_modif = create_hash_key_for_no_modification(df_no_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, conf_data["hash_no_modifications"])
-
+    print('Shape no modif to process puis process')
+    print(df_no_modif_to_process.shape)
+    print('\n', df_no_modif_processed.shape)
+    print('Shape modif to process puis process')
+    print(df_modif_to_process.shape)
+    print('\n', df_modif_processed.shape)
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
@@ -148,15 +153,11 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
 
     Returns
     ----------
-    Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traités.
+    Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traitées.
     """
     with open(os.path.join(path_to_data, path_to_hash_pickle), "rb") as file_hash_modif:
         hash_processed = pickle.load(file_hash_modif)
     mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
-
-    # Sauvegarde des clefs de hash rencontrés
-    with open(os.path.join(path_to_data, path_to_hash_pickle), "wb") as file_hash_modif:
-        pickle.dump(df['hash_key'],file_hash_modif)
 
     return df[~mask_hash_to_process], df[mask_hash_to_process]
 

@@ -628,7 +628,7 @@ def recuperation_colonne_a_modifier() -> dict:
     colonne_to_modify = dict()
     # On récupère les colonnes détectés dans gestion_flux
     with open("columns_modifications", "rb") as file_modif:
-        columns_modifications = pickle.load(file_modif)
+        columns_modification = pickle.load(file_modif)
     for column in columns_modification:
         if "Modification" in column:
             key = column
@@ -794,6 +794,8 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     dict_modification = recuperation_colonne_a_modifier()
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
+    # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
+    df["id_technique"] = df.index
     prise_en_compte_modifications(df)
     df = regroupement_marche(df, dict_modification)
     return df

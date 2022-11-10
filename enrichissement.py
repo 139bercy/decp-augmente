@@ -42,64 +42,50 @@ def main():
           .pipe(apply_luhn)
           .pipe(enrichissement_departement)
           .pipe(enrichissement_arrondissement)
+          .pipe(concat_unduplicate_and_caching_hash)
           .pipe(manage_column_final)
           .pipe(change_sources_name)
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
-    # Concaténer avec le df de la veille
-    # Dédoublonner 
-    if conf_debug["debug"] : # Mise en pkl par sûreté
+    # Mise en cache pour être ré_utilisé.
+    if conf_debug["debug"]:
         with open('df_new_augmente', 'wb') as df_augmente:
-        # Export présent pour faciliter la comparaison
+            # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
 
-
-def apply_luhn_up(df: pd.DataFrame) -> pd.DataFrame:
+def concat_unduplicate_and_caching_hash(df):
     """
-    Application de la formule de Luhn sur les siren/siret
-
-    Retour:
-        - pd.DataFrame
+    Cette fonction concatène ensemble les dataframes (celui du flux et celui du Stock).
+    Dédoublonne le dataframe (lorsqu'on aura les infos du dédoublonnage)
+    Pourquoi ne pas concaténer uniquement à la fin du processus enrichissement ?
+    Dans la fonction suivante, manage_column_final on garde les colonnes souhaitées et on drop les autres.
+    Si un jour on choisit d'exporter une nouvelle colonne il est intéressant d'avoir en cache le dataframe entier.
+    Sinon on doit tout recalculer.
     """
-    logger.info("Début du traitement: Vérification Siren/Siret par formule de Luhn")
-    # Application sur les siren des Acheteur
-    df['siren1Acheteur'] = df["acheteur.id"].str[:9]
-    df_SA = pd.DataFrame(df['siren1Acheteur'])
-    df_SA = df_SA.drop_duplicates(subset=['siren1Acheteur'], keep='first')
-    df_SA['sirenAcheteurValide'] = df_SA['siren1Acheteur'].apply(is_luhn_valid)
-    df = pd.merge(df, df_SA, how='left', on='siren1Acheteur', copy=False)
-    logger.info("Nombre de Siren Acheteur jugé invalide:{}".format(len(df) - sum(df.sirenAcheteurValide)))
-    del df['siren1Acheteur']
-    del df_SA
-    # Application sur les siren des établissements
-    df['siren2Etablissement'] = df.sirenEtablissement.str[:]
-    df_SE = pd.DataFrame(df['siren2Etablissement'])
-    df_SE = df_SE.drop_duplicates(subset=['siren2Etablissement'], keep='first')
-    df_SE['sirenEtablissementValide'] = df_SE['siren2Etablissement'].apply(is_luhn_valid)
-    df = pd.merge(df, df_SE, how='left', on='siren2Etablissement', copy=False)
-    logger.info("Nombre de Siren Etablissement jugé invalide:{}".format(len(df) - sum(df.sirenEtablissementValide)))
-    del df['siren2Etablissement']
-    del df_SE
-    # Application sur les siret des établissements
-    df['siret2Etablissement'] = df.siretEtablissement.str[:]
-    df_SE2 = pd.DataFrame(df['siret2Etablissement'])
-    df_SE2 = df_SE2.drop_duplicates(subset=['siret2Etablissement'], keep='first')
-    df_SE2['siretEtablissementValide'] = df_SE2['siret2Etablissement'].apply(is_luhn_valid)
-    # Merge avec le df principal
-    df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
-    logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
-    del df["siret2Etablissement"]
-    #del df_SE2enrichissement_siret
-    del df_SE2
+    # concat
+    path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
+    file_cache_exists = os.path.isfile(path_to_df_cache)
+    if file_cache_exists :
+        with open(os.path.join(path_to_data, conf_data['cache_df']), "rb") as file_cache:
+            df_cache = pickle.load(file_cache)
+        df = pd.concat([df, df_cache]).reset_index(drop=True)
+    
+    # Save hash keys
+    df_modif = df[df.booleanModification==1]
+    with open(os.path.join(path_to_data, "hash_keys_modifications"), "wb") as f:
+        pickle.dump(df_modif.hash_key, f) 
 
-    # On rectifie pour les codes non-siret
-    df.siretEtablissementValide = np.where(
-        (df.typeIdentifiantEtablissement != 'SIRET'),
-        "Non valable",
-        df.siretEtablissementValide)
+    df_no_modif = df[df.booleanModification==0]
+    with open(os.path.join(path_to_data, "hash_keys_no_modifications"), "wb") as f:
+        pickle.dump(df_no_modif.hash_key, f) 
+    logger.info("Cache des clefs de hachage actualisé")
+
+    # Save DataFrame pour la prochaine fois
+    with open(os.path.join(path_to_data, conf_data['cache_df']), "wb") as file_cache:
+            pickle.dump(df, file_cache)
     return df
 
 def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
