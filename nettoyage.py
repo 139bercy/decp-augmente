@@ -820,6 +820,17 @@ def manage_modifications(data: dict) -> pd.DataFrame:
 if __name__ == "__main__":
     # vérification des arguments fournis en entrée de script, si l'argument -t est présent on lance les tests
     if args.test:
-        main(True)
+        if conf_debug["debug"]:
+            profiler = cProfile.Profile()
+            profiler.enable()
+            main(True)
+            profiler.disable()
+            with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye:
+                df = pickle.load(df_nettoye)
+                init_len = len(df)
+            with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:
+                ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
+                ps.sort_stats('cumulative')
+                ps.print_stats()
     else:
         main()
