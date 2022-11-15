@@ -65,6 +65,7 @@ def concat_unduplicate_and_caching_hash(df):
     Si un jour on choisit d'exporter une nouvelle colonne il est intéressant d'avoir en cache le dataframe entier.
     Sinon on doit tout recalculer.
     """
+    print("concat cache", df.shape)
     # concat
     path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
     file_cache_exists = os.path.isfile(path_to_df_cache)
@@ -72,16 +73,6 @@ def concat_unduplicate_and_caching_hash(df):
         with open(os.path.join(path_to_data, conf_data['cache_df']), "rb") as file_cache:
             df_cache = pickle.load(file_cache)
         df = pd.concat([df, df_cache]).reset_index(drop=True)
-    
-    # Save hash keys
-    df_modif = df[df.booleanModification==1]
-    with open(os.path.join(path_to_data, "hash_keys_modifications"), "wb") as f:
-        pickle.dump(df_modif.hash_key, f) 
-
-    df_no_modif = df[df.booleanModification==0]
-    with open(os.path.join(path_to_data, "hash_keys_no_modifications"), "wb") as f:
-        pickle.dump(df_no_modif.hash_key, f) 
-    logger.info("Cache des clefs de hachage actualisé")
 
     # Save DataFrame pour la prochaine fois
     with open(os.path.join(path_to_data, conf_data['cache_df']), "wb") as file_cache:
@@ -95,6 +86,7 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    print('manage column fina', df.shape)
     logger.info("Début du traitement: Reorganisation du dataframe final")
     with open(os.path.join("confs", "var_to_export.json")) as f:
         conf_export = json.load(f)
@@ -268,6 +260,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    print("type entreprise", df.shape)
     logger.info('début enrichissement_type_entreprise')
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement_siret"], copy=False)
     # Recuperation de la base
@@ -397,6 +390,7 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
+    print('enr siret', df.shape)
     logger.info("Début du traitement: Enrichissement siret")
     dfSIRET = get_siretdf_from_original_data(df)
     archiveErrorSIRET = getArchiveErrorSIRET()
@@ -539,6 +533,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     key_columns_csv, la colonnes qu'on va considérer comme clef du csv
 
     """
+    print("cache manageent insee", df.shape)
     # Création des variables ici plutôt que de les mettre dans l'appelle de pipe au début du fichier avec les noms à rallonger
 
     path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
@@ -807,6 +802,7 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.Dataframe
     """
+    print("CPV", df.shape)
     # Importation et mise en forme des codes/ref CPV
     logger.info("Début du traitement: Enrichissement cpv")
     path = os.path.join(path_to_data, conf_data["cpv_2008_ver_2013"])
@@ -840,6 +836,7 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.DataFrame
     """
+    print('acheteur', df.shape)
     # StockEtablissement_utf8 et les caches
     path_to_cache_bdd = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
     path_to_cache_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
@@ -952,6 +949,7 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.DataFrame
     """
+    print("geo", df.shape)
     logger.info("Début du traitement: Enrichissement geographique")
     # Enrichissement latitude & longitude avec adresse la ville
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(object)
@@ -1055,6 +1053,7 @@ def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
     """
     Get a dataframe in input, and based on a dict will rename the source
     """
+    print('change sources', df.shape)
     dict_replace_name_source = {
         "data.gouv.fr_aife": "API AIFE",
         "data.gouv.fr_pes": "PES Marchés",

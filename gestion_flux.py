@@ -31,6 +31,7 @@ def main():
         data = json.load(json_data)
     
     df_decp = json_normalize(data['marches'])
+    print('original', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
@@ -140,6 +141,9 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     hash_modif = hash_pandas_object(df_modification_explode.loc[:, subset_to_hash_modif], index=False) # index doit toujours rester à False, sinon la clef de hash prends en compte l'index (ce qu'on ne veut pas)
     df_decp_modif['hash_key'] = hash_modif
 
+    with open(os.path.join(path_to_data, "hash_keys_modifications"), "wb") as f:
+        pickle.dump(df_decp_modif.hash_key, f) 
+
     return df_decp_modif
 
 def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash_column="hash_key"):
@@ -157,6 +161,7 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     """
     with open(os.path.join(path_to_data, path_to_hash_pickle), "rb") as file_hash_modif:
         hash_processed = pickle.load(file_hash_modif)
+    print(hash_processed)
     mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
 
     return df[~mask_hash_to_process], df[mask_hash_to_process]
@@ -193,6 +198,9 @@ def create_hash_key_for_no_modification(df : pd.DataFrame):
     subset_to_hash_no_modif = conf_glob["gestion_flux"]["subset_for_hash_no_modifications"]
     hash_keys = hash_pandas_object(df.loc[:, subset_to_hash_no_modif], index=False)
     df['hash_key'] = hash_keys
+    with open(os.path.join(path_to_data, "hash_keys_no_modifications"), "wb") as f:
+        pickle.dump(df.hash_key, f) 
+    logger.info("Cache des clefs de hachage actualisé")
 
     return df
 
@@ -209,7 +217,8 @@ def check_reference_files():
     useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
-                     "cache_not_in_bdd_legale"]
+                     "cache_not_in_bdd_legale",
+                     "cache_df"]
 
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
