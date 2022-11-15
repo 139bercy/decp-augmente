@@ -661,6 +661,26 @@ def recuperation_colonne_a_modifier(data: dict, liste_indices: list) -> dict:
             colonne_to_modify[col] = col
     return colonne_to_modify
 
+def concat_modifications(dictionaries : list):
+    """
+    Parfois, certains marché ont plusieurs modifications (la colonne modification est une liste de dictionnaire).
+    Jusqu'alors, seul le premier élément de la liste (et donc la première modification) était pris en compte. 
+    Cette fonction met à jour le premier dictionnaire de la liste. Ainsi les modifications considérées par la suite seront bien les dernières.
+
+    Arguments
+    ------------
+    dictionnaries (list) liste des dictionnaires de modifications
+
+    Returns
+    ----------
+    Une liste d'un élément : le dictionnaire des modifications à considérer.
+
+    """
+    dict_original = dictionaries[0]
+    for dict in dictionaries: # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
+        dict_original.update(dict)
+    return [dict_original]
+
 
 def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'modifications'):
     """
@@ -672,8 +692,13 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
     # Check colonne modifications.
     if col_to_normalize not in df.columns:
         raise ValueError(f"Il n'y a aucune colonne du nom de {col_to_normalize} dans le dataframe entrée en paramètre")
-    to_normalize = df[col_to_normalize]  # Récupération de la colonne à splitter
-    df["booleanModification"] = 0
+    
+    mask_multiples_modifications = df.modifications.apply(lambda x:len(x)>1)
+    df.loc[mask_multiples_modifications, col_to_normalize] = df.loc[mask_multiples_modifications, col_to_normalize].apply(concat_modifications)
+    df["HowManyModification"] = df[col_to_normalize].apply(lambda x:len(x))
+    df["booleanModification"] = df["HowManyModification"].apply(lambda x:1 if x>0 else 0)
+    
+    to_normalize = df[col_to_normalize]
     for i in range(len(to_normalize)):
         json_modification = to_normalize[i]
         if json_modification:  # dans le cas ou des modifications ont été apportées
@@ -685,7 +710,6 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
                 if col not in df.columns:  # Cas ou on tombe sur le premier marche qui modifie un champ
                     df[col] = ""  # Initialisation dans le df initial
                 df[col][i] = json_modification[0][col_init]
-                df["booleanModification"][i] = 1  # Création d'une booléenne pour simplifier le subset pour la suite
 
 
 def split_dataframe(df: pd.DataFrame, sub_data: pd.DataFrame, modalite: str) -> tuple:
@@ -730,6 +754,21 @@ def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_m
     return df_source
 
 
+def fusion_source_modification_whole_dataset(df_source : pd.DataFrame, dict_modification : dict):
+    """
+    Cette fonction met à jour les colonnes originales 
+
+    """
+    # Maintenant toutes les modifications sont uniques.
+    for column_modif in dict_modification.keys():
+        column_to_change = dict_modification[column_modif]# Les colonnes auquelles il y a des modifications à apporter 
+        # ont été construites ainsi nomcolonne+"Modification". 
+        # Donc on retire Modificaiton pour pointer vers la bonne colonne                            
+        mask_raw_to_change = df_source[column_modif].apply(lambda x:x!='').fillna(False)
+        # Les valeurs None ne répondent pas au boolean. On les mets à False pour ne pas y toucher
+        df_source.loc[mask_raw_to_change, column_to_change] = df_source.loc[mask_raw_to_change, column_modif]
+    return df_source
+
 def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFrame:
     """
     Permet de recoder la variable identifiant.
@@ -738,6 +777,9 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     En sortie: id correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une
     modification.
     Modification inplace du df source
+    La variable idtech permet ici d'identifier les marchés qui sont en réalités des doublons causés par la gestion des modifications
+    Ce n'est pas forcément une erreur de traitement, cela peut aussi être directement lié au fournisseur qui met une ligne pour chacune des nouvelles modifs.
+
 
     Retour:
         pd.DataFrame
@@ -745,19 +787,17 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     df["idtech"] = ""
     subdata_modif = df[df.booleanModification == 1]  # Tout les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
-    df_to_concatene = pd.DataFrame()  # df vide pour la concaténation
-    logger.info("Au total, {} marchés sont concernés par au moins une modification".format(len(liste_objet)))
-    for objet_marche in liste_objet:
+    marches_init = []
+    for objet_marche in liste_objet: # C'est du dedoublonnage en fait ça
         # Récupération du dataframe modification et du dataframe source
+        # On créée la colonne "idtech"
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
-        for j in range(len(marche)):
-            marche_init = fusion_source_modification(marche.iloc[j], marche_init, dict_modification.keys(),
-                                                     dict_modification)
         marche_init["idtech"] = marche.iloc[-1].id_technique
-        df_to_concatene = pd.concat([df_to_concatene, marche_init], copy=False)
+        marches_init.append(marche_init)
+    df_to_concatene = pd.concat([x for x in marches_init], copy=False)
     df.update(df_to_concatene)
-    # Attention aux id.
     df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
+    df = fusion_source_modification_whole_dataset(df, dict_modification)
     return df
 
 
@@ -773,8 +813,6 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     df = json_normalize(data['marches'])
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     prise_en_compte_modifications(df)
-    #df["idtech"] = df["id_technique"].copy()
-    #df['idMarche'] = df["id_technique"].copy()
     df = regroupement_marche(df, dict_modification)
     return df
 

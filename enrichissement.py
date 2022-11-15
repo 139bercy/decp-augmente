@@ -52,6 +52,7 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    
     # if conf_debug["debug"] : # Mise en pkl par sûreté
     #    with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente :
     #        # Export présent pour faciliter la comparaison
@@ -342,7 +343,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     df = df.merge(
         dfcache[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
     df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
-
+    df = pd.concat([df,dfSIRET_valide_notfound])
     logger.info('fin enrichissement_type_entreprise\n')
     return df
 
@@ -888,6 +889,7 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     # Chargement des caches qui existent forcément. Donc pas de test sur leur existence
     sirets_not_found = loading_cache(path_to_cache_not_in_bdd)
     mask_siret_valid_not_found = df.siret.isin(sirets_not_found)
+    df_siret_valid_not_found = df[mask_siret_valid_not_found]
     df = df[~mask_siret_valid_not_found]
     mask_siret_not_valid = (~df.siret.apply(is_luhn_valid)) | (df.siret == '00000000000000')
     dfSIRET_siret_not_valid = df[mask_siret_not_valid]
@@ -912,6 +914,7 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['acheteur.id'], keep='first')
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
+    df = pd.concat([df, dfSIRET_siret_not_valid, df_siret_valid_not_found])
 
     return df
 
