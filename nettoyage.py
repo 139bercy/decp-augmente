@@ -188,7 +188,7 @@ def manage_titulaires(df: pd.DataFrame):
     L'autre point de cette fonction est de gérer les marchés lorsqu'il y a plusieurs titulaires. Avant on créait des lignes pour chaque nouveau titulaire, maintenant
     on a des nvls colonnes pour les cotitulaires. On garde l'unicité de 1 ligne = 1 marché qui était perdu avant.
     """
-    print('Titulaires ', df.shape)
+    logger.info(f"Taille dataframe avant manage_titulaires {df.shape}")
     
     df = df[~(df['titulaires'].isna() & df['concessionnaires'].isna())]
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
@@ -227,7 +227,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    print('duplicate', df.shape)
+    logger.info(f"Taille dataframe avant   manage_duplicates{df.shape}")
     logger.info("Début du traitement: Suppression des doublons")
     nb_ligne_avant_suppression = len(df)
     df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
@@ -283,7 +283,8 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    print('amount', df.shape)
+    logger.info(f"Taille dataframe avant manage_amount {df.shape}")
+
     logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
     df["montant"] = pd.to_numeric(df["montant"], downcast='float') # Passage en float32 plutôt que 64
@@ -404,7 +405,6 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    print('REGION', df.shape)
     logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). "
                 "Zone d'execution du marché")
     # Régions / Départements #
@@ -474,7 +474,7 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
-    print('DATE', df.shape)
+    logger.info(f"Taille dataframe avant manage_date {df.shape}")
     logger.info("Début du traitement: Récupération de l'année et du mois du marché public + "
                 "Correction des années aberrantes")
     # Date / Temps #
@@ -511,7 +511,6 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
-    print("date2", df.shape)
     logger.info("Début du traitement: Correction de la variable dureeMois.")
     # On cherche les éventuelles erreurs mois -> jours
     df['montantCalcule'] = df['montantCalcule'].astype(np.int32) # 32 au lieu de 64 pour l'espace mémoire
@@ -602,7 +601,7 @@ def regroupement_marche_complet(df):
     """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
     les marchés en fonction de leur objets/date de publication des données et montant.
     Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
-    print('marche complet ', df.shape)
+    logger.info(f"Taille dataframe avant regroupement_marche_complet {df.shape}")
     # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]] .groupby(["objet",
                                                     "datePublicationDonnees", "montant"])["id"])
@@ -801,7 +800,7 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    print("manage modif", df.shape)
+    logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
     dict_modification = recuperation_colonne_a_modifier()
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
