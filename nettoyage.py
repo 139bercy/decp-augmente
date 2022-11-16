@@ -35,6 +35,13 @@ def main():
     logger.info("Récupération du flux")
     with open("df_flux", "rb") as flux_file:
         df_flux = pickle.load(flux_file)
+    # SI il n'y a pas d'ajout de données.
+    if df_flux.empty :
+        with open('df_nettoye', 'wb') as df_nettoye:
+            # Export présent pour faciliter l'utilisation du module enrichissement.py
+            pickle.dump(df_flux, df_nettoye)
+        logger.info("Flux vide")
+        return df_flux
 
     # Modification pour un prendre subset de données 
 
@@ -342,7 +349,6 @@ def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    print(df.shape)
     logger.info("Début du traitement: Gestion des Id null")
     # Ecriture dans les logs
     logger.info("Nombre d'identifiant manquants et remplacés: {}".format(sum(df["id"].isnull())))
@@ -641,7 +647,7 @@ def recuperation_colonne_a_modifier() -> dict:
             value = column
         colonne_to_modify[key] = value
 
-    colonne_to_modify = {'objetModification': 'objetModification'} # Cette colonne est un cas particulier.
+    colonne_to_modify["objetModification"] = "objetModification" # Cette colonne est un cas particulier.
     # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
     # Le mapping suivra la forme "xxxModification" : "xxx".
     # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.

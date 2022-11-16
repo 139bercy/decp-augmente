@@ -30,6 +30,17 @@ def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
+    # Gestion flux vide
+    if df.empty:
+        logger.info("Flux vide")
+        df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+
+        if conf_debug["debug"]:
+            with open('df_new_augmente_flux_apres_smalljson', 'wb') as df_augmente:
+                # Export présent pour faciliter la comparaison
+                pickle.dump(df, df_augmente)
+        return None
+
     
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
@@ -51,7 +62,7 @@ def main():
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
-        with open('df_new_augmente', 'wb') as df_augmente:
+        with open('df_new_augmente_flux_apres_smalljson_repetition', 'wb') as df_augmente:
             # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
@@ -825,6 +836,7 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     # Rename la variable CODE en codeCPV
     df.rename(columns={"codeCPV": "codeCPV_Original",
               "CODE": "codeCPV"}, inplace=True)
+    print('fin cpv', df.shape)
     return df
 
 

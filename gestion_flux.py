@@ -135,6 +135,7 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     """
     df_decp_modif['modif_up'] = df_decp_modif.modifications.apply(concat_modifications) # On rassemble les modifications 
     columns_modification = df_decp_modif.modif_up.apply(lambda x:list(x[0].keys())).explode().unique() # Permet de récupérer toutes les clefs possibles même si le format évolue
+    print('cool')
     # On sauvegarde coluns_modification pour le réutiliser dans nettoyage
     with open("columns_modifications", "wb") as file_modif:
         pickle.dump(columns_modification, file_modif)
