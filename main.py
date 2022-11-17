@@ -26,14 +26,8 @@ args = parser.parse_args()
 
 
 def main():
-    # vérification des arguments fournis en entrée de script, si l'argument -T est présent on lance les tests
-    if args.test:
-        test_check = True
-    else:
-        test_check = False
-
     logger.info("Début du script de nettoyage")
-    nettoyage.main(test_check)
+    nettoyage.main(args.test)
     logger.info("Fin du script de nettoyage")
     logger.info("Début du script d'enrichissement des données")
     enrichissement.main()
