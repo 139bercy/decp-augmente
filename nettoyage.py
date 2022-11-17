@@ -6,11 +6,16 @@ from random import random
 import numpy as np
 import pandas as pd
 import itertools
+import argparse
 from pandas import json_normalize
 
 import cProfile
 import pstats
 
+# Initialize parser
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -29,16 +34,14 @@ logger = logging.getLogger("main.nettoyage")
 logger.setLevel(logging.DEBUG)
 
 
-def main():
+def main(test_check=False):
     check_reference_files()
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-
-    # Modification pour un prendre subset de données 
-
-    if conf_debug["subset"]:
+    if test_check:
+        # Modification pour prendre un subset de données
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
         logger.info(
@@ -99,6 +102,7 @@ def check_reference_files():
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
         if key not in useless_keys:
+
             logger.info(f'Test du fichier {conf_data[key]}')
             mask = os.path.exists(os.path.join(path, conf_data[key]))
             if not mask:
@@ -115,16 +119,16 @@ def create_columns_titulaires_fast(df, column="titulaires"):
     """
     Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
     Nécessite une unicité des index
-    
+
     Arguments
     ---------
-    df 
+    df
     column (strign) colonne dans laquelle se trouve l'objet à exploser pour créer les colonnes
 
     Returns
     --------
     Le même dataframe avec les informations extraites de la colonne column
-    
+
     """
     df_explode = df[column].explode() # Very quick
     df_explode['typeIdentifiant'] = df_explode.apply(found_values_in_dic, args=(["typeIdentifiant"]))
@@ -136,6 +140,7 @@ def create_columns_titulaires_fast(df, column="titulaires"):
                                 'denominationSociale' : df_explode['denominationSociale'].iloc[:-2]})
     df = df.merge(df_explode, left_index=True, right_index=True)
     return df
+
 
 def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
     """
@@ -149,7 +154,7 @@ def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
     n_cotit (int) , nombe de cotitulaires dont il faut extraire les informations
     """
     df_with_cotitulaires_and_columns = df_with_cotitulaires['titulaires'].explode().apply(pd.Series) # On explose les lignes
-    df_with_cotitulaires_and_columns['index'] = df_with_cotitulaires_and_columns.index # On créé la colonne index pour pouvoir ne récupérer que le premier 
+    df_with_cotitulaires_and_columns['index'] = df_with_cotitulaires_and_columns.index # On créé la colonne index pour pouvoir ne récupérer que le premier
     mask_duplicated = df_with_cotitulaires_and_columns.duplicated(subset=['index'], keep='first') # La première occurence est False, les autres sont True
     df_with_cotitulaires_titulaires = df_with_cotitulaires_and_columns.loc[~mask_duplicated, ["id", "denominationSociale", "typeIdentifiant"]]
     df_with_cotitulaires_titulaires.rename(columns={"id": "idTitulaires"}, inplace=True)
@@ -158,7 +163,7 @@ def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
     # Récupérer les titulaires secondes et recommencer l'opération de dedoublonnage sur l'index pour cotitulaires 1, 2 et 3
     c_cotitulaires = 1
     while c_cotitulaires <=3: # 3 cotitulaires max : règle métier
-        df_with_cotitulaires_and_columns = df_with_cotitulaires_and_columns.loc[mask_duplicated] # On ne récupère que les doublons sans la première occurence. Le cotitulaire 1 est alors le premier duplicata 
+        df_with_cotitulaires_and_columns = df_with_cotitulaires_and_columns.loc[mask_duplicated] # On ne récupère que les doublons sans la première occurence. Le cotitulaire 1 est alors le premier duplicata
         mask_duplicated = df_with_cotitulaires_and_columns.duplicated(subset=['index'], keep='first') # La première occurence est False, les autres sont True
         df_with_cotitulaires_c = df_with_cotitulaires_and_columns.loc[~mask_duplicated, ["typeIdentifiant", "id", "denominationSociale"]]
         df_with_cotitulaires_c = df_with_cotitulaires_c.rename(columns={"id": f"id_cotitulaire{c_cotitulaires}",\
@@ -173,15 +178,15 @@ def deal_with_many_titulaires(df_with_cotitulaires : pd.DataFrame, n_cotit=3):
 
 def manage_titulaires(df: pd.DataFrame):
     """
-    Cette fonction gère les titulaires des marchés qu'ils soient uniques ou multiples. 
-    D'un point de vue métier/data : Les titulaires d'un marchés sont sous formes de JSON (dictionnaire) dans la colonne titulaires. 
+    Cette fonction gère les titulaires des marchés qu'ils soient uniques ou multiples.
+    D'un point de vue métier/data : Les titulaires d'un marchés sont sous formes de JSON (dictionnaire) dans la colonne titulaires.
     L'immense majorité des JSON titulaires est ainsi : {'typeIndentifiant' : value, 'id': value, 'denominationSociale': value}
     On veut éclater cette colonne, c-à-d ne plus avoir une colonne avec un JSON mais créer de nouvelles colonnes avec les valeurs de ce JSON
 
     L'autre point de cette fonction est de gérer les marchés lorsqu'il y a plusieurs titulaires. Avant on créait des lignes pour chaque nouveau titulaire, maintenant
     on a des nvls colonnes pour les cotitulaires. On garde l'unicité de 1 ligne = 1 marché qui était perdu avant.
     """
-    
+
     df = df[~(df['titulaires'].isna() & df['concessionnaires'].isna())]
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
@@ -202,8 +207,8 @@ def manage_titulaires(df: pd.DataFrame):
     df_one_titulaires.rename(columns={"id_y": "idTitulaires", "id_x": "id"}, inplace=True)
 
     # Dans le cas de plusieurs titulaires
-    df_with_cotitulaires = df[df["nbTitulairesSurCeMarche"]>1].copy() # On ne garde que les dataframes avec des cotitulaires 
-    dict_df_with_cotitulaires = deal_with_many_titulaires(df_with_cotitulaires) # Cette fonction peut être amélioré, cependant comme 
+    df_with_cotitulaires = df[df["nbTitulairesSurCeMarche"]>1].copy() # On ne garde que les dataframes avec des cotitulaires
+    dict_df_with_cotitulaires = deal_with_many_titulaires(df_with_cotitulaires) # Cette fonction peut être amélioré, cependant comme
     df_cotitulaires = pd.concat([x for x in dict_df_with_cotitulaires.values()], axis=1) # On recolle les différents co titulaires d'un même marché
 
     df_with_cotitulaires = pd.concat([df_with_cotitulaires, df_cotitulaires], axis=1)
@@ -580,7 +585,7 @@ def replace_char(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def create_value_number(x):
-    """Retourne le max parmis les élements de l'objet d'entrée, si il y a un Nan, retourne Nan 
+    """Retourne le max parmis les élements de l'objet d'entrée, si il y a un Nan, retourne Nan
     """
     if x.isna().any():
         value_number = 0  # Essentiel pour la construction de df_avec_valid_id. Sinon ça crash
@@ -604,8 +609,8 @@ def regroupement_marche_complet(df):
     flat_id = list(itertools.chain(*[[x]*y for (x,y) in zip(df_group["valid_id"].values, df_group["nbTit"].values)]))
     dict_data = {"nombreTitulaireSurMarchePresume" : flat_nbtit, "id": flat_id}
     df_reconstruct = pd.DataFrame(index=flat_indx, data=dict_data)
-    
-    df_reconstruct['id'].replace(0, pd.NA, inplace=True) # On renomme remplace ici les 0 par des Nan, pas plus tôt pour deux raisons 
+
+    df_reconstruct['id'].replace(0, pd.NA, inplace=True) # On renomme remplace ici les 0 par des Nan, pas plus tôt pour deux raisons
     # Lorsqu'on flat les listes les Nan ne sont pas itérables
     # Cependant on a bien besoin de forcer le typage en pd.NA pour la suite de la pipeline
     df["nombreTitulaireSurMarchePresume"] = 0 # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
@@ -813,10 +818,11 @@ def manage_modifications(data: dict) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    if conf_debug["debug"]:
+    # vérification des arguments fournis en entrée de script, si l'argument -t est présent on lance les tests
+    if args.test:
         profiler = cProfile.Profile()
         profiler.enable()
-        main()
+        main(True)
         profiler.disable()
         with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)

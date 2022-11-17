@@ -5,6 +5,7 @@ import logging.config
 import cProfile
 import pstats
 import pickle
+import argparse
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.DEBUG)
@@ -18,10 +19,15 @@ fh.setFormatter(formatter)
 logger.addHandler(ch)
 logger.addHandler(fh)
 
+# Initialize parser
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
+
 
 def main():
     logger.info("Début du script de nettoyage")
-    nettoyage.main() 
+    nettoyage.main(args.test)
     logger.info("Fin du script de nettoyage")
     logger.info("Début du script d'enrichissement des données")
     enrichissement.main()
