@@ -68,7 +68,6 @@ def main():
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
-
     logger.info("Début du traitement: Gestion des titulaires")
     df = (df.pipe(manage_titulaires)
           .pipe(manage_duplicates)
@@ -101,7 +100,7 @@ def check_reference_files():
     useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
-                     "cache_not_in_bdd_legale"]
+                     "cache_not_in_bdd_legale", "cache_acheteur_bdd_legale", "cache_acheteur_not_in_bdd_legale"]
 
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
@@ -188,8 +187,6 @@ def manage_titulaires(df: pd.DataFrame):
     L'autre point de cette fonction est de gérer les marchés lorsqu'il y a plusieurs titulaires. Avant on créait des lignes pour chaque nouveau titulaire, maintenant
     on a des nvls colonnes pour les cotitulaires. On garde l'unicité de 1 ligne = 1 marché qui était perdu avant.
     """
-    logger.info(f"Taille dataframe avant manage_titulaires {df.shape}")
-    
     df = df[~(df['titulaires'].isna() & df['concessionnaires'].isna())]
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
@@ -283,7 +280,6 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-    logger.info(f"Taille dataframe avant manage_amount {df.shape}")
 
     logger.info("Début du traitement: Détection et correction des montants aberrants")
     # Identifier les outliers - travail sur les montants
