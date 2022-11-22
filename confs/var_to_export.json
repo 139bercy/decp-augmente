@@ -52,6 +52,7 @@
                "nicEtablissement": 1, 
                "sirenEtablissementValide": 1, 
                "categorieEntreprise": 1, 
+               "denominationUniteLegale" : 1,
                "denominationSocialeEtablissement": 1, 
                "codeRegionEtablissement": 1, 
                "libelleRegionEtablissement": 1, 

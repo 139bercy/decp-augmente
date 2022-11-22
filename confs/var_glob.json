@@ -1,4 +1,7 @@
-{   
+{   "gestion_flux" : {
+        "subset_for_hash_modifications" : ["objetModification", "dateNotificationModification", "montant", "datePublicationDonneesModification", "dureeMois", "dateSignatureModification", "valeurGlobale", "titulaires_transfo"],
+        "subset_for_hash_no_modifications" : ["id", "source", "objet", "codeCPV", "nature", "montant", "valeurGlobale", "datePublicationDonnees", "acheteur.id" ]
+                    },
     "nettoyage": {
         "type_col_nettoyage": {
                     "id": "string",
