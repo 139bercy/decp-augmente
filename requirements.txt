@@ -10,3 +10,4 @@ folium
 tqdm
 geopy
 openpyxl
+wget
