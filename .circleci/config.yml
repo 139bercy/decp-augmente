@@ -69,6 +69,26 @@ jobs:
            key: data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
            paths:
              - "data"
+  get_data_daily_python:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - run:
+            name: Daily data Python
+            command: |
+                python3 get_daily_data.py
+  get_data_weekly_python:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - run:
+            name: Weekly data Python 
+            command: |
+                python3 get_data_weekly.py
 
   get_data_weekly:
      docker:
@@ -160,6 +180,12 @@ workflows:
   main:
     jobs:
       - get_data_daily
+      - get_data_daily_python:
+          context:
+              - bercy_secret
+      - get_data_weekly_python:
+          context:
+              - bercy_secret
       - get_data_weekly
       - install_requirements
       - compute:
