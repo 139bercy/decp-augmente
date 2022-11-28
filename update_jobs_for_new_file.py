@@ -56,7 +56,7 @@ def updates_files_on_saagie(modified_files : list, object):
     object : the object used to write on s3 file.
 
     return 
-    True si la fonction s'éxecute en entier.
+    result (dict) Indique l'état de la communication avec le S3 pour l'actualisation du commit id.
 
     """   
     saagieapi =  SaagieApi.easy_connect(url_saagie_platform="https://saagieavv-workspace.saagie.com/projects/platform/1/project/3581976c-20f6-46e1-892b-2fa168c7159b/jobs",
@@ -80,12 +80,12 @@ def updates_files_on_saagie(modified_files : list, object):
             runtime_version='3.9')
     print('Actualisation du dernier commit traité')
     id_commit = REPO.head.commit
-    object.put(Body=str(id_commit))
-    return True
+    result = object.put(Body=str(id_commit))
+    return result
 
 def main():
     modified_files, object = get_files_to_updates()    
-    bool = updates_files_on_saagie(modified_files, object)
+    res = updates_files_on_saagie(modified_files, object)
     return None
 
 
