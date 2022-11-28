@@ -1,12 +1,16 @@
 import json
 import wget
 import boto3
+from boto3.s3.transfer import TransferConfig
 import json
 import os
 from zipfile import ZipFile 
 import pathlib
+import logging
 
 
+logger = logging.getLogger("main.enrichissement")
+logger.setLevel(logging.DEBUG)
 url_geoflar = "https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B"
 url_cpv = "https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip"
 url_departement = "https://www.insee.fr/fr/statistiques/fichier/4316069/departement2020-csv.zip"
@@ -27,6 +31,7 @@ def load_files_and_unzip(urls):
         os.mkdir(data_path)
     # Téléchargements des fichiers
     for url in urls :
+        logger.info(f"Téléchargement de {url}")
         if url == url_geoflar: # Traitement spécifique pour ce téléchargement
             wget.download(url, out=os.path.join(data_path, "geoflar-communes-2015.csv" ), bar=None)
         else:
@@ -66,19 +71,19 @@ def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
                         region_name="eu-west-3"
                         )
     for file in os.listdir(data_path):
+        logger.info(f"Upload du fichier {file} en cours")
         object = s3.Object(bucket_name, file)
         full_path =  os.path.abspath(os.path.join(data_path, file))
-
-        result = object.put(Body=open(full_path, "rb"))
-        res = result.get('ResponseMetadata')
-        if res.get('HTTPStatusCode') == 200:
-            print(f'File {file} Uploaded Successfully')
-        else:
-            print(f'File {file} Not Uploaded')
+        #result = object.put(Body=open(full_path, "rb")) Ne gère pas plus de 5GB.
+        try:
+            object.upload_file(full_path, os.path.join(data_path, file))
+            logger.info(f"Upload du fichier {file} réussi")
+        except:
+            logger.info(f"ERROR : Upload du fichier{file} non réussi")
     return None
 
 def main():
-    load_files_and_unzip(urls)
+    #load_files_and_unzip(urls)
     upload_on_s3()
 
 
