@@ -82,6 +82,5 @@ def main():
     upload_on_s3()
 
 
-
 if __name__ == "__main__":
     main()

@@ -9,7 +9,7 @@ output_directory_local = r"decp.json"
 output_directory_s3 = r"data/decp.json" 
 json_decp = wget.download(url_decp, output_directory_local)
 
-access_key = os.environ.get("SECRET_ACCESS")
+access_key = os.environ.get("ACCESS_KEY")
 secret_key = os.environ.get("SECRET_KEY")
 
 local_credentials="saagie_cred.json"
