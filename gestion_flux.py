@@ -21,7 +21,7 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-logger = logging.getLogger("main.nettoyage")
+logger = logging.getLogger("main.gestion_flux")
 logger.setLevel(logging.DEBUG)
 
 def main():

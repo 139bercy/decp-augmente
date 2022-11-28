@@ -9,7 +9,7 @@ import pathlib
 import logging
 
 
-logger = logging.getLogger("main.enrichissement")
+logger = logging.getLogger("main.weekly")
 logger.setLevel(logging.DEBUG)
 url_geoflar = "https://public.opendatasoft.com/explore/dataset/geoflar-communes-2015/download/?format=csv&timezone=Europe/Berlin&lang=fr&use_labels_for_header=true&csv_separator=%3B"
 url_cpv = "https://simap.ted.europa.eu/documents/10184/36234/cpv_2008_xls.zip"
@@ -72,11 +72,11 @@ def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
                         )
     for file in os.listdir(data_path):
         logger.info(f"Upload du fichier {file} en cours")
-        object = s3.Object(bucket_name, file)
+        object = s3.Object(bucket_name, os.path.join(data_path, file))
         full_path =  os.path.abspath(os.path.join(data_path, file))
         #result = object.put(Body=open(full_path, "rb")) Ne gère pas plus de 5GB.
         try:
-            object.upload_file(full_path, os.path.join(data_path, file))
+            object.upload_file(full_path)
             logger.info(f"Upload du fichier {file} réussi")
         except:
             logger.info(f"ERROR : Upload du fichier{file} non réussi")
