@@ -34,5 +34,9 @@ s3_resource = boto3.resource('s3',
 with open(output_directory_local, encoding='utf-8') as json_data:
     data = json.load(json_data)
 s3object  = s3_resource.Object('bercy', output_directory_s3)
-s3object.put(Body=bytes(json.dumps(data).encode('utf-8')))
-
+result = s3object.put(Body=bytes(json.dumps(data).encode('utf-8')))
+res = result.get('ResponseMetadata')
+if res.get('HTTPStatusCode') == 200:
+    print('File DECP.JSON Uploaded Successfully')
+else:
+    print('File DECP.JSON Not Uploaded')
