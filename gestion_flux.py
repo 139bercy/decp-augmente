@@ -3,17 +3,26 @@ import os
 import numpy as np
 import pickle
 import json
+import boto3
 import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
+import utils
+
+logger = logging.getLogger("main.gestion_flux")
+logger.setLevel(logging.DEBUG)
 
 
+#Chargement des fichiers depuis le S3:
+res = utils.download_confs()
+if res :
+    logger.info("Chargement des fichiers confs depuis le S3")
+else:
+    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
-path_to_data = conf_data["path_to_data"]
-decp_file_name = conf_data["decp_file_name"]
 
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
@@ -21,8 +30,8 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-logger = logging.getLogger("main.gestion_flux")
-logger.setLevel(logging.DEBUG)
+path_to_data = conf_data["path_to_data"]
+decp_file_name = conf_data["decp_file_name"]
 
 def main():
     check_reference_files()
@@ -41,6 +50,8 @@ def main():
     df_modif = create_hash_key_for_modifications(df_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes modifications déjà enrichies.")
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,conf_data["hash_modifications"])
+    #Sauvegarde clef de hache sur le S3
+    resp = utils.write_cache_on_s3(conf_data["hash_modifications"], df_no_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(os.path.join(path_to_data, conf_data["hash_modifications"]), "wb") as f:
         pickle.dump(df_modif.hash_key, f)
@@ -49,6 +60,8 @@ def main():
     df_no_modif = create_hash_key_for_no_modification(df_no_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, conf_data["hash_no_modifications"])
+    #Sauvegarde clef de hache sur le S3
+    resp = utils.write_cache_on_s3(conf_data["hash_no_modifications"], df_no_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(os.path.join(path_to_data, conf_data["hash_no_modifications"]), "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
@@ -60,6 +73,8 @@ def main():
     print('\n', df_modif_processed.shape)
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
+    #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
+    resp = utils.write_object_file_on_s3("df_flux", df_to_process)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open("df_flux", "wb") as file:
         pickle.dump(df_to_process, file)
@@ -135,7 +150,8 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     """
     df_decp_modif['modif_up'] = df_decp_modif.modifications.apply(concat_modifications) # On rassemble les modifications 
     columns_modification = df_decp_modif.modif_up.apply(lambda x:list(x[0].keys())).explode().unique() # Permet de récupérer toutes les clefs possibles même si le format évolue
-    print('cool')
+     # On sauvegarde coluns_modification pour le réutiliser dans nettoyage dans le BUCKET S3
+    resp = utils.write_object_file_on_s3("columns_modifications", columns_modification)
     # On sauvegarde coluns_modification pour le réutiliser dans nettoyage
     with open("columns_modifications", "wb") as file_modif:
         pickle.dump(columns_modification, file_modif)
