@@ -61,6 +61,7 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    logger.info("chemin d'accès au fichier: %s", os.path.abspath("decp_augmente.csv"))
     
     if conf_debug["debug"]:  # Mise en pkl par sûreté
         with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente:
