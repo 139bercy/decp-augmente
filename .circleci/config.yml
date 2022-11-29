@@ -183,10 +183,12 @@ workflows:
       - get_data_daily
       - get_data_daily_python:
           context:
-              - bercy_secret
+              - decp-augmente
+          requires:
+              - install_requirements
       - get_data_weekly_python:
           context:
-              - bercy_secret
+              - decp-augmente
       - get_data_weekly
       - compute:
           requires:
