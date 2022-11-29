@@ -3,15 +3,24 @@ import csv
 import json
 import os
 import pickle
-import logging
+import logging.config
 import numpy as np
 import pandas as pd
 import cProfile
 import pstats
 from geopy.distance import distance, Point
 
-logger = logging.getLogger("main.enrichissement")
+logger = logging.getLogger("enrichissement")
 logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+fh = logging.handlers.RotatingFileHandler("decp_augmente.log", maxBytes=100000000, backupCount=5)
+fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)-20s - %(levelname)-8s - %(message)s")
+ch.setFormatter(formatter)
+fh.setFormatter(formatter)
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 # Initialize parser
 parser = argparse.ArgumentParser()
@@ -57,7 +66,6 @@ def main():
         with open('df_augmente_avec_luhn_pasdanslapipeline', 'wb') as df_augmente:
             # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
-    logger.info("Fin du traitement")
 
 
 def apply_luhn_up(df: pd.DataFrame) -> pd.DataFrame:

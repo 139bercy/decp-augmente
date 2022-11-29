@@ -30,8 +30,17 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-logger = logging.getLogger("main.nettoyage")
+logger = logging.getLogger("nettoyage")
 logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+fh = logging.handlers.RotatingFileHandler("decp_augmente.log", maxBytes=100000000, backupCount=5)
+fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)-20s - %(levelname)-8s - %(message)s")
+ch.setFormatter(formatter)
+fh.setFormatter(formatter)
+logger.addHandler(ch)
+logger.addHandler(fh)
 
 
 def main(test_check=False):
