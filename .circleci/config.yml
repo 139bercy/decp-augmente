@@ -136,6 +136,34 @@ jobs:
            - "decp_nettoye.csv"
            - "decp_augmente.csv"
 
+  compute-all:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies
+      - run: date +%F > date
+      - run: date +%G-%V > date-weekly
+      - restore_cache:
+          keys:
+            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+      - restore_cache:
+          keys:
+            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+      - run:
+          name: Traitement des données
+          no_output_timeout: 2h
+          command: |
+            . venv/bin/activate
+            mkdir cache
+            python3 main.py
+      - store_artifacts:
+          path: decp_augmente.log
+
   compute-nettoyage:
     docker:
       - image: 139bercy/decp-rama
@@ -183,9 +211,6 @@ jobs:
       - restore_cache:
           keys:
             - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - restore_cache:
-          keys:
-            - cleaned-out-{{ .Branch }}-{{ checksum "date" }}
       - run:
           name: Traitement des données
           no_output_timeout: 2h
@@ -258,18 +283,15 @@ workflows:
   daily-prod:
     jobs:
       - install_requirements
-      - compute-nettoyage:
+      - compute-all:
           requires:
             - install_requirements
-      - compute-enrichissement:
-          requires:
-            - compute-nettoyage
       - send:
           requires:
-            - compute-enrichissement
+            - compute-all
     triggers:
       - schedule:
-          cron: 25 16 * * 2-6
+          cron: 25 17 * * 2-6
           filters:
             branches:
               only:
