@@ -180,7 +180,7 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - get_data_daily
+
       - get_data_daily_python:
           context:
               - decp-augmente
