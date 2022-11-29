@@ -255,29 +255,21 @@ workflows:
               only:
                 - master
 
-  daily-prod-nettoyage:
+  daily-prod:
     jobs:
       - install_requirements
       - compute-nettoyage:
           requires:
             - install_requirements
-    triggers:
-      - schedule:
-          cron: 30 15 * * 2-6
-          filters:
-            branches:
-              only:
-                - fix_path_in_circleci
-
-  daily-prod-enrichissement:
-    jobs:
-      - compute-enrichissement
+      - compute-enrichissement:
+          requires:
+            - compute-nettoyage
       - send:
           requires:
             - compute-enrichissement
     triggers:
       - schedule:
-          cron: 50 15 * * 2-6
+          cron: 25 16 * * 2-6
           filters:
             branches:
               only:
