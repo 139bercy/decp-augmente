@@ -44,6 +44,11 @@ logger.addHandler(fh)
 
 
 def main(test_check=False):
+
+    # suppression du csv de sortie s'il existe déjà
+    if os.path.exists("decp_nettoye.csv"):
+        os.remove("decp_nettoye.csv")
+
     check_reference_files()
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:

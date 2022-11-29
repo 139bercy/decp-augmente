@@ -44,6 +44,10 @@ def main():
     with open('df_nettoye', 'rb') as df_nettoye:
         df = pickle.load(df_nettoye)
 
+    # suppression du csv de sortie s'il existe déjà
+    if os.path.exists("decp_augmente.csv"):
+        os.remove("decp_augmente.csv")
+
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
           .pipe(enrichissement_siret)
