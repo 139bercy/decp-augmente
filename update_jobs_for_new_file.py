@@ -2,6 +2,7 @@ import git
 import os
 import boto3
 import json
+from zipfile import ZipFile
 from saagieapi import SaagieApi
 
 
@@ -47,13 +48,14 @@ def get_files_to_updates():
     changed_files = REPO.git.diff(f"{id_commit}..HEAD", name_only=True) # On récupère uniquement les noms des fichiers qui ont été concernés par des commits depuis le dernier commit mis sur Saagie
     return changed_files.split('\n'), object
     
-def updates_files_on_saagie(modified_files : list, object):
+def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_utils=["gestion_flux.py", "nettoyage.py", "enrichissement.py"]):
     """
     Cette fonction met à jour les jobs Saagie. Une fois que les jobs ont été mis à jour ou créés, on stock dans le fichier S3 correspondant l'ID du commit.
     
     Arguments
     modified_files (list) List containing the files who needs to be updated on Saagie
     object : the object used to write on s3 file.
+    files_to_zip_with_utils (list) : Somes files need a script utils.py to be fully functional. We have to zip them to upgrade a job cleanly.
 
     return 
     result (dict) Indique l'état de la communication avec le S3 pour l'actualisation du commit id.
@@ -69,11 +71,23 @@ def updates_files_on_saagie(modified_files : list, object):
         try:
             id_job = saagieapi.jobs.get_id(project_name=PROJECT_NAME, job_name=str(file_name))
             print(f"Un jobs {file_name} a été trouvé, son id est le {id_job}. On le met à jour.")
-            saagieapi.jobs.upgrade(job_id=id_job, file=file, command_line="python {file}")
+
+            # Par sécurité, tous les jobs seront upgradés avec le fichier de requirements correspondant au job.
+            zipObj = ZipFile(f"{file_name}.zip", "w")
+            zipObj.write(file)
+            zipObj.write("requirements.txt")
+            if file in files_to_zip_with_utils:
+                zipObj.write('utils.py')
+            zipObj.close()
+            saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"python {file_name}.py")
         except :
             print(f"Il n'existe pas de jobs {file_name}. On le créé avec les paramètres par défaut.")
             id_projet = saagieapi.projects.get_id(PROJECT_NAME)
-            saagieapi.jobs.create(job_name=str(file_name), file=file, command_line="python {file}", project_id=id_projet,
+            zipObj = ZipFile(f"{file_name}.zip", "w")
+            zipObj.write(file)
+            zipObj.write("requirements.txt")
+            zipObj.close()
+            saagieapi.jobs.create(job_name=str(file_name), file=f"{file_name}.zip", command_line=f"python {file_name}.py", project_id=id_projet,
             category='Extraction',
             technology='python',# technology id corresponding to your context.id in your technology catalog definition
             technology_catalog='Saagie',

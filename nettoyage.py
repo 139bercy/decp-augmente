@@ -7,17 +7,23 @@ import numpy as np
 import pandas as pd
 import itertools
 from pandas import json_normalize
-
 import cProfile
 import pstats
+import utils
 
-
+logger = logging.getLogger("main.nettoyage")
+logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
+if utils.USE_S3:
+    utils.download_data_nettoyage()
+    res = utils.download_confs()
+if res :
+    logger.info("Chargement des fichiers confs depuis le S3")
+else:
+    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
-path_to_data = conf_data["path_to_data"]
-decp_file_name = conf_data["decp_file_name"]
 
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
@@ -25,21 +31,29 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-logger = logging.getLogger("main.nettoyage")
-logger.setLevel(logging.DEBUG)
+path_to_data = conf_data["path_to_data"]
+decp_file_name = conf_data["decp_file_name"]
 
 
 def main():
 
     # Chargement du fichier flux
     logger.info("Récupération du flux")
-    with open("df_flux", "rb") as flux_file:
+    flux_file = "df_flux"
+    if utils.USE_S3:
+        logger.info(" Fichier Flux chargé depuis S3")
+        utils.download_file(flux_file, flux_file)
+    
+    with open(flux_file, "rb") as flux_file:
         df_flux = pickle.load(flux_file)
     # SI il n'y a pas d'ajout de données.
     if df_flux.empty :
-        with open('df_nettoye', 'wb') as df_nettoye:
-            # Export présent pour faciliter l'utilisation du module enrichissement.py
-            pickle.dump(df_flux, df_nettoye)
+        if utils.USE_S3:
+            utils.write_object_file_on_s3("df_nettoye", df_flux)
+        else : 
+            with open('df_nettoye', 'wb') as df_nettoye:
+                # Export présent pour faciliter l'utilisation du module enrichissement.py
+                pickle.dump(df_flux, df_nettoye)
         logger.info("Flux vide")
         return df_flux
 
@@ -82,9 +96,12 @@ def main():
     logger.info("Fin du traitement")
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
-    with open('df_nettoye', 'wb') as df_nettoye:
-        # Export présent pour faciliter l'utilisation du module enrichissement.py
-        pickle.dump(df, df_nettoye)
+    if utils.USE_S3 : 
+        utils.write_object_file_on_s3("df_nettoye", df_flux)
+    else:
+        with open('df_nettoye', 'wb') as df_nettoye:
+            # Export présent pour faciliter l'utilisation du module enrichissement.py
+            pickle.dump(df, df_nettoye)
     df.to_csv("decp_nettoye.csv")
     logger.info("Ecriture du csv terminé")
 
@@ -630,8 +647,11 @@ def recuperation_colonne_a_modifier() -> dict:
         dict
     """
     colonne_to_modify = dict()
+    dict_path = "columns_modifications"
+    if utils.USE_S3:
+        utils.download_file(dict_path, dict_path)
     # On récupère les colonnes détectés dans gestion_flux
-    with open("columns_modifications", "rb") as file_modif:
+    with open(dict_path, "rb") as file_modif:
         columns_modification = pickle.load(file_modif)
     for column in columns_modification:
         if "Modification" in column:
@@ -812,7 +832,7 @@ if __name__ == "__main__":
         profiler.enable()
         main()
         profiler.disable()
-        with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye:
+        with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye: # Forcément du local, pas besoin de gérer ça sur S3
             df = pickle.load(df_nettoye)
             init_len = len(df)
         with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:

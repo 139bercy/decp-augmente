@@ -35,8 +35,11 @@ decp_file_name = conf_data["decp_file_name"]
 
 def main():
     check_reference_files()
+    decp_path = os.path.join(path_to_data, decp_file_name)
+    if utils.USE_S3:
+        utils.download_file(decp_path, decp_path)
     logger.info("Ouverture du fichier decp.json d'aujourd'hui")
-    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
+    with open(decp_file_name, encoding='utf-8') as json_data:
         data = json.load(json_data)
     
     df_decp = json_normalize(data['marches'])
@@ -51,9 +54,10 @@ def main():
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes modifications déjà enrichies.")
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,conf_data["hash_modifications"])
     #Sauvegarde clef de hache sur le S3
-    resp = utils.write_cache_on_s3(conf_data["hash_modifications"], df_no_modif.hash_key)
+    path_cache_modifications = os.path.join(path_to_data, conf_data["hash_modifications"])
+    resp = utils.write_cache_on_s3(path_cache_modifications, df_no_modif.hash_key)
     #Sauvegarde clefs de hache
-    with open(os.path.join(path_to_data, conf_data["hash_modifications"]), "wb") as f:
+    with open(path_cache_modifications, "wb") as f:
         pickle.dump(df_modif.hash_key, f)
     #Gestion de la partie sans les modifications
     logger.info("Création clef de hash pour les marchés n'ayant pas de modifications de decp.json")
@@ -61,9 +65,10 @@ def main():
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, conf_data["hash_no_modifications"])
     #Sauvegarde clef de hache sur le S3
-    resp = utils.write_cache_on_s3(conf_data["hash_no_modifications"], df_no_modif.hash_key)
+    path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"])
+    resp = utils.write_cache_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
     #Sauvegarde clefs de hache
-    with open(os.path.join(path_to_data, conf_data["hash_no_modifications"]), "wb") as f:
+    with open(path_cache_no_modifications, "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
     print('Shape no modif to process puis process')
     print(df_no_modif_to_process.shape)
