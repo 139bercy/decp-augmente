@@ -9,7 +9,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
             - dependencies-master-{{ checksum "requirements.txt"}}
       - run:
           name: Installation des requirements
@@ -21,7 +21,6 @@ jobs:
           key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           paths:
             - "venv"
-            - "confs/config_data.json"
 
   linter:
     docker:
@@ -31,7 +30,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
       - run:
           name: Linter
           command: |
@@ -104,7 +103,7 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
               - dependencies
         - run:
             name: Daily data Python
