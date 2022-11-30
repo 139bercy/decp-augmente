@@ -193,12 +193,10 @@ jobs:
     steps:
       - checkout
       - run: date +%F > date
-      - restore_cache:
-          keys:
-            - data-out-{{ .Branch }}-{{ checksum "date" }}
       - run:
           name: Condition pour les branches
           command: |
+            pwd
             ls -l
             if [ "$CIRCLE_BRANCH" != "master" ]; then
                 circleci-agent step halt
