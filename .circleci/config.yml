@@ -118,7 +118,7 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
               - dependencies
         - run:
             name: Weekly data Python 
@@ -134,7 +134,7 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
               - dependencies
         - run:
             name: Gestion des flux
@@ -149,7 +149,7 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
               - dependencies
         - run:
           name: Upload des fichiers modifiés sur Saagie
