@@ -130,11 +130,10 @@ jobs:
             fi
       - store_artifacts:
           path: decp_augmente.log
-      - save_cache:
-         key: data-out-{{ .Branch }}-{{ checksum "date" }}
-         paths:
-           - "decp_nettoye.csv"
-           - "decp_augmente.csv"
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - "decp_augmente.csv"
 
   compute-nettoyage:
     docker:
@@ -201,6 +200,8 @@ jobs:
       - image: 139bercy/decp-rama
     resource_class: large
     steps:
+      - attach_workspace:
+          at: ~/project
       - checkout
       - run: date +%F > date
       - restore_cache:
