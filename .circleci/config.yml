@@ -132,7 +132,7 @@ jobs:
             ls -l
 
       - persist_to_workspace:
-          root: .
+          root: ~/project
           paths:
             - .
       - store_artifacts:
