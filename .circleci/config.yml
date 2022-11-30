@@ -103,7 +103,7 @@ jobs:
             name: Daily data Python
             command: |
                 python3 get_daily_data.py
-get_data_weekly_python:
+  get_data_weekly_python:
       docker:
           - image: 139bercy/decp-rama
       resource_class: large
