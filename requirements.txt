@@ -11,3 +11,5 @@ tqdm
 geopy
 openpyxl
 wget
+boto3
+zipfile
