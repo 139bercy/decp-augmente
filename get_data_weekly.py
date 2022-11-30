@@ -83,7 +83,7 @@ def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
     return None
 
 def main():
-    #load_files_and_unzip(urls)
+    load_files_and_unzip(urls)
     upload_on_s3()
 
 
