@@ -186,6 +186,8 @@ workflows:
       - gestion_flux:
           context:
               - decp-augmente
+          requires:
+              - install_requirement
       - update_file:
           context:
               - decp-augmente
