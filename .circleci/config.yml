@@ -130,6 +130,10 @@ jobs:
             fi
             pwd
             ls -l
+      - save_cache:
+          key: data-output-{{ checksum "date" }}
+          paths:
+            - "decp_augmente.csv"
 
   compute-nettoyage:
     docker:
