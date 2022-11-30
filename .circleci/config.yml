@@ -207,7 +207,7 @@ jobs:
                 circleci-agent step halt
             fi
       - run:
-          name: Transfert des données vers data.economie
+          name: Transfert des données vers data.economie.gouv.fr
           command: |
             pwd
             ls -l
