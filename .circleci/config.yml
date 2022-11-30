@@ -221,14 +221,14 @@ workflows:
       - get_data_weekly
       - install_requirements
       - compute:
-          - persist_to_workspace:
-            root: .
-            paths:
-              - *
           - requires:
             - install_requirements
             - get_data_daily
             - get_data_weekly
+          - persist_to_workspace:
+              root: .
+              paths:
+                - *
       - send:
           - attach_workspace:
             at: .
