@@ -296,6 +296,8 @@ workflows:
           requires:
               - get_data_weekly_python
               - get_data_daily_python
+          context:
+              - decp-augmente
       - update_file:
           context:
               - decp-augmente
