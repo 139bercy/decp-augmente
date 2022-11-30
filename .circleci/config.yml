@@ -40,6 +40,7 @@ jobs:
         - run:
             name: Daily data Python
             command: |
+                . venv/bin/activate
                 python3 get_daily_data.py
   get_data_weekly_python:
       docker:
@@ -50,6 +51,7 @@ jobs:
         - run:
             name: Weekly data Python 
             command: |
+                . venv/bin/activate
                 python3 get_data_weekly.py
 
   compute:
@@ -122,6 +124,8 @@ workflows:
       - get_data_weekly_python:
           context:
               - decp-augmente
+          requires:
+              - install_requirements
       - compute:
           requires:
             - install_requirements
