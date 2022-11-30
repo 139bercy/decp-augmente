@@ -19,7 +19,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           paths:
             - "venv"
             - "confs/config_data.json"
