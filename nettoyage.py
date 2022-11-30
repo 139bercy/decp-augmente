@@ -17,8 +17,8 @@ pd.options.mode.chained_assignment = None  # default='warn'
 if utils.USE_S3:
     utils.download_data_nettoyage()
     res = utils.download_confs()
-if res :
-    logger.info("Chargement des fichiers confs depuis le S3")
+    if res :
+        logger.info("Chargement des fichiers confs depuis le S3")
 else:
     logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 

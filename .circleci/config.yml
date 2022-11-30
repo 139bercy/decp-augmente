@@ -124,6 +124,36 @@ jobs:
                 . venv/bin/activate
                 python3 get_data_weekly.py
 
+  gestion_flux:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies
+        - run:
+            name: Gestion des flux
+            command: |
+                . venv/bin/activate
+                python3 gestion_flux.py
+  update_file:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies
+        - run:
+          name: Upload des fichiers modifiés sur Saagie
+          command: |
+              . venv/bin/activate
+              python3 update_jobs_for_new_files.py
   compute:
     docker:
       - image: 139bercy/decp-rama
@@ -252,15 +282,17 @@ workflows:
               - decp-augmente
           requires:
               - install_requirements
+      - get_data_weekly_python:
+          context:
+              - decp-augmente
+          requires:
+              - install_requirements
       - install_requirements
-      - compute:
+      - gestion_flux:
           requires:
-            - install_requirements
-            - get_data_daily
-            - get_data_weekly
-      - send:
-          requires:
-            - compute
+              - get_data_weekly_python
+              - get_data_daily_python
+      
 
   daily-data:
     jobs:
