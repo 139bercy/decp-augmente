@@ -36,7 +36,6 @@ jobs:
             pip install pylint
             PYTHON_FILE="$(ls *.py)"
             pylint $PYTHON_FILE
-
   get_data_daily:
       docker:
         - image: 139bercy/decp-rama
@@ -65,26 +64,6 @@ jobs:
            key: data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
            paths:
              - "data"
-  get_data_daily_python:
-      docker:
-        - image: 139bercy/decp-rama
-      resource_class: large
-      steps:
-        - checkout
-        - run:
-            name: Daily data Python
-            command: |
-                python3 get_daily_data.py
-  get_data_weekly_python:
-      docker:
-          - image: 139bercy/decp-rama
-      resource_class: large
-      steps:
-        - checkout
-        - run:
-            name: Weekly data Python 
-            command: |
-                python3 get_data_weekly.py
 
   get_data_weekly:
      docker:
@@ -114,7 +93,26 @@ jobs:
           key: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
           paths:
             - "data"
-
+  get_data_daily_python:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - run:
+            name: Daily data Python
+            command: |
+                python3 get_daily_data.py
+get_data_weekly_python:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - run:
+            name: Weekly data Python 
+            command: |
+                python3 get_data_weekly.py
   compute:
     docker:
       - image: 139bercy/decp-rama
@@ -139,7 +137,11 @@ jobs:
           command: |
             . venv/bin/activate
             mkdir cache
-            python main.py
+            if [ "$CIRCLE_BRANCH" == "master" ]; then
+              python3 main.py
+            else
+              python3 main.py -t True
+            fi
       - store_artifacts:
           path: decp_augmente.log
       - save_cache:
@@ -147,6 +149,66 @@ jobs:
          paths:
            - "decp_nettoye.csv"
            - "decp_augmente.csv"
+
+  compute-nettoyage:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies
+      - run: date +%F > date
+      - run: date +%G-%V > date-weekly
+      - restore_cache:
+          keys:
+            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+      - restore_cache:
+          keys:
+            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+      - run:
+          name: Traitement des données
+          no_output_timeout: 2h
+          command: |
+            . venv/bin/activate
+            mkdir cache
+            python nettoyage.py
+      - store_artifacts:
+          path: decp_augmente.log
+      - save_cache:
+          key: cleaned-out-{{ .Branch }}-{{ checksum "date" }}
+          paths:
+            - "df_nettoye"
+
+  compute-enrichissement:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies
+      - run: date +%F > date
+      - run: date +%G-%V > date-weekly
+      - restore_cache:
+          keys:
+            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+      - restore_cache:
+          keys:
+            - cleaned-out-{{ .Branch }}-{{ checksum "date" }}
+      - run:
+          name: Traitement des données
+          no_output_timeout: 2h
+          command: |
+            . venv/bin/activate
+            mkdir cache
+            python enrichissement.py
+      - store_artifacts:
+          path: decp_augmente.log
 
   send:
     docker:
@@ -161,32 +223,20 @@ jobs:
       - run:
           name: Condition pour les branches
           command: |
-            if [ "$CIRCLE_BRANCH" != "master"] || ["$CIRCLE_BRANCH"  != "v2_augmente_fix"]; then
-                if [ $(git log -1 | grep "\[send\]" | wc -l) = 0 ]; then
-                  circleci-agent step halt
-                fi
+            if [ "$CIRCLE_BRANCH" != "master" ]; then
+                circleci-agent step halt
             fi
       - run:
           name: Transfert des données vers data.economie
           command: |
-            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
-
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente.csv ; quit"
 workflows:
   version: 2
   main:
     jobs:
-      - install_requirements
-      - get_data_daily_python:
-          context:
-              - decp-augmente
-          requires:
-              - install_requirements
-      - get_data_weekly_python:
-          context:
-              - decp-augmente
-          requires:
-              - install_requirements
+      - get_data_daily
       - get_data_weekly
+      - install_requirements
       - compute:
           requires:
             - install_requirements
@@ -195,7 +245,18 @@ workflows:
       - send:
           requires:
             - compute
-
+  - get_data_daily_python:
+    context:
+        - decp-augmente
+    requires:
+        - install_requirements
+- get_data_weekly_python:
+    context:
+        - decp-augmente
+    requires:
+        - install_requirements
+  
+  
   daily-data:
     jobs:
       - get_data_daily
@@ -217,18 +278,29 @@ workflows:
               only:
                 - master
 
-  daily-prod:
+  daily-prod-nettoyage:
     jobs:
       - install_requirements
-      - compute:
+      - compute-nettoyage:
           requires:
             - install_requirements
-      - send:
-          requires:
-            - compute
     triggers:
       - schedule:
           cron: 0 6 * * 2-6
+          filters:
+            branches:
+              only:
+                - master
+
+  daily-prod-enrichissement:
+    jobs:
+      - compute-enrichissement
+      - send:
+          requires:
+            - compute-enrichissement
+    triggers:
+      - schedule:
+          cron: 5 7 * * 2-6
           filters:
             branches:
               only:
