@@ -118,6 +118,10 @@ jobs:
       resource_class: large
       steps:
         - checkout
+        - restore_cache:
+            keys:
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies
         - run:
             name: Weekly data Python 
             command: |
@@ -292,6 +296,11 @@ workflows:
           requires:
               - get_data_weekly_python
               - get_data_daily_python
+      - update_file:
+          context:
+              - decp-augmente
+          requires:
+              - gestion_flux
       
 
   daily-data:
