@@ -104,9 +104,9 @@ jobs:
       steps:
         - checkout
         - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
+            keys:
+              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+              - dependencies
         - run:
             name: Daily data Python
             command: |
