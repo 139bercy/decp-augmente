@@ -123,11 +123,13 @@ jobs:
           command: |
             . venv/bin/activate
             mkdir cache
-            if [ "$CIRCLE_BRANCH" == "fix_path_in_circleci" ]; then
+            if [ "$CIRCLE_BRANCH" == "master" ]; then
               python3 main.py
             else
               python3 main.py -t True
             fi
+            pwd
+            ls -l
 
   compute-nettoyage:
     docker:
