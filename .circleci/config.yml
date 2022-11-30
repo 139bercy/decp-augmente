@@ -232,7 +232,8 @@ workflows:
 
   daily-prod-enrichissement:
     jobs:
-
+      - send:
+          
     triggers:
       - schedule:
           cron: 5 7 * * 2-6
