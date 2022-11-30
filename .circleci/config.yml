@@ -11,7 +11,6 @@ jobs:
           keys:
             - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
             - dependencies-master-{{ checksum "requirements.txt"}}
-      - run: cp confs/config-circleci.json confs/config_data.json
       - run:
           name: Installation des requirements
           command: |
@@ -158,102 +157,6 @@ jobs:
           command: |
               . venv/bin/activate
               python3 update_jobs_for_new_files.py
-  compute:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            if [ "$CIRCLE_BRANCH" == "master" ]; then
-              python3 main.py
-            else
-              python3 main.py -t True
-            fi
-      - store_artifacts:
-          path: decp_augmente.log
-      - save_cache:
-         key: data-out-{{ .Branch }}-{{ checksum "date" }}
-         paths:
-           - "decp_nettoye.csv"
-           - "decp_augmente.csv"
-
-  compute-nettoyage:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            python nettoyage.py
-      - store_artifacts:
-          path: decp_augmente.log
-      - save_cache:
-          key: cleaned-out-{{ .Branch }}-{{ checksum "date" }}
-          paths:
-            - "df_nettoye"
-
-  compute-enrichissement:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - restore_cache:
-          keys:
-            - cleaned-out-{{ .Branch }}-{{ checksum "date" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            python enrichissement.py
-      - store_artifacts:
-          path: decp_augmente.log
 
   send:
     docker:
@@ -281,16 +184,6 @@ workflows:
     jobs:
       - get_data_daily
       - get_data_weekly
-      - get_data_daily_python:
-          context:
-              - decp-augmente
-          requires:
-              - install_requirements
-      - get_data_weekly_python:
-          context:
-              - decp-augmente
-          requires:
-              - install_requirements
       - install_requirements
       - gestion_flux:
           requires:
