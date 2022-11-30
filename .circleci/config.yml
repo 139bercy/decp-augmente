@@ -130,71 +130,10 @@ jobs:
             fi
       - store_artifacts:
           path: decp_augmente.log
-      - save_cache:
-         key: data-out-{{ .Branch }}-{{ checksum "date" }}
-         paths:
-           - "decp_nettoye.csv"
-           - "decp_augmente.csv"
-
-  compute-nettoyage:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            python nettoyage.py
-      - store_artifacts:
-          path: decp_augmente.log
-      - save_cache:
-          key: cleaned-out-{{ .Branch }}-{{ checksum "date" }}
+      - persist_to_workspace:
+          root: ~/project
           paths:
-            - "df_nettoye"
-
-  compute-enrichissement:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - restore_cache:
-          keys:
-            - cleaned-out-{{ .Branch }}-{{ checksum "date" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            python enrichissement.py
-      - store_artifacts:
-          path: decp_augmente.log
+            - "decp_augmente.csv"
 
   send:
     docker:
@@ -202,6 +141,8 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - attach_workspace:
+          at: ~/project
       - run: date +%F > date
       - restore_cache:
           keys:
@@ -209,6 +150,8 @@ jobs:
       - run:
           name: Condition pour les branches
           command: |
+            pwd
+            ls -l
             if [ "$CIRCLE_BRANCH" != "master" ]; then
                 circleci-agent step halt
             fi
@@ -221,14 +164,10 @@ workflows:
   version: 2
   main:
     jobs:
-      - get_data_daily
-      - get_data_weekly
       - install_requirements
       - compute:
           requires:
             - install_requirements
-            - get_data_daily
-            - get_data_weekly
       - send:
           requires:
             - compute
@@ -254,29 +193,22 @@ workflows:
               only:
                 - master
 
-  daily-prod-nettoyage:
+  daily-compute:
     jobs:
+      - get_data_daily
+      - get_data_weekly
       - install_requirements
-      - compute-nettoyage:
+      - compute:
           requires:
             - install_requirements
-    triggers:
-      - schedule:
-          cron: 0 6 * * 2-6
-          filters:
-            branches:
-              only:
-                - master
-
-  daily-prod-enrichissement:
-    jobs:
-      - compute-enrichissement
+            - get_data_daily
+            - get_data_weekly
       - send:
           requires:
-            - compute-enrichissement
+            - compute
     triggers:
       - schedule:
-          cron: 5 7 * * 2-6
+          cron: 0 7 * * 2-6
           filters:
             branches:
               only:
