@@ -198,6 +198,9 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - dependencies
       - run: date +%F > date
       - run:
           name: Condition pour les branches
