@@ -228,13 +228,13 @@ workflows:
       - get_data_weekly
       - install_requirements
       - compute:
-          - requires:
-            - install_requirements
-            - get_data_daily
-            - get_data_weekly
+        - requires:
+          - install_requirements
+          - get_data_daily
+          - get_data_weekly
       - send:
-          - requires:
-            - compute
+        - requires:
+          - compute
 
   daily-data:
     jobs:
