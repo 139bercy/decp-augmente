@@ -200,9 +200,9 @@ jobs:
       - image: 139bercy/decp-rama
     resource_class: large
     steps:
+      - checkout
       - attach_workspace:
           at: ~/project
-      - checkout
       - run: date +%F > date
       - restore_cache:
           keys:
