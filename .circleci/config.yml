@@ -182,8 +182,6 @@ workflows:
   version: 2
   main:
     jobs:
-      - get_data_daily_pytho
-      - get_data_weekly
       - install_requirements
       - gestion_flux:
           context:
