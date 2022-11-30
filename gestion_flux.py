@@ -34,7 +34,7 @@ path_to_data = conf_data["path_to_data"]
 decp_file_name = conf_data["decp_file_name"]
 
 def main():
-    check_reference_files()
+    #check_reference_files()
     decp_path = os.path.join(path_to_data, decp_file_name)
     if utils.USE_S3: 
         utils.download_file(decp_path, decp_path)

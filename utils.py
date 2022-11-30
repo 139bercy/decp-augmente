@@ -27,8 +27,6 @@ s3 = boto3.resource('s3',
                 aws_secret_access_key=SECRET_KEY, 
                 region_name="eu-west-3"
                 )
-print('ACCES KEY ', ACCESS_KEY[0:2])
-print('SECRET KET ', SECRET_KEY[0:2])
 
 def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_bases = ["departements-francais", "region-fr"]):
     """
