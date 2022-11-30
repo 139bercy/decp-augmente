@@ -222,9 +222,6 @@ workflows:
   daily-prod-nettoyage:
     jobs:
       - install_requirements
-      - compute-nettoyage:
-          requires:
-            - install_requirements
     triggers:
       - schedule:
           cron: 0 6 * * 2-6
@@ -235,10 +232,7 @@ workflows:
 
   daily-prod-enrichissement:
     jobs:
-      - compute-enrichissement
-      - send:
-          requires:
-            - compute-enrichissement
+
     triggers:
       - schedule:
           cron: 5 7 * * 2-6
