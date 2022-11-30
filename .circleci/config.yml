@@ -7,18 +7,12 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: cp confs/config-circleci.json confs/config_data.json
       - run:
           name: Installation des requirements
           command: |
             python3 -m venv venv
             . venv/bin/activate
             pip install -r requirements.txt
-      - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-          paths:
-            - "venv"
-            - "confs/config_data.json"
 
   linter:
     docker:
