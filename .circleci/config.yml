@@ -14,7 +14,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+          key: dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
           paths:
             - "venv"
 
@@ -26,7 +26,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
       - run:
           name: Linter
           command: |
@@ -99,8 +99,8 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
-              - dependencies
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
         - run:
             name: Daily data Python
             command: |
@@ -114,8 +114,8 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
-              - dependencies
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
         - run:
             name: Weekly data Python 
             command: |
@@ -130,8 +130,8 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
-              - dependencies
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
         - run:
             name: Gestion des flux
             command: |
@@ -145,8 +145,8 @@ jobs:
         - checkout
         - restore_cache:
             keys:
-              - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
-              - dependencies
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
         - run:
           name: Upload des fichiers modifiés sur Saagie
           command: |
