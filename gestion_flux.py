@@ -188,10 +188,11 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traitées.
     """
     path_to_hash_cache = os.path.join(path_to_data, path_to_hash_pickle)
+    print(f"Chargement des hash keys {path_to_hash_cache}")
     if utils.USE_S3:
         hash_processed = utils.get_object_content(path_to_hash_cache)
         if hash_processed is None: # Equivalent à si le chemin en local n'est pas trouvé
-            print("Pas de cache trouvé")
+            print("Pas de cache trouvé S3")
             return df, pd.DataFrame()
 
     exists_path = os.path.isfile(path_to_hash_cache)
@@ -200,7 +201,7 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
             hash_processed = pickle.load(file_hash_modif)
     
     else:
-        print("Pas de cache trouvé")
+        print("Pas de cache trouvé local")
         return df, pd.DataFrame()
     mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
 
