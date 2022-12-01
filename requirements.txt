@@ -13,3 +13,4 @@ openpyxl
 wget
 GitPython
 boto3
+saagieapi
