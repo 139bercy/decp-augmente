@@ -160,10 +160,11 @@ def get_object_content(file_name_s3: str):
         else :
             print(f"L'objet {file_name_s3} existe mais il y a un problème")
             return None
-    object_content = object.get()['Body'].read().decode('utf-8')
     if file_name_s3.endswith("json"):
+        object_content = object.get()['Body'].read().decode('utf-8')
         return json.loads(object_content)
     if file_name_s3.endswith("pkl"):
+        object_content = object.get()['Body'].read()
         return pickle.loads(object_content)
     else :
         print(f"{file_name_s3} n'est ni un pickle ni un Python")
