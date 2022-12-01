@@ -30,7 +30,7 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-path_to_data = conf_data["path_to_data"]
+path_to_data = conf_data["path_to_data"] + "/"
 decp_file_name = conf_data["decp_file_name"]
 
 def main():

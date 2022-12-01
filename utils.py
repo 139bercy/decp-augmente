@@ -62,7 +62,7 @@ def download_data_enrichissement():
 
     return True
 def download_datas():
-    data_path = "data"
+    data_path = "data/"
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=data_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")
@@ -71,7 +71,7 @@ def download_datas():
     return True
 
 def download_confs():
-    conf_path = "confs"
+    conf_path = "confs/"
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=conf_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")
