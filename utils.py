@@ -115,7 +115,7 @@ def write_object_file_on_s3(file_name: str, object_to_pickle):
     pickle_byte_obj = pickle.dumps(object_to_pickle)
     response = object.put(Body=pickle_byte_obj)
     if response['ResponseMetadata']['HTTPStatusCode'] == 200:
-        print(f"Objet uploadé sur le Bucket S3")
+        print(f"Objet {file_name} uploadé sur le Bucket S3")
         return True
     else:
         print(f" ERROR Objet n'est PAS upload sur le Bucket S3")
@@ -143,3 +143,18 @@ def download_file(file_name_s3: str, file_name_local:str):
         return json_content
     else : 
         bucket.download_file(file_name_s3, file_name_local)
+
+def get_object_content(file_name_s3: str):
+    """
+    Cette fonction retourne le contenu de l'objet correspondant sur S3    
+    """
+    bucket = s3.Bucket(BUCKET_NAME)
+    content_object = s3.Object(BUCKET_NAME, file_name_s3)
+    file_content = content_object.get()['Body'].read().decode('utf-8')
+    if file_name_s3.endswith("json"):
+        return json.loads(file_content)
+    if file_name_s3.endswith("pkl"):
+        return pickle.loads(file_content)
+    else :
+        print(f"{file_name_s3} n'est ni un pickle ni un Python")
+        return None

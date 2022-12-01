@@ -38,8 +38,7 @@ decp_file_name = conf_data["decp_file_name"]
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
     if utils.USE_S3: 
-        data = utils.download_file(decp_path, decp_path)
-        print(len(data['marches']))
+        data = utils.get_object_content(decp_path)
     else : 
         check_reference_files()
         logger.info("Ouverture du fichier decp.json d'aujourd'hui")
@@ -59,7 +58,7 @@ def main():
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,conf_data["hash_modifications"])
     #Sauvegarde clef de hache sur le S3
     path_cache_modifications = os.path.join(path_to_data, conf_data["hash_modifications"])
-    resp = utils.write_cache_on_s3(path_cache_modifications, df_modif.hash_key)
+    resp = utils.write_object_file_on_s3(path_cache_modifications, df_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_modifications, "wb") as f:
         pickle.dump(df_modif.hash_key, f)
@@ -70,7 +69,7 @@ def main():
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, conf_data["hash_no_modifications"])
     #Sauvegarde clef de hache sur le S3
     path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"])
-    resp = utils.write_cache_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
+    resp = utils.write_object_file_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_no_modifications, "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
@@ -177,7 +176,6 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
 def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash_column="hash_key"):
     """
     Cette fonction permet de différencier les nouvelles lignes en comparant les clefs de hash calculées pour le decp actuellement récupéré avec les clefs de hash déjà en mémoire.
-    Elle ré-écrit également le cache de mémoire avec l'ensemble des clefs (anciennes+nouvelles).
 
     Arguments
     ----------
@@ -188,15 +186,23 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traitées.
     """
     path_to_hash_cache = os.path.join(path_to_data, path_to_hash_pickle)
+    if utils.USE_S3:
+        hash_processed = utils.get_object_content(path_to_hash_cache)
+        if hash_processed is None: # Equivalent à si le chemin en local n'est pas trouvé
+            print("Pas de cache trouvé")
+            return df, pd.DataFrame()
+
     exists_path = os.path.isfile(path_to_hash_cache)
-    if exists_path : 
+    if exists_path :
         with open(path_to_hash_cache, "rb") as file_hash_modif:
             hash_processed = pickle.load(file_hash_modif)
-        mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
-
-        return df[~mask_hash_to_process], df[mask_hash_to_process]
+    
     else:
+        print("Pas de cache trouvé")
         return df, pd.DataFrame()
+    mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
+
+    return df[~mask_hash_to_process], df[mask_hash_to_process]
 
 def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
     """
