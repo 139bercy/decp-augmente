@@ -37,7 +37,7 @@ def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
     if utils.USE_S3: 
         decp_path = "data/decp.json" # test
-        utils.download_file(decp_path, decp_path)
+        #utils.download_file(decp_path, decp_path)
         data = utils.download_file2(decp_path)
     check_reference_files()
     logger.info("Ouverture du fichier decp.json d'aujourd'hui")
