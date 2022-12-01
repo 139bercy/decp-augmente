@@ -123,8 +123,7 @@ def write_object_file_on_s3(file_name: str, object_to_pickle):
 
 
 
-
-def download_file(file_name_s3: str, file_name_local: str):
+def download_file(file_name_s3: str, file_name_local:str):
     """
     Cette fonction charge un fichiers de s3.
 
@@ -133,27 +132,14 @@ def download_file(file_name_s3: str, file_name_local: str):
     (file_name_s3) Le nom du fichier à traiter sur s3
     (file_name_local) Le nom à donner au fichier en local
     """
-    print(f"{file_name_s3} Va etre téléchargé")
-    print(f"file_name_s3 {file_name_s3} file loca {file_name_local}")
     bucket = s3.Bucket(BUCKET_NAME)
-    for obj in bucket.objects.filter(Prefix=file_name_s3):
-        bucket.download_file(file_name_s3, file_name_local)
-    print(f"{file_name_s3} est téléchargé")
-    return None
-
-def download_file2(file_name_s3: str):
-    """
-    Cette fonction charge un fichiers de s3.
-
-    Arguments
-    -------------
-    (file_name_s3) Le nom du fichier à traiter sur s3
-    (file_name_local) Le nom à donner au fichier en local
-    """
-    if file_name_s3.endswith(".json"):
+    if file_name_s3.endswith(".json"): # Dans le cas de decp_json notamment
+        # Pourquoi fait-on ça plutôt qu'un download_file ? Lors d'un gros download de fichiers, boto3 télécharge par paquet
+        # ce  qui créé des fichiers temporaires et pose problème lors du téléchargement. Pour mieux comprendre, je vous invite à tester 
+        # les deux émthodes avec decp.json
         content_object = s3.Object(BUCKET_NAME, file_name_s3)
         file_content = content_object.get()['Body'].read().decode('utf-8')
-    json_content = json.loads(file_content)
-    
-    return json_content
-
+        json_content = json.loads(file_content)
+        return json_content
+    else : 
+        bucket.download_file(file_name_s3, file_name_local)
