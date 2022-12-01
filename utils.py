@@ -2,6 +2,7 @@ import os
 import boto3
 import json
 import pickle
+import botocore
 
 
 local_credentials="saagie_cred.json"
@@ -149,12 +150,21 @@ def get_object_content(file_name_s3: str):
     Cette fonction retourne le contenu de l'objet correspondant sur S3    
     """
     bucket = s3.Bucket(BUCKET_NAME)
-    content_object = s3.Object(BUCKET_NAME, file_name_s3)
-    file_content = content_object.get()['Body'].read().decode('utf-8')
+    object = s3.Object(BUCKET_NAME, file_name_s3)
+    try:
+        object.load()
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            print(f"L'objet {file_name_s3} recherché n'existe pas")
+            return None
+        else :
+            print(f"L'objet {file_name_s3} existe mais il y a un problème")
+            return None
+    object_content = object.get()['Body'].read().decode('utf-8')
     if file_name_s3.endswith("json"):
-        return json.loads(file_content)
+        return json.loads(object_content)
     if file_name_s3.endswith("pkl"):
-        return pickle.loads(file_content)
+        return pickle.loads(object_content)
     else :
         print(f"{file_name_s3} n'est ni un pickle ni un Python")
         return None

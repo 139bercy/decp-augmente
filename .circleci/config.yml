@@ -151,8 +151,8 @@ jobs:
               - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
               - dependencies2
         - run:
-          name: Upload des fichiers modifiés sur Saagie
-          command: |
+            name: Upload des fichiers modifiés sur Saagie
+            command: |
               . venv/bin/activate
               python3 update_jobs_for_new_files.py
 
