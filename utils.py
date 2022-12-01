@@ -141,7 +141,7 @@ def download_file(file_name_s3: str, file_name_local: str):
     print(f"{file_name_s3} est téléchargé")
     return None
 
-def download_file2(file_name_s3: str, file_name_local: str):
+def download_file2(file_name_s3: str):
     """
     Cette fonction charge un fichiers de s3.
 
