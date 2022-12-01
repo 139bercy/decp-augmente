@@ -137,7 +137,7 @@ def download_file(file_name_s3: str, file_name_local: str):
     print(f"file_name_s3 {file_name_s3} file loca {file_name_local}")
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=file_name_s3):
-        obj.download_file(file_name_local)
+        bucket.download_file(file_name_local)
     print(f"{file_name_s3} est téléchargé")
     return None
 
