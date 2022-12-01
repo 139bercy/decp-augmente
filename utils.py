@@ -141,4 +141,19 @@ def download_file(file_name_s3: str, file_name_local: str):
     print(f"{file_name_s3} est téléchargé")
     return None
 
+def download_file2(file_name_s3: str, file_name_local: str):
+    """
+    Cette fonction charge un fichiers de s3.
+
+    Arguments
+    -------------
+    (file_name_s3) Le nom du fichier à traiter sur s3
+    (file_name_local) Le nom à donner au fichier en local
+    """
+    if file_name_s3.endswith(".json"):
+        content_object = s3.Object(BUCKET_NAME, file_name_s3)
+        file_content = content_object.get()['Body'].read().decode('utf-8')
+    json_content = json.loads(file_content)
+    
+    return json_content
 
