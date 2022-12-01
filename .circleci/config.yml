@@ -155,7 +155,7 @@ jobs:
             command: |
               . venv/bin/activate
               python3 update_jobs_for_new_files.py
-  nettoyage:
+  nettoyage_flux:
       docker:
           - image: 139bercy/decp-rama
       resource_class: large
