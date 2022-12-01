@@ -34,10 +34,10 @@ path_to_data = conf_data["path_to_data"]
 decp_file_name = conf_data["decp_file_name"]
 
 def main():
-    check_reference_files()
     decp_path = os.path.join(path_to_data, decp_file_name)
     if utils.USE_S3: 
         utils.download_file(decp_path, decp_path)
+    check_reference_files()
     logger.info("Ouverture du fichier decp.json d'aujourd'hui")
     with open(decp_file_name, encoding='utf-8') as json_data:
         data = json.load(json_data)
