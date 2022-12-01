@@ -39,19 +39,21 @@ def main():
 
     # Chargement du fichier flux
     logger.info("Récupération du flux")
-    flux_file = "df_flux"
+    flux_file = "df_flux.pkl"
+    print(utils.USE_S3)
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        utils.download_file(flux_file, flux_file)
-    
-    with open(flux_file, "rb") as flux_file:
-        df_flux = pickle.load(flux_file)
+        df_flux = utils.get_object_content(flux_file)
+    else : 
+        print('Chargement en local')
+        with open(flux_file, "rb") as flux_file:
+            df_flux = pickle.load(flux_file)
     # SI il n'y a pas d'ajout de données.
     if df_flux.empty :
         if utils.USE_S3:
-            utils.write_object_file_on_s3("df_nettoye", df_flux)
+            utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
         else : 
-            with open('df_nettoye', 'wb') as df_nettoye:
+            with open('df_nettoye.pkl', 'wb') as df_nettoye:
                 # Export présent pour faciliter l'utilisation du module enrichissement.py
                 pickle.dump(df_flux, df_nettoye)
         logger.info("Flux vide")
@@ -97,9 +99,9 @@ def main():
 
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     if utils.USE_S3 : 
-        utils.write_object_file_on_s3("df_nettoye", df_flux)
+        utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
     else:
-        with open('df_nettoye', 'wb') as df_nettoye:
+        with open('df_nettoye.pkl', 'wb') as df_nettoye:
             # Export présent pour faciliter l'utilisation du module enrichissement.py
             pickle.dump(df, df_nettoye)
     df.to_csv("decp_nettoye.csv")

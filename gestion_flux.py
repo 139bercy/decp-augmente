@@ -84,9 +84,9 @@ def main():
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
-    resp = utils.write_object_file_on_s3("df_flux", df_to_process)
+    resp = utils.write_object_file_on_s3("df_flux.pkl", df_to_process)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
-    with open("df_flux", "wb") as file:
+    with open("df_flux.pkl", "wb") as file:
         pickle.dump(df_to_process, file)
     return None
 
