@@ -39,10 +39,12 @@ def main():
         decp_path = "data/decp.json" # test
         #utils.download_file(decp_path, decp_path)
         data = utils.download_file2(decp_path)
-    check_reference_files()
-    logger.info("Ouverture du fichier decp.json d'aujourd'hui")
-    with open(decp_file_name, encoding='utf-8') as json_data:
-        data = json.load(json_data)
+        print(len(data['marches']))
+    else : 
+        check_reference_files()
+        logger.info("Ouverture du fichier decp.json d'aujourd'hui")
+        with open(decp_file_name, encoding='utf-8') as json_data:
+            data = json.load(json_data)
     
     df_decp = json_normalize(data['marches'])
     print('original', df_decp.shape)

@@ -7,6 +7,9 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
       - run:
           name: Installation des requirements
           command: |
