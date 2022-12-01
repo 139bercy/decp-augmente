@@ -134,8 +134,10 @@ def download_file(file_name_s3: str, file_name_local: str):
     (file_name_local) Le nom à donner au fichier en local
     """
     print(f"{file_name_s3} Va etre téléchargé")
+    print(f"file_name_s3 {file_name_s3} file loca {file_name_local}")
     bucket = s3.Bucket(BUCKET_NAME)
     bucket.download_file(file_name_s3, file_name_local)
+    print(f"{file_name_s3} est téléchargé")
     return None
 
 
