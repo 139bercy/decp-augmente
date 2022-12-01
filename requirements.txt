@@ -11,4 +11,5 @@ tqdm
 geopy
 openpyxl
 wget
+git
 boto3

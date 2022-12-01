@@ -22,7 +22,7 @@ else :  # Sur la CI ou Saagie
 PROJECT_NAME = "BercyHub - OpenData"
 BUCKET_NAME = "bercy"
 USE_S3 = os.environ.get("USE_S3") # Boolean pour savoir si l'on va utiliser S3 ou non.
-
+USE_S3 = True
 s3 = boto3.resource('s3', 
                 aws_access_key_id=ACCESS_KEY, 
                 aws_secret_access_key=SECRET_KEY, 
