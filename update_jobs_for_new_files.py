@@ -67,31 +67,31 @@ def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_uti
 
     for file in modified_files:
         file_name = file[:-3]
-        print(f"Traitement du fichier {file_name}")
-        try:
-            id_job = saagieapi.jobs.get_id(project_name=PROJECT_NAME, job_name=str(file_name))
-            print(f"Un jobs {file_name} a été trouvé, son id est le {id_job}. On le met à jour.")
-
-            # Par sécurité, tous les jobs seront upgradés avec le fichier de requirements correspondant au job.
-            zipObj = ZipFile(f"{file_name}.zip", "w")
-            zipObj.write(file)
-            zipObj.write("requirements.txt")
-            if file in files_to_zip_with_utils:
-                zipObj.write('utils.py')
-            zipObj.close()
-            saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"python {file_name}.py")
-        except :
-            print(f"Il n'existe pas de jobs {file_name}. On le créé avec les paramètres par défaut.")
-            id_projet = saagieapi.projects.get_id(PROJECT_NAME)
-            zipObj = ZipFile(f"{file_name}.zip", "w")
-            zipObj.write(file)
-            zipObj.write("requirements.txt")
-            zipObj.close()
-            saagieapi.jobs.create(job_name=str(file_name), file=f"{file_name}.zip", command_line=f"python {file_name}.py", project_id=id_projet,
-            category='Extraction',
-            technology='python',# technology id corresponding to your context.id in your technology catalog definition
-            technology_catalog='Saagie',
-            runtime_version='3.9')
+        if len(file_name) != 0: 
+            print(f"Traitement du fichier {file_name}")
+            try:
+                id_job = saagieapi.jobs.get_id(project_name=PROJECT_NAME, job_name=str(file_name))
+                print(f"Un jobs {file_name} a été trouvé, son id est le {id_job}. On le met à jour.")
+                # Par sécurité, tous les jobs seront upgradés avec le fichier de requirements correspondant au job.
+                zipObj = ZipFile(f"{file_name}.zip", "w")
+                zipObj.write(file)
+                zipObj.write("requirements.txt")
+                if file in files_to_zip_with_utils:
+                    zipObj.write('utils.py')
+                zipObj.close()
+                saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"python {file_name}.py")
+            except :
+                print(f"Il n'existe pas de jobs {file_name}. On le créé avec les paramètres par défaut.")
+                id_projet = saagieapi.projects.get_id(PROJECT_NAME)
+                zipObj = ZipFile(f"{file_name}.zip", "w")
+                zipObj.write(file)
+                zipObj.write("requirements.txt")
+                zipObj.close()
+                saagieapi.jobs.create(job_name=str(file_name), file=f"{file_name}.zip", command_line=f"python {file_name}.py", project_id=id_projet,
+                category='Extraction',
+                technology='python',# technology id corresponding to your context.id in your technology catalog definition
+                technology_catalog='Saagie',
+                runtime_version='3.9')
     print('Actualisation du dernier commit traité')
     id_commit = REPO.head.commit
     result = object.put(Body=str(id_commit))
