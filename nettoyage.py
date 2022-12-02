@@ -667,6 +667,7 @@ def recuperation_colonne_a_modifier() -> dict:
         colonne_to_modify[key] = value
 
     colonne_to_modify["objetModification"] = "objetModification" # Cette colonne est un cas particulier.
+    print(colonne_to_modify)
     # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
     # Le mapping suivra la forme "xxxModification" : "xxx".
     # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.
@@ -806,10 +807,11 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         marche_init["idtech"] = marche.iloc[-1].id_technique
         marches_init.append(marche_init)
-    df_to_concatene = pd.concat([x for x in marches_init], copy=False)
-    df.update(df_to_concatene)
-    df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
-    df = fusion_source_modification_whole_dataset(df, dict_modification)
+    if marches_init :  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
+        df_to_concatene = pd.concat([x for x in marches_init], copy=False)
+        df.update(df_to_concatene)
+        df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
+        df = fusion_source_modification_whole_dataset(df, dict_modification)
     return df
 
 
