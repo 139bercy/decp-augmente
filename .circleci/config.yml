@@ -183,7 +183,7 @@ jobs:
               - dependencies2
         - run:
             name: Enrichissement flux
-            no_output_timeout: 40mn
+            no_output_timeout: 40m
             command: |
                 . venv/bin/activate
                 python3 enrichissement.py
