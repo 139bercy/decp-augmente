@@ -45,7 +45,7 @@ def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_ba
     path_data = "data"
     for base in useful_bases :
         path_base_to_download = json_content[base]
-        bucket.download_file(os.path.join(path_data, path_base_to_download), os.path.join(path_data, path_base_to_download))
+        bucket.download_file(os.path.join(path_data, path_base_to_download), path_base_to_download)
         print(f"{base} est téléchargé.")
 
     return True
