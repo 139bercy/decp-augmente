@@ -33,7 +33,9 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 
 path_to_data = conf_data["path_to_data"]
 decp_file_name = conf_data["decp_file_name"]
-
+path_to_data = conf_data["path_to_data"]
+if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
+    os.mkdir(path_to_data)
 
 def main():
 
