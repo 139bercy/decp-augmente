@@ -46,6 +46,7 @@ def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_ba
     for base in useful_bases :
         path_base_to_download = json_content[base]
         bucket.download_file(os.path.join(path_data, path_base_to_download), path_base_to_download)
+        print(os.listdir())
         os.replace(path_base_to_download , os.path.join(path_data, path_base_to_download))
         # /!\ Ne pas modifier le téléchargement à la racine puis le déplacement du fichier, sinon S3 créé des temp files qui bug le téléchargement.
         print(f"{base} est téléchargé.")
