@@ -38,7 +38,7 @@ decp_file_name = conf_data["decp_file_name"]
 def main():
 
     decp_augmente_file = "decp_augmente.csv"
-    nettoye_file = "df_nettoye"
+    nettoye_file = "df_nettoye.pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
         utils.download_file(nettoye_file, nettoye_file)
@@ -51,7 +51,8 @@ def main():
         logger.info("Flux vide")
         df.to_csv(decp_augmente_file, quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if utils.USE_S3:
-            utils.write_object_file_on_s3(decp_augmente_file, decp_augmente_file)
+            #utils.write_object_file_on_s3(decp_augmente_file, decp_augmente_file)
+            pass
         if conf_debug["debug"]:
             with open('df_agumente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -82,7 +83,7 @@ def main():
         utils.write_object_file_on_s3(decp_augmente_file, decp_augmente_file)
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
-        with open('df_new_augmente_flux_apres_smalljson_repetition', 'wb') as df_augmente:
+        with open('df_augmente_debug', 'wb') as df_augmente:
             # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
@@ -379,7 +380,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         need_refresh_cache = not(series_siret_acheteur_not_in_cache.empty)
         if need_refresh_cache : 
             logger.info("Enrichissement type entreprise: Besoin d'actualiser cache pour les acheteurs")
-            dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(series_siret_acheteur_not_in_cache, path, dfcache_acheteur)
+            dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(series_siret_acheteur_not_in_cache, path, dfcache_acheteur,  columns=usecols, dtypes=dtype)
 
             list_siret_acheteur_not_found += series_siren_acheteur_valid_but_not_found_in_bdd.tolist()
         # Actualise les caches

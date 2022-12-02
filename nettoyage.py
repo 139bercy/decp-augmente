@@ -42,7 +42,6 @@ def main():
     # Chargement du fichier flux
     logger.info("Récupération du flux")
     flux_file = "df_flux.pkl"
-    print(utils.USE_S3)
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
         df_flux = utils.get_object_content(flux_file)
@@ -52,6 +51,7 @@ def main():
             df_flux = pickle.load(flux_file)
     # SI il n'y a pas d'ajout de données.
     if df_flux.empty :
+        print('Flux vide')
         if utils.USE_S3:
             utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
         else : 
@@ -98,10 +98,10 @@ def main():
           .pipe(replace_char)
           )
     logger.info("Fin du traitement")
-
+    print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     if utils.USE_S3 : 
-        utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
+        utils.write_object_file_on_s3("df_nettoye.pkl", df)
     else:
         with open('df_nettoye.pkl', 'wb') as df_nettoye:
             # Export présent pour faciliter l'utilisation du module enrichissement.py
@@ -812,6 +812,8 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         df.update(df_to_concatene)
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
         df = fusion_source_modification_whole_dataset(df, dict_modification)
+    else: # Pour que la colonne idMarche existe quand même.
+        df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique) 
     return df
 
 

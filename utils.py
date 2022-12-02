@@ -60,18 +60,33 @@ def download_data_enrichissement():
 
     """
     download_datas() # Toutes les bases présentes dans data/ sont utiles. Data comporte égale le cache du df d'un traitement de flux à l'autre.
-
-     # les caches également
-
-
+    download_cache() # les caches également
 
     return True
+
+def download_cache():
+    print('Download du cache')
+    cache_path = "cache"
+    bucket = s3.Bucket(BUCKET_NAME)
+    for obj in bucket.objects.filter(Prefix=cache_path):
+        print(f"{obj.key} , {str(obj.key)} va se télécharger")
+        path, filename = os.path.split(obj.key)
+        if not(os.path.exists(cache_path)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
+            os.mkdir(cache_path)
+        bucket.download_file(obj.key, filename)
+        os.replace(filename , os.path.join(cache_path, filename))
+        print(f"{obj.key} , {str(obj.key)} est téléchargé")
+    pass
 def download_datas():
-    data_path = "data/"
+    data_path = "data"
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=data_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")
-        bucket.download_file(obj.key, str(obj.key))
+        path, filename = os.path.split(obj.key)
+        bucket.download_file(obj.key, filename)
+        if not(os.path.exists(data_path)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
+            os.mkdir(data_path)
+        os.replace(filename , os.path.join(data_path, filename))
         print(f"{obj.key} , {str(obj.key)} est téléchargé")
     return True
 
@@ -130,24 +145,18 @@ def write_object_file_on_s3(file_name: str, object_to_pickle):
 
 def download_file(file_name_s3: str, file_name_local:str):
     """
-    Cette fonction charge un fichiers de s3.
+    Cette fonction charge un fichiers de s3 qui doit être à la racine local.
 
     Arguments
     -------------
     (file_name_s3) Le nom du fichier à traiter sur s3
     (file_name_local) Le nom à donner au fichier en local
     """
-    bucket = s3.Bucket(BUCKET_NAME)
-    if file_name_s3.endswith(".json"): # Dans le cas de decp_json notamment
-        # Pourquoi fait-on ça plutôt qu'un download_file ? Lors d'un gros download de fichiers, boto3 télécharge par paquet
-        # ce  qui créé des fichiers temporaires et pose problème lors du téléchargement. Pour mieux comprendre, je vous invite à tester 
-        # les deux émthodes avec decp.json
-        content_object = s3.Object(BUCKET_NAME, file_name_s3)
-        file_content = content_object.get()['Body'].read().decode('utf-8')
-        json_content = json.loads(file_content)
-        return json_content
-    else : 
+    bucket = s3.Bucket(BUCKET_NAME) 
+    if "/" in file_name_local:
+        print("Attention, vous souhaitez stocker ce fichier ailleurs que dans le current directory. Si le fichier est trop volumineux, cela peut causer une erreur.")
         bucket.download_file(file_name_s3, file_name_local)
+    bucket.download_file(file_name_s3, file_name_local)
 
 def get_object_content(file_name_s3: str):
     """
