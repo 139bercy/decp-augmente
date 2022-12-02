@@ -202,5 +202,5 @@ workflows:
           context:
               - decp-augmente
           requires:
-              - instal_requirements
+              - install_requirements
       
