@@ -207,7 +207,7 @@ workflows:
           context:
                - decp-augmente
           requires:
-              getion_flux
+                - getion_flux
       - nettoyage_flux:
           context:
               - decp-augmente
