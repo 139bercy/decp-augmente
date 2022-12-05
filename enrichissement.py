@@ -80,7 +80,7 @@ def main():
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     if utils.USE_S3:
-        utils.write_object_file_on_s3(decp_augmente_file, decp_augmente_file)
+        utils.write_object_file_on_s3(decp_augmente_file, df)
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:
