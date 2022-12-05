@@ -153,23 +153,15 @@ jobs:
       - run:
           name: Transfert des données vers data.economie
           command: |
-            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_nettoye.csv decp_augmente.csv ; quit"
+            echo ${DEPLOY_HOST}
 
 workflows:
   version: 2
   main:
     jobs:
-      - get_data_daily
-      - get_data_weekly
       - install_requirements
-      - compute:
-          requires:
-            - install_requirements
-            - get_data_daily
-            - get_data_weekly
-      - send:
-          requires:
-            - compute
+      - send
+
 
   daily-data:
     jobs:
