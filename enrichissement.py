@@ -32,6 +32,7 @@ with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
 path_to_data = conf_data["path_to_data"]
+path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
 
 
@@ -41,18 +42,17 @@ def main():
     nettoye_file = "df_nettoye.pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        utils.download_file(nettoye_file, nettoye_file)
-
-    with open(nettoye_file, 'rb') as df_nettoye:
-        df = pickle.load(df_nettoye)
+        df = utils.get_object_content(nettoye_file)
+    else:
+        with open(nettoye_file, 'rb') as df_nettoye:
+            df = pickle.load(df_nettoye)
 
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
         df.to_csv(decp_augmente_file, quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if utils.USE_S3:
-            #utils.write_object_file_on_s3(decp_augmente_file, decp_augmente_file)
-            pass
+            utils.write_object_file_on_s3(decp_augmente_file, df)
         if conf_debug["debug"]:
             with open('df_agumente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -318,8 +318,8 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
     usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale", "denominationUniteLegale"]
     dtype={"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string', "denominationUniteLegale":"string"}
-    path_cache = os.path.join(path_to_data, conf_data["cache_bdd_legale"])
-    path_cache_not_in_bdd = os.path.join(path_to_data, conf_data["cache_not_in_bdd_legale"])
+    path_cache = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
+    path_cache_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_legale"])
     cache_siren_not_found_exists = os.path.isfile(path_cache_not_in_bdd)
     if cache_siren_not_found_exists:
         list_siret_not_found = loading_cache(path_cache_not_in_bdd)
@@ -363,8 +363,8 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     logger.info('Mettons en cache les données sur les acheteurs\n')
     # On s'occupe des titulaires puis des acheteurs de deux manières distinctes pour clarifier et simplifier le traitement.
     # Car, par ailleurs on ne veut pas enrichir les acheteurs avec des nouvelles colonnes, simplement repasser sur les noms par la suite.
-    path_cache_acheteur = os.path.join(path_to_data, conf_data["cache_acheteur_bdd_legale"])
-    path_cache_acheteur_not_in_bdd = os.path.join(path_to_data, conf_data["cache_acheteur_not_in_bdd_legale"])
+    path_cache_acheteur = os.path.join(path_to_cache, conf_data["cache_acheteur_bdd_legale"])
+    path_cache_acheteur_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_acheteur_not_in_bdd_legale"])
     cache_acheteur_siren_not_found_exists = os.path.isfile(path_cache_acheteur_not_in_bdd)
     if cache_acheteur_siren_not_found_exists:
         list_siret_acheteur_not_found = loading_cache(path_cache_acheteur_not_in_bdd)
@@ -385,13 +385,19 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
             list_siret_acheteur_not_found += series_siren_acheteur_valid_but_not_found_in_bdd.tolist()
         # Actualise les caches
             write_cache(dfcache_acheteur, path_cache_acheteur)
-            write_cache(list_siret_acheteur_not_found, path_cache_acheteur_not_in_bdd)
+            write_cache(list(set(list_siret_acheteur_not_found)), path_cache_acheteur_not_in_bdd)
     else:
         dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(df_acheteur.idAcheteur, path, dfcache=pd.DataFrame(), columns=usecols, dtypes=dtype)
         dfcache_acheteur = dfcache_acheteur.drop_duplicates(subset=['siret'], keep='first') # La colonne s'appelle encore siren dans le cache
         # Créer les cache
         write_cache(dfcache_acheteur, path_cache_acheteur)
         write_cache(list(set(series_siren_acheteur_valid_but_not_found_in_bdd.tolist())), path_cache_acheteur_not_in_bdd) # On dédoublonne
+
+    if utils.USE_S3: # Upload des caches sur le S3
+        utils.write_cache_on_s3(path_cache, dfcache) #Cache n1
+        utils.write_cache_on_s3(path_cache_not_in_bdd, list(set(list_siret_not_found)))
+        utils.write_cache_on_s3(path_cache_acheteur, dfcache_acheteur)
+        utils.write_cache_on_s3(path_cache_acheteur_not_in_bdd, list(set(list_siret_acheteur_not_found)))
 
     logger.info('fin enrichissement_type_entreprise\n')
     return df
@@ -404,7 +410,7 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     Cette fonction repasse également sur la catégorieEntreprise qui jusqu'alors était relié au SIRET et non au SIREN.
     """
     
-    pathbdd = os.path.join(path_to_data, conf_data["cache_bdd_legale"])
+    pathbdd = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
 
     with open(pathbdd, "rb") as f:
         df_bdd = pickle.load(f)
@@ -423,7 +429,7 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     # Si il n'y a pas de correspondance, on  met "NC".
     mask_nan_cat = df.categorieEntreprise.isna()
     df.loc[mask_nan_cat, "categorieEntreprise"] = "NC"
-    pathbdd_acheteur = os.path.join(path_to_data, conf_data["cache_acheteur_bdd_legale"])
+    pathbdd_acheteur = os.path.join(path_to_cache, conf_data["cache_acheteur_bdd_legale"])
     with open(pathbdd_acheteur, "rb") as f:
         df_bdd_acheteur = pickle.load(f)
     dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siren , df_bdd_acheteur.denominationUniteLegale))
@@ -522,10 +528,6 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     path_to_cache_not_in_insee = os.path.join(path_to_data, conf_data["cache_not_in_bdd_insee"])
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee, path_to_cache_not_in_insee)
     logger.info("Enrichissement insee fini")
-    with open("enrichissementInsee_stock", "wb") as f:
-        pickle.dump(enrichissementInsee, f)
-    with open("nanSiren_stock", "wb") as f:
-        pickle.dump(nanSiren, f)
     logger.info("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
     del archiveErrorSIRET
@@ -666,8 +668,8 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     # Création des variables ici plutôt que de les mettre dans l'appelle de pipe au début du fichier avec les noms à rallonger
 
     path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
-    path_to_cache_insee = os.path.join(path_to_data, conf_data["cache_bdd_insee"])
-    path_to_cache_not_in_insee = os.path.join(path_to_data, conf_data["cache_not_in_bdd_insee"])
+    path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
+    path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
     columns = [
     'siren',
     'nic',
@@ -723,6 +725,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
             # Actualise les caches
             write_cache(dfcache, path_to_cache_insee)
             write_cache(sirets_not_found, path_to_cache_not_in_insee)
+
     else : 
         logger.info("Enrichissement avec insee : Création du cache")
         # crécupérer le dataframe correspondant au cache
@@ -731,6 +734,9 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
         # Créer les cache
         write_cache(dfcache, path_to_cache_insee)
         write_cache(series_siret_valid_but_not_found_in_bdd.tolist(), path_to_cache_not_in_insee)
+    if utils.USE_S3:
+            utils.write_cache_on_s3(path_to_cache_insee, dfcache)
+            utils.write_cache_on_s3(path_to_cache_not_in_insee, sirets_not_found)
     return df
 
 def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str, path_to_cache_not_in_bdd: str) -> list:
@@ -968,8 +974,8 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info(f"Taille du dataframe au début de enrichissement acheteur {df.shape}")
     # StockEtablissement_utf8 et les caches
-    path_to_cache_bdd = os.path.join(path_to_data, conf_data["cache_bdd_insee"])
-    path_to_cache_not_in_bdd = os.path.join(path_to_data, conf_data["cache_not_in_bdd_insee"])
+    path_to_cache_bdd = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
+    path_to_cache_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
     
     # Chargement des caches qui existent forcément. Donc pas de test sur leur existence
     sirets_not_found = loading_cache(path_to_cache_not_in_bdd)

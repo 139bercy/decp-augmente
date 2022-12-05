@@ -180,5 +180,6 @@ def get_object_content(file_name_s3: str):
         object_content = object.get()['Body'].read()
         return pickle.loads(object_content)
     else :
-        print(f"{file_name_s3} n'est ni un pickle ni un Python")
-        return None
+        print(f"{file_name_s3} n'est ni un pickle ni un Python. On le considère comme un pickle")
+        object_content = object.get()['Body'].read()
+        return pickle.loads(object_content)

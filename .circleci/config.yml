@@ -222,7 +222,7 @@ workflows:
           context:
                - decp-augmente
           requires:
-                - gestion_flux
+                - enrichissement_flux
       - nettoyage_flux:
           context:
               - decp-augmente

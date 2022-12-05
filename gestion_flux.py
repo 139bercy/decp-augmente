@@ -161,9 +161,10 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     df_decp_modif['modif_up'] = df_decp_modif.modifications.apply(concat_modifications) # On rassemble les modifications 
     columns_modification = df_decp_modif.modif_up.apply(lambda x:list(x[0].keys())).explode().unique() # Permet de récupérer toutes les clefs possibles même si le format évolue
      # On sauvegarde coluns_modification pour le réutiliser dans nettoyage dans le BUCKET S3
-    resp = utils.write_object_file_on_s3("columns_modifications", columns_modification)
+    name_columns_modification = "columns_modifications.pkl"
+    resp = utils.write_object_file_on_s3(name_columns_modification, columns_modification)
     # On sauvegarde coluns_modification pour le réutiliser dans nettoyage
-    with open("columns_modifications", "wb") as file_modif:
+    with open(name_columns_modification, "wb") as file_modif:
         pickle.dump(columns_modification, file_modif)
     df_modification_explode = explode_according_to_keys(df_decp_modif.modif_up, columns_modification)
     # A ce stade, les titulaires sont encore des listes de dictionnaires, donc non hashables. Transformons-les.
