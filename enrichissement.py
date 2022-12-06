@@ -13,9 +13,10 @@ import utils
 logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
-
+path_to_conf = "confs"
+if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+    os.mkdir(path_to_conf)
 if utils.USE_S3:
-    utils.download_data_enrichissement()
     res = utils.download_confs()
 if res :
     logger.info("Chargement des fichiers confs depuis le S3")
@@ -34,6 +35,15 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 path_to_data = conf_data["path_to_data"]
 path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
+
+if utils.USE_S3:
+    utils.download_data_enrichissement()
+    folders_to_create = [path_to_cache, path_to_data]
+    for folder in folders_to_create:
+        if not(os.path.exists(folder)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+            os.mkdir(folder)
+
+
 
 
 def main():
