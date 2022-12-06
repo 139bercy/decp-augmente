@@ -14,6 +14,10 @@ logger = logging.getLogger("main.gestion_flux")
 logger.setLevel(logging.DEBUG)
 
 
+path_to_conf = "confs"
+if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+    print('ml')
+    os.mkdir(path_to_conf)
 #Chargement des fichiers depuis le S3:
 res = utils.download_confs()
 if res :
