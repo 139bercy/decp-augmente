@@ -153,12 +153,10 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - compute:
+      - gestion_flux:
           requires:
             - install_requirements
-      - send:
-          requires:
-            - compute
+
 
   daily-data:
     jobs:
