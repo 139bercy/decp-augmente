@@ -19,5 +19,6 @@
 	"cache_acheteur_not_in_bdd_legale" : "cache_acheteur_NOTIN_StockUniteLegale_utf8.csv",
 	"hash_modifications" : "hash_keys_modifications",
 	"hash_no_modifications" : "hash_keys_no_modifications",
-	"cache_df" : "cache_df"
+	"cache_df" : "cache_df",
+	"decp_augmente_file_flux" : "decp_augmente_flux.pkl"
 }

@@ -143,9 +143,9 @@ def write_object_file_on_s3(file_name: str, object_to_pickle):
 
 
 
-def download_file(file_name_s3: str, file_name_local:str):
+def download_file(file_name_s3: str, file_name_local:str, verbose=False):
     """
-    Cette fonction charge un fichiers de s3 qui doit être à la racine local.
+    Cette fonction charge un fichiers de s3.
 
     Arguments
     -------------
@@ -153,10 +153,17 @@ def download_file(file_name_s3: str, file_name_local:str):
     (file_name_local) Le nom à donner au fichier en local
     """
     bucket = s3.Bucket(BUCKET_NAME) 
+    path, filename = os.path.split(file_name_local) # On télécharge d'abord à la racine du répertoire courant. Puis on déplace. Sinon erreur s3.
+    if verbose:
+        print(f"Fichier {file_name_s3} téléchargé vers {filename}")
+    bucket.download_file(file_name_s3, filename)
     if "/" in file_name_local:
-        print("Attention, vous souhaitez stocker ce fichier ailleurs que dans le current directory. Si le fichier est trop volumineux, cela peut causer une erreur.")
-        bucket.download_file(file_name_s3, file_name_local)
-    bucket.download_file(file_name_s3, file_name_local)
+        if not(os.path.exists(path)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
+            os.mkdir(path)
+        os.replace(filename , os.path.join(path, filename))
+        if verbose:
+            print(f"fichier{filename} déplacé vers {os.path.join(path, filename)}")
+    return None
 
 def get_object_content(file_name_s3: str):
     """
@@ -180,6 +187,6 @@ def get_object_content(file_name_s3: str):
         object_content = object.get()['Body'].read()
         return pickle.loads(object_content)
     else :
-        print(f"{file_name_s3} n'est ni un pickle ni un Python. On le considère comme un pickle")
+        print(f"{file_name_s3} n'est ni un pickle ni un json. On le considère comme un pickle")
         object_content = object.get()['Body'].read()
         return pickle.loads(object_content)

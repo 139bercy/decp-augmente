@@ -35,6 +35,7 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 path_to_data = conf_data["path_to_data"]
 path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
+decp_augmente_file = conf_data["decp_augmente_file_flux"]
 
 if utils.USE_S3:
     folders_to_create = [path_to_cache, path_to_data]
@@ -47,8 +48,6 @@ if utils.USE_S3:
 
 
 def main():
-
-    decp_augmente_file = "decp_augmente.csv"
     nettoye_file = "df_nettoye.pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
@@ -60,11 +59,10 @@ def main():
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
-        df.to_csv(decp_augmente_file, quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if utils.USE_S3:
             utils.write_object_file_on_s3(decp_augmente_file, df)
         if conf_debug["debug"]:
-            with open('df_agumente_debug', 'wb') as df_augmente:
+            with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
                 pickle.dump(df, df_augmente)
         return None
@@ -88,7 +86,6 @@ def main():
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
-    df.to_csv("decp_augmente.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     if utils.USE_S3:
         utils.write_object_file_on_s3(decp_augmente_file, df)
     # Mise en cache pour être ré_utilisé.
