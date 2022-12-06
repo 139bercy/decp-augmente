@@ -184,11 +184,9 @@ workflows:
       - get_data_daily
       - get_data_weekly
       - install_requirements
-      - compute:
+      - gestion_flux
           requires:
             - install_requirements
-            - get_data_daily
-            - get_data_weekly
     triggers:
       - schedule:
           cron: 0 7 * * 2-6
