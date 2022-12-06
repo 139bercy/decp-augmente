@@ -8,21 +8,10 @@ import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
-import utils
 
 logger = logging.getLogger("main.gestion_flux")
 logger.setLevel(logging.DEBUG)
 
-
-path_to_conf = "confs"
-if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
-    os.mkdir(path_to_conf)
-#Chargement des fichiers depuis le S3:
-res = utils.download_confs()
-if res :
-    logger.info("Chargement des fichiers confs depuis le S3")
-else:
-    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
@@ -40,14 +29,12 @@ decp_file_name = conf_data["decp_file_name"]
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
-    if utils.USE_S3: 
-        data = utils.get_object_content(decp_path)
-    else : 
-        check_reference_files()
-        logger.info("Ouverture du fichier decp.json d'aujourd'hui")
-        with open(decp_file_name, encoding='utf-8') as json_data:
-            data = json.load(json_data)
     
+    check_reference_files()
+    logger.info("Ouverture du fichier decp.json d'aujourd'hui")
+    with open(decp_file_name, encoding='utf-8') as json_data:
+        data = json.load(json_data)
+
     df_decp = json_normalize(data['marches'])
     print('original', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
@@ -62,7 +49,6 @@ def main():
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,hash_modifications_pickle)
     #Sauvegarde clef de hache sur le S3
     path_cache_modifications = os.path.join(path_to_data, hash_modifications_pickle)
-    resp = utils.write_object_file_on_s3(path_cache_modifications, df_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_modifications, "wb") as f:
         pickle.dump(df_modif.hash_key, f)
@@ -74,7 +60,6 @@ def main():
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle)
     #Sauvegarde clef de hache sur le S3
     path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"]+".pkl")
-    resp = utils.write_object_file_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_no_modifications, "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
@@ -86,8 +71,6 @@ def main():
     print('\n', df_modif_processed.shape)
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
-    #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
-    resp = utils.write_object_file_on_s3("df_flux.pkl", df_to_process)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open("df_flux.pkl", "wb") as file:
         pickle.dump(df_to_process, file)
@@ -165,7 +148,6 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     columns_modification = df_decp_modif.modif_up.apply(lambda x:list(x[0].keys())).explode().unique() # Permet de récupérer toutes les clefs possibles même si le format évolue
      # On sauvegarde coluns_modification pour le réutiliser dans nettoyage dans le BUCKET S3
     name_columns_modification = "columns_modifications.pkl"
-    resp = utils.write_object_file_on_s3(name_columns_modification, columns_modification)
     # On sauvegarde coluns_modification pour le réutiliser dans nettoyage
     with open(name_columns_modification, "wb") as file_modif:
         pickle.dump(columns_modification, file_modif)
@@ -195,20 +177,13 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     exists_path = os.path.isfile(path_to_hash_cache)
 
     print(f"Chargement des hash keys {path_to_hash_cache}")
-    if utils.USE_S3:
-        hash_processed = utils.get_object_content(path_to_hash_cache)
-        if hash_processed is None: # Equivalent à si le chemin en local n'est pas trouvé
-            print("Pas de cache trouvé S3")
-            return df, pd.DataFrame()
+    exists_path = os.path.isfile(path_to_hash_cache)
+    if exists_path :
+        with open(path_to_hash_cache, "rb") as file_hash_modif:
+            hash_processed = pickle.load(file_hash_modif)
     else:
-        exists_path = os.path.isfile(path_to_hash_cache)
-        if exists_path :
-            with open(path_to_hash_cache, "rb") as file_hash_modif:
-                hash_processed = pickle.load(file_hash_modif)
-        
-        else:
-            print("Pas de cache trouvé local")
-            return df, pd.DataFrame()
+        print("Pas de cache trouvé local")
+        return df, pd.DataFrame()
     mask_hash_to_process = df.loc[:, str(hash_column)].isin(hash_processed)
 
     return df[~mask_hash_to_process], df[mask_hash_to_process]
@@ -261,7 +236,7 @@ def check_reference_files():
     useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee","cache_bdd_legale",
                      "cache_not_in_bdd_legale","cache_df",
-                     "hash_modifications", "hash_no_modifications"]
+                     "hash_modifications", "hash_no_modifications", "decp_augmente_file_flux"]
 
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
