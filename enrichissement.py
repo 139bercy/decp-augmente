@@ -37,11 +37,11 @@ path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
 
 if utils.USE_S3:
-    utils.download_data_enrichissement()
     folders_to_create = [path_to_cache, path_to_data]
     for folder in folders_to_create:
-        if not(os.path.exists(folder)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+        if not(os.path.exists(folder)):
             os.mkdir(folder)
+    utils.download_data_enrichissement()
 
 
 
@@ -798,6 +798,7 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
         logger.info("Chargement du cache")
         dfcache = loading_cache(path_to_cache_bdd)
         # regarder les siret dans le cache, ceux pas dans le cache on va passer à travers la bdd pour les trouver. Ceux qui ne sont pas dans la BdD sont sauvés dans un 2e cache.
+    
     enrichissement_insee_siret = pd.merge(dfSIRET, dfcache, how='left', on=['siret'], copy=False)
     enrichissement_insee_siret.rename(columns={"siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
