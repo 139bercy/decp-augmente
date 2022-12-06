@@ -184,7 +184,7 @@ workflows:
       - get_data_daily
       - get_data_weekly
       - install_requirements
-      - gestion_flux
+      - gestion_flux:
           requires:
             - install_requirements
     triggers:
