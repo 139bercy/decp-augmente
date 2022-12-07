@@ -26,6 +26,7 @@ path_to_data = conf_data["path_to_data"]
 if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_data)
 decp_file_name = conf_data["decp_file_name"]
+print(conf_data.keys())
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
