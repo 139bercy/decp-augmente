@@ -140,6 +140,11 @@ jobs:
           - run: date +%G-%V > date
           - restore_cache:
               keys: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          - run:
+              name: Nettoyage flux
+              command: |
+                  . venv/bin/activate
+                  python3 gestion_flux.py
 
   send:
     docker:
