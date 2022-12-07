@@ -9,7 +9,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config_data.json"}}-{{ checksum "confs/config-circleci.json"}}
             - dependencies-master-{{ checksum "requirements.txt"}}
       - run: cp confs/config-circleci.json confs/config_data.json
       - run:
@@ -19,7 +19,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}-{{ checksum "confs/config_data.json"}}
           paths:
             - "venv"
             - "confs/config_data.json"
