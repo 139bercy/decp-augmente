@@ -11,7 +11,6 @@ jobs:
           keys:
             - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config_data.json"}}-{{ checksum "confs/config-circleci.json"}}
             - dependencies-master-{{ checksum "requirements.txt"}}
-      - run: cp confs/config-circleci.json confs/config_data.json
       - run:
           name: Installation des requirements
           command: |
