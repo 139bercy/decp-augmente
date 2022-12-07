@@ -26,7 +26,6 @@ path_to_data = conf_data["path_to_data"]
 if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_data)
 decp_file_name = conf_data["decp_file_name"]
-print(conf_data.keys())
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
@@ -36,7 +35,7 @@ def main():
         data = json.load(json_data)
 
     df_decp = json_normalize(data['marches'])
-    print('original', df_decp.shape)
+    print('Taille du dataframe decp : ', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
