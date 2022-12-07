@@ -106,6 +106,12 @@ jobs:
           - checkout
           - restore_cache:
               keys:
+                - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+          - restore_cache:
+              keys:
+                - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
+          - restore_cache:
+              keys:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - run:
               name: Gestion des flux
@@ -154,9 +160,15 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - gestion_flux:
+      - get_data_daily:
           requires:
             - install_requirements
+      - get_data_weekly:
+          requires:
+            - install_requirements
+      - gestion_flux:
+          requires:
+            - get_data_weekly
 
 
   daily-data:
