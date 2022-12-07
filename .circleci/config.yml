@@ -107,7 +107,7 @@ jobs:
           - run: date +%G-%V > date-weekly
           - restore_cache:
               keys:
-                - hashkeys-{{ .Branch }}-{{ checksum "data/hash_keys_modifications.pkl"}}-{{ checksum "data/hash_keys_no_modifications.pkl"}}
+                - hashkeys-{{ .Branch }}
           - restore_cache:
               keys:
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
