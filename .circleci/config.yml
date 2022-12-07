@@ -127,6 +127,7 @@ jobs:
               paths:
                 - "df_flux.pkl"
                 - "columns_modifications.pkl"
+                
   nettoyage_flux:
         docker:
             - image: 139bercy/decp-rama
@@ -182,7 +183,7 @@ workflows:
             - install_requirements
       - gestion_flux:
           requires:
-            - get_data_weekly
+            - get_data_daily
       - nettoyage_flux:
           requires:
             - gestion_flux
