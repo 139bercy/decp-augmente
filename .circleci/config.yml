@@ -107,6 +107,9 @@ jobs:
           - run: date +%G-%V > date-weekly
           - restore_cache:
               keys:
+                - hashkeys-{{ .Branch }}-{{ checksum "data/hash_keys_modifications.pkl"}}-{{ checksum "data/hash_keys_no_modifications.pkl"}}
+          - restore_cache:
+              keys:
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
           - restore_cache:
               keys:
@@ -126,6 +129,13 @@ jobs:
               paths:
                 - "df_flux.pkl"
                 - "columns_modifications.pkl"
+  nettoyage_flux:
+        docker:
+            - image: 139bercy/decp-rama
+        resource_class: large
+        steps:
+          - checkout
+
 
   send:
     docker:
