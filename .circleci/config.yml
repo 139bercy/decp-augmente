@@ -105,6 +105,7 @@ jobs:
         steps:
           - checkout
           - run: date +%F > date
+          - run: date +%G-%V > date-weekly
           - restore_cache:
               keys:
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
