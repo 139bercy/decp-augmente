@@ -104,6 +104,7 @@ jobs:
         resource_class: large
         steps:
           - checkout
+          - run: date +%F > date
           - restore_cache:
               keys:
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
