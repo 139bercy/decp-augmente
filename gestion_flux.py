@@ -31,7 +31,6 @@ print(conf_data.keys())
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
     
-    check_reference_files()
     logger.info("Ouverture du fichier decp.json d'aujourd'hui")
     with open(decp_path, encoding='utf-8') as json_data:
         data = json.load(json_data)
