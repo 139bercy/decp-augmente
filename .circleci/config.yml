@@ -111,8 +111,6 @@ jobs:
           - restore_cache:
               keys: 
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
-          - restore_cache:
-              keys:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - run:
               name: Gestion des flux
@@ -148,7 +146,7 @@ jobs:
               name: Nettoyage flux
               command: |
                   . venv/bin/activate
-                  python3 gestion_flux.py
+                  python3 nettoyage.py
 
   send:
     docker:
@@ -180,9 +178,6 @@ workflows:
     jobs:
       - install_requirements
       - get_data_daily:
-          requires:
-            - install_requirements
-      - get_data_weekly:
           requires:
             - install_requirements
       - gestion_flux:
