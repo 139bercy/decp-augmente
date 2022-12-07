@@ -119,8 +119,6 @@ jobs:
               name: Gestion des flux
               command: |
                   . venv/bin/activate
-                  cd data
-                  ls
                   python3 gestion_flux.py
           - save_cache:
               key: hashkeys-{{ .Branch }}-{{ checksum "data/hash_keys_modifications.pkl"}}-{{ checksum "data/hash_keys_no_modifications.pkl"}}
