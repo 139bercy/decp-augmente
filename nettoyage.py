@@ -18,12 +18,6 @@ pd.options.mode.chained_assignment = None  # default='warn'
 path_to_conf = "confs"
 if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_conf)
-if utils.USE_S3:
-    res = utils.download_confs()
-    if res :
-        logger.info("Chargement des fichiers confs depuis le S3")
-else:
-    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
@@ -37,32 +31,20 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 path_to_data = conf_data["path_to_data"]
 decp_file_name = conf_data["decp_file_name"]
 path_to_data = conf_data["path_to_data"] # Ré écris
-if utils.USE_S3:
-    if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
-        os.mkdir(path_to_data)
-    utils.download_data_nettoyage()
 
 def main():
 
     # Chargement du fichier flux
     logger.info("Récupération du flux")
     flux_file = "df_flux.pkl"
-    if utils.USE_S3:
-        logger.info(" Fichier Flux chargé depuis S3")
-        df_flux = utils.get_object_content(flux_file)
-    else : 
-        print('Chargement en local')
-        with open(flux_file, "rb") as flux_file:
-            df_flux = pickle.load(flux_file)
+    with open(flux_file, "rb") as flux_file:
+        df_flux = pickle.load(flux_file)
     # SI il n'y a pas d'ajout de données.
     if df_flux.empty :
         print('Flux vide')
-        if utils.USE_S3:
-            utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
-        else : 
-            with open('df_nettoye.pkl', 'wb') as df_nettoye:
-                # Export présent pour faciliter l'utilisation du module enrichissement.py
-                pickle.dump(df_flux, df_nettoye)
+        with open('df_nettoye.pkl', 'wb') as df_nettoye:
+            # Export présent pour faciliter l'utilisation du module enrichissement.py
+            pickle.dump(df_flux, df_nettoye)
         logger.info("Flux vide")
         return df_flux
 
@@ -105,12 +87,9 @@ def main():
     logger.info("Fin du traitement")
     print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
-    if utils.USE_S3 : 
-        utils.write_object_file_on_s3("df_nettoye.pkl", df)
-    else:
-        with open('df_nettoye.pkl', 'wb') as df_nettoye:
-            # Export présent pour faciliter l'utilisation du module enrichissement.py
-            pickle.dump(df, df_nettoye)
+    with open('df_nettoye.pkl', 'wb') as df_nettoye:
+        # Export présent pour faciliter l'utilisation du module enrichissement.py
+        pickle.dump(df, df_nettoye)
     df.to_csv("decp_nettoye.csv")
     logger.info("Ecriture du csv terminé")
 
@@ -657,8 +636,6 @@ def recuperation_colonne_a_modifier() -> dict:
     """
     colonne_to_modify = dict()
     dict_path = "columns_modifications"
-    if utils.USE_S3:
-        utils.download_file(dict_path, dict_path)
     # On récupère les colonnes détectés dans gestion_flux
     with open(dict_path, "rb") as file_modif:
         columns_modification = pickle.load(file_modif)

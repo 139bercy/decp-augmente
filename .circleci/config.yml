@@ -135,8 +135,11 @@ jobs:
         resource_class: large
         steps:
           - checkout
-
-
+          - attach_workspace:
+              at: ~/project
+          - run: date +%G-%V > date
+          - restore_cache:
+              keys: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
 
   send:
     docker:
