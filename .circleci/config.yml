@@ -150,6 +150,46 @@ jobs:
               command: |
                   . venv/bin/activate
                   python3 nettoyage.py
+          - persist_to_workspace:
+              root: ~/project
+              paths:
+                - "df_flux.pkl"
+                - "columns_modifications.pkl"
+                - "df_nettoye.pkl"
+  enrichissement_flux:
+        docker:
+            - image: 139bercy/decp-rama
+        resource_class: large
+        steps:
+          - checkout
+          - attach_workspace:
+              at: ~/project
+          - restore_cache:
+              keys:
+                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}
+          - restore_cache:
+              keys:
+                - cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}
+          - restore_cache:
+              keys:
+                - cache_StockEtablissement-{{ .Branch }}-{{ checksum "reset_cache_StockEtablissement.txt"}}
+          - restore_cache:
+              keys: 
+                - data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          - restore_cache:
+              keys:
+                - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+          - run:
+              name: Enrichissement flux
+              command: |
+                  . venv/bin/activate
+                  python3 enrichissement .py
+          - save_cache:
+              key: hashkeys-{{ .Branch }}-{{checksum "reset_hash_keys.txt"}}
+              paths:
+                - "data/hash_keys_modifications.pkl"
+                - "data/hash_keys_no_modifications.pkl"
+
 
   send:
     docker:

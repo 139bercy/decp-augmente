@@ -8,7 +8,6 @@ import pandas as pd
 import cProfile
 import pstats
 from geopy.distance import distance, Point
-import utils
 
 logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
@@ -16,10 +15,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 path_to_conf = "confs"
 if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_conf)
-if utils.USE_S3:
-    res = utils.download_confs()
-if res :
-    logger.info("Chargement des fichiers confs depuis le S3")
+
 else:
     logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
@@ -37,30 +33,17 @@ path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
 decp_augmente_file = conf_data["decp_augmente_file_flux"]
 
-if utils.USE_S3:
-    folders_to_create = [path_to_cache, path_to_data]
-    for folder in folders_to_create:
-        if not(os.path.exists(folder)):
-            os.mkdir(folder)
-    utils.download_data_enrichissement()
-
 
 
 
 def main():
     nettoye_file = "df_nettoye.pkl"
-    if utils.USE_S3:
-        logger.info(" Fichier Flux chargé depuis S3")
-        df = utils.get_object_content(nettoye_file)
-    else:
-        with open(nettoye_file, 'rb') as df_nettoye:
-            df = pickle.load(df_nettoye)
+    with open(nettoye_file, 'rb') as df_nettoye:
+        df = pickle.load(df_nettoye)
 
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
-        if utils.USE_S3:
-            utils.write_object_file_on_s3(decp_augmente_file, df)
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -86,8 +69,6 @@ def main():
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
-    if utils.USE_S3:
-        utils.write_object_file_on_s3(decp_augmente_file, df)
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:
@@ -114,9 +95,6 @@ def concat_unduplicate_and_caching_hash(df):
         df = pd.concat([df, df_cache]).reset_index(drop=True)
 
     # Save DataFrame pour la prochaine fois
-    if utils.USE_S3:
-        utils.write_object_file_on_s3(path_to_df_cache, df)
-
     with open(path_to_df_cache, "wb") as file_cache:
             pickle.dump(df, file_cache)
     
@@ -400,11 +378,6 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         write_cache(dfcache_acheteur, path_cache_acheteur)
         write_cache(list(set(series_siren_acheteur_valid_but_not_found_in_bdd.tolist())), path_cache_acheteur_not_in_bdd) # On dédoublonne
 
-    if utils.USE_S3: # Upload des caches sur le S3
-        utils.write_cache_on_s3(path_cache, dfcache) #Cache n1
-        utils.write_cache_on_s3(path_cache_not_in_bdd, list(set(list_siret_not_found)))
-        utils.write_cache_on_s3(path_cache_acheteur, dfcache_acheteur)
-        utils.write_cache_on_s3(path_cache_acheteur_not_in_bdd, list(set(list_siret_acheteur_not_found)))
 
     logger.info('fin enrichissement_type_entreprise\n')
     return df
@@ -741,9 +714,6 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
         # Créer les cache
         write_cache(dfcache, path_to_cache_insee)
         write_cache(series_siret_valid_but_not_found_in_bdd.tolist(), path_to_cache_not_in_insee)
-    if utils.USE_S3:
-            utils.write_cache_on_s3(path_to_cache_insee, dfcache)
-            utils.write_cache_on_s3(path_to_cache_not_in_insee, sirets_not_found)
     return df
 
 def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str, path_to_cache_not_in_bdd: str) -> list:
