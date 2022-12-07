@@ -111,6 +111,8 @@ jobs:
           - restore_cache:
               keys: 
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
+          - restore_cache:
+              keys:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - run:
               name: Gestion des flux
