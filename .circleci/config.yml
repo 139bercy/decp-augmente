@@ -109,7 +109,7 @@ jobs:
               keys:
                 - hashkeys-{{ .Branch }}-{{ checksum "reset_hash_keys.txt"}}
           - restore_cache:
-              keys:
+              keys: 
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
           - restore_cache:
               keys:
@@ -140,6 +140,9 @@ jobs:
           - run: date +%G-%V > date
           - restore_cache:
               keys: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
+          - restore_cache:
+              keys:
+                - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - run:
               name: Nettoyage flux
               command: |
