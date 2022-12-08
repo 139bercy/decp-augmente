@@ -33,8 +33,10 @@ path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
 decp_augmente_file = conf_data["decp_augmente_file_flux"]
 
-
-
+#Création du directory cache dans le cas où il n'existe pas :
+exists_path_cache = os.path.exists(path_to_cache)
+if not exists_path_cache:
+    os.mkdir(path_to_cache)
 
 def main():
     nettoye_file = "df_nettoye.pkl"
@@ -505,8 +507,8 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Enrichissement insee en cours...")
     path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
-    path_to_cache_insee = os.path.join(path_to_data, conf_data["cache_bdd_insee"])
-    path_to_cache_not_in_insee = os.path.join(path_to_data, conf_data["cache_not_in_bdd_insee"])
+    path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
+    path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee, path_to_cache_not_in_insee)
     logger.info("Enrichissement insee fini")
     logger.info("Enrichissement infogreffe en cours...")
@@ -761,6 +763,7 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     # On retire les siret valides mais non trouvés lors des précédents passages du df.
     dfSIRET = dfSIRET[~mask_siret_valid_not_found]
     
+    print(path_to_cache_bdd)
     cache_exists = os.path.isfile(path_to_cache_bdd)
     if cache_exists: # Il devrait pas ne pas exister, donc on rentrera toujours dans la boucle. Je laisse la condition pour qu'on comprenne si ça bug un jour en connectant à la CI etc.
         logger.info("Chargement du cache")

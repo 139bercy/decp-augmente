@@ -18,7 +18,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}-{{ checksum "confs/config_data.json"}}
+          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config_data.json"}}-{{ checksum "confs/config-circleci.json"}}
           paths:
             - "venv"
             - "confs/config_data.json"
@@ -169,13 +169,13 @@ jobs:
               at: ~/project
           - restore_cache:
               keys:
-                -cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}-{{ checksum "cache/cache_acheteur_StockUniteLegale_utf8.pkl"}}-{{ checksum "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"}}
+                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}-{{ checksum "cache/cache_acheteur_StockUniteLegale_utf8.pkl"}}-{{ checksum "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"}}
           - restore_cache:
               keys:
                 - cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockUniteLegale_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"}}
           - restore_cache:
               keys:
-                - cache_stockEtablissement-{{ .Branch }}-{{ checksum "reset_cache_stockEtablissement.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl}}
+                - cache_stockEtablissement-{{ .Branch }}-{{ checksum "reset_cache_stockEtablissement.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl"}}
           - restore_cache:
               keys: 
                 - data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}

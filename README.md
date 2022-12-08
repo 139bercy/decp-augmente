@@ -168,11 +168,11 @@ Dans l'objectif de remplacement de decp-rama, decp-rama-v2 dispose d'une CI qui 
 - Publier sur le serveur FTP de economie.gouv dans le dossier decp/test le résultat du script : decp_augmente.csv
 
 #### Gestion des caches dans la CI
-Lorsque l'on souhaite ré initialiser un cache, il suffit de monter le chiffre de +1 dans le fichier reset_{nom_du_cache}.txt
+Lorsque l'on souhaite ré initialiser un cache, il suffit de monter le chiffre de +1 dans le fichier reset_{nom_du_cache}.txt <br>
 Sachant que les caches classiques et ceux NOTIN (les caches comportants les données valides mais non trouvées)
-vont de pair lors d'un reset.
+vont de pair lors d'un reset. <br>
 :hotsprings: :hotsprings: :hotsprings:
-<u> Pensez à augmenter </u> la valeur dans le fichier reset. Car si la valeur dans le .txt diminue, la valeur de checksum peut être une valeur que gitHub a déjà stocké quelque part et donc la clef du cache sera celle d'un cache déjà processé par le passé. 
+<u> Pensez à augmenter </u> :hotsprings: :hotsprings: :hotsprings: la valeur dans le fichier reset. Car si la valeur dans le .txt diminue, la valeur de checksum peut être une valeur que gitHub a déjà stocké quelque part et donc la clef du cache sera celle d'un cache déjà processé par le passé. 
 
 ### Problèmes et pistes d'améliorations
 

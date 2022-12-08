@@ -44,7 +44,7 @@ def main():
     logger.info("Création clef de hash pour les marchés ayant des modifications de decp.json")
     df_modif = create_hash_key_for_modifications(df_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes modifications déjà enrichies.")
-    hash_modifications_pickle = conf_data["hash_modifications"] + ".pkl"
+    hash_modifications_pickle = conf_data["hash_modifications"]
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,hash_modifications_pickle)
     #Sauvegarde clef de hache sur le S3
     path_cache_modifications = os.path.join(path_to_data, hash_modifications_pickle)
@@ -55,7 +55,7 @@ def main():
     logger.info("Création clef de hash pour les marchés n'ayant pas de modifications de decp.json")
     df_no_modif = create_hash_key_for_no_modification(df_no_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
-    hash_no_modifications_pickle = conf_data["hash_no_modifications"] + ".pkl"
+    hash_no_modifications_pickle = conf_data["hash_no_modifications"] 
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle)
     #Sauvegarde clef de hache sur le S3
     path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"]+".pkl")
