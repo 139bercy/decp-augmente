@@ -59,7 +59,7 @@ def main():
     hash_no_modifications_pickle = conf_data["hash_no_modifications"] 
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle)
     #Sauvegarde clef de hache sur le S3
-    path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"]+".pkl")
+    path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"])
     #Sauvegarde clefs de hache
     with open(path_cache_no_modifications, "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
