@@ -71,9 +71,11 @@ def main():
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(df_flux)
     logger.info("Fin du traitement")
+    print("Fin du traitement manage_modification")
 
     df = regroupement_marche_complet(df)
     logger.info("Début du traitement: Gestion des titulaires")
+    print("Debut traitement manage titulaires")
     df = (df.pipe(manage_titulaires)
           .pipe(manage_duplicates)
           .pipe(manage_amount)
