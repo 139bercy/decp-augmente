@@ -164,6 +164,7 @@ jobs:
         resource_class: large
         steps:
           - checkout
+          - run: date +%G-%V > date
           - attach_workspace:
               at: ~/project
           - restore_cache:

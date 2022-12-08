@@ -11,9 +11,10 @@ import cProfile
 import pstats
 import utils
 
-logger = logging.getLogger("main.nettoyage")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
+logger.info("Début du traitement")
 
 path_to_conf = "confs"
 if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
