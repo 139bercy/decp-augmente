@@ -68,7 +68,8 @@ def main():
           .pipe(change_sources_name)
           )
 
-    logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
+    logger.info("Début du traitement: Ecriture du csv final: decp_augmente_flux_ci")
+    df.to_csv("decp_augmente_flux.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:
