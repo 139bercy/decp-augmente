@@ -167,6 +167,13 @@ Dans l'objectif de remplacement de decp-rama, decp-rama-v2 dispose d'une CI qui 
 - Lancer main.py
 - Publier sur le serveur FTP de economie.gouv dans le dossier decp/test le résultat du script : decp_augmente.csv
 
+#### Gestion des caches dans la CI
+Lorsque l'on souhaite ré initialiser un cache, il suffit de monter le chiffre de +1 dans le fichier reset_{nom_du_cache}.txt
+Sachant que les caches classiques et ceux NOTIN (les caches comportants les données valides mais non trouvées)
+vont de pair lors d'un reset.
+:hotsprings: :hotsprings: :hotsprings:
+<u> Pensez à augmenter </u> la valeur dans le fichier reset. Car si la valeur dans le .txt diminue, la valeur de checksum peut être une valeur que gitHub a déjà stocké quelque part et donc la clef du cache sera celle d'un cache déjà processé par le passé. 
+
 ### Problèmes et pistes d'améliorations
 
 Decp-augmente feat_v2 n'est aujourd'hui pas en état pour faire tourner le script à partir du fichier produit par decp-rama-v2. En effet, des erreurs apparaissent et un travail de correction de bugs est nécessaire. Par la durée du téléchargement des données et du processus avant d'obtenir une erreur, il est difficile de repérer et tester des solutions. Voici les différentes pistes de solution de ces problèmes et d'améliorations possibles :
