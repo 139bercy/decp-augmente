@@ -635,7 +635,7 @@ def recuperation_colonne_a_modifier() -> dict:
         dict
     """
     colonne_to_modify = dict()
-    dict_path = "columns_modifications"
+    dict_path = "columns_modifications.pkl"
     # On récupère les colonnes détectés dans gestion_flux
     with open(dict_path, "rb") as file_modif:
         columns_modification = pickle.load(file_modif)
@@ -649,7 +649,6 @@ def recuperation_colonne_a_modifier() -> dict:
         colonne_to_modify[key] = value
 
     colonne_to_modify["objetModification"] = "objetModification" # Cette colonne est un cas particulier.
-    print(colonne_to_modify)
     # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
     # Le mapping suivra la forme "xxxModification" : "xxx".
     # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.
