@@ -232,7 +232,7 @@ jobs:
           name: Transfert des données vers data.economie
           command: |
             lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente_flux.csv ; quit"
-            
+
 workflows:
   version: 2
   main:
@@ -253,6 +253,13 @@ workflows:
       - send:
           requires:
             - enrichissement_flux
+    triggers:
+      - schedule:
+          cron: 0 6 * * *
+          filters:
+            branches:
+              only:
+                - flux_ci
 
   daily-data:
     jobs:

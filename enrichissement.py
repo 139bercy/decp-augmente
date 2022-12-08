@@ -52,7 +52,7 @@ def main():
                 pickle.dump(df, df_augmente)
         return None
 
-    
+    print(f"Taille dataframe avant pipeline {df.shape}")
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
           .pipe(enrichissement_siret)
@@ -95,7 +95,9 @@ def concat_unduplicate_and_caching_hash(df):
     if file_cache_exists :
         with open(os.path.join(path_to_data, conf_data['cache_df']), "rb") as file_cache:
             df_cache = pickle.load(file_cache)
+        print(f"Taille du dataframe cache en mémoire {df_cache.shape}")
         df = pd.concat([df, df_cache]).reset_index(drop=True)
+        print(f"Taille du dataframe après la concaténation avec le df en cache {df.shape}")
 
     # Save DataFrame pour la prochaine fois
     with open(path_to_df_cache, "wb") as file_cache:
