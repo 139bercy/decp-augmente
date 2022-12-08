@@ -87,7 +87,7 @@ def main():
           .pipe(replace_char)
           )
     logger.info("Fin du traitement")
-    print(df.columns)
+    print(f"Taille du fichier en sortie de nettoye : {df.shape}")
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     with open('df_nettoye.pkl', 'wb') as df_nettoye:
         # Export présent pour faciliter l'utilisation du module enrichissement.py

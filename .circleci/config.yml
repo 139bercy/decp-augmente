@@ -189,7 +189,7 @@ jobs:
               no_output_timeout: 35m
               command: |
                   . venv/bin/activate
-                  python3 enrichissement .py
+                  python3 enrichissement.py
           - save_cache:
               key: cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}-{{ checksum "cache/cache_acheteur_StockUniteLegale_utf8.pkl"}}-{{ checksum "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"}}
               paths:
