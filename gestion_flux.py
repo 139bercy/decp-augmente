@@ -69,6 +69,9 @@ def main():
     print('Shape modif to process puis process')
     print(df_modif_to_process.shape)
     print('\n', df_modif_processed.shape)
+
+    print('LISTING DES FICHIERS DANS FOLDER DATA FIN')
+    print(os.listdir('data'))
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
