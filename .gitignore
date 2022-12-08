@@ -19,7 +19,6 @@ saagie_*
 
 # PYTHON
 __pycache__
-test.py
 
 # Fichier intermédiaire
 df_backup_acheteur
