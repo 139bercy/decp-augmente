@@ -184,7 +184,7 @@ jobs:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - restore_cache:
               keys:
-                - cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df"}}
+                - cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df.pkl"}}
           - run:
               name: Enrichissement flux
               no_output_timeout: 35m
@@ -202,12 +202,12 @@ jobs:
                 - "cache/cache_StockUniteLegale_utf8.pkl"
                 - "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"
           - save_cache:
-              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl}}
+              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl"}}
               paths:
                 - "cache/cache_StockEtablissement_utf8.pkll"
                 - "cache/cache_NOTIN_StockEtablissement_utf8.pkl"
           - save_cache:
-              key: cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df"}}
+              key: cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df.pkl"}}
               paths:
                 - "data/cache_df"
           - persist_to_workspace:
@@ -229,17 +229,10 @@ jobs:
           keys:
             - data-out-{{ .Branch }}-{{ checksum "date" }}
       - run:
-          name: Condition pour les branches
-          command: |
-            pwd
-            ls -l
-            if [ "$CIRCLE_BRANCH" != "master" ]; then
-                circleci-agent step halt
-            fi
-      - run:
           name: Transfert des données vers data.economie
           command: |
             lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente_flux.csv ; quit"
+            
 workflows:
   version: 2
   main:
