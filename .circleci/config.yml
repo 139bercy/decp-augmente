@@ -257,7 +257,7 @@ workflows:
       - enrichissement_flux:
           requires:
             - nettoyage_flux
-      -send;
+      - send:
           requires:
             - enrichissement_flux
 
