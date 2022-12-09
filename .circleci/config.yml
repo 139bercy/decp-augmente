@@ -103,8 +103,8 @@ jobs:
         resource_class: large
         steps:
           - checkout
-          - run: date +%H > date-today
-          - run: date --date='1 hour ago' +%H > date-yesterday
+          - run: date +%F > date-today
+          - run: date --date='1 day ago' +%F > date-yesterday
           - run: date +%F > date
           - run: date +%G-%V > date-weekly
           - restore_cache:
@@ -167,8 +167,8 @@ jobs:
         steps:
           - checkout
           - run: date +%G-%V > date
-          - run: date +%H > date-today
-          - run: date --date='1 hour ago' +%H > date-yesterday
+          - run: date +%F > date-today
+          - run: date --date='1 day ago' +%F > date-yesterday
           - attach_workspace:
               at: ~/project
           - restore_cache:
@@ -258,7 +258,13 @@ workflows:
           requires:
             - enrichissement_flux
 
-
+    triggers:
+      - schedule:
+          cron: 0 6 * * *
+          filters:
+            branches:
+              only:
+                - flux_ci
   daily-data:
     jobs:
       - get_data_daily
