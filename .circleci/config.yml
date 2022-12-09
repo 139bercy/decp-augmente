@@ -116,6 +116,7 @@ jobs:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - run:
               name: Gestion des flux
+              no_output_timeout: 30m
               command: |
                   . venv/bin/activate
                   python3 gestion_flux.py
