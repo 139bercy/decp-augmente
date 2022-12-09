@@ -46,6 +46,9 @@ def main():
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
+        concat_and_unduplicate(df) # Pas nécessaire conceptuellement, si le flux est vide on aurait a priori pas besoin de ré upload le même fichier que la veille sur data eco
+        # Cependant, c'est un premier jet pour satisfaire la CI en place dans l'objectif d'arriver à une solution rapidement.
+        df.to_csv("decp_augmente_flux.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -65,7 +68,7 @@ def main():
           .pipe(apply_luhn)
           .pipe(enrichissement_departement)
           .pipe(enrichissement_arrondissement)
-          .pipe(concat_unduplicate_and_caching_hash)
+          .pipe(concat_and_unduplicate)
           .pipe(manage_column_final)
           .pipe(change_sources_name)
           )
@@ -79,7 +82,7 @@ def main():
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
 
-def concat_unduplicate_and_caching_hash(df):
+def concat_and_unduplicate(df):
     """
     Cette fonction concatène ensemble les dataframes (celui du flux et celui du Stock).
     Dédoublonne le dataframe (lorsqu'on aura les infos du dédoublonnage)

@@ -173,7 +173,7 @@ jobs:
               at: ~/project
           - restore_cache:
               keys:
-                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-yesterday"}
+                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
               keys:
                 - cache_uniteLegale-{{ .Branch }}-{{ checksum "date-yesterday"}}
