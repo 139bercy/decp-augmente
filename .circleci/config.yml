@@ -103,11 +103,13 @@ jobs:
         resource_class: large
         steps:
           - checkout
+          - run: date +%H > date-today
+          - run: date --date='1 hour ago' +%H > date-yesterday
           - run: date +%F > date
           - run: date +%G-%V > date-weekly
           - restore_cache:
               keys:
-                - hashkeys-{{ .Branch }}-{{ checksum "reset_hash_keys.txt"}}
+                - hashkeys-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
               keys: 
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
@@ -121,7 +123,7 @@ jobs:
                   . venv/bin/activate
                   python3 gestion_flux.py
           - save_cache:
-              key: hashkeys-{{ .Branch }}-{{ checksum "reset_hash_keys.txt"}}
+              key: hashkeys-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "data/hash_keys_modifications.pkl"
                 - "data/hash_keys_no_modifications.pkl"
@@ -165,17 +167,19 @@ jobs:
         steps:
           - checkout
           - run: date +%G-%V > date
+          - run: date +%H > date-today
+          - run: date --date='1 hour ago' +%H > date-yesterday
           - attach_workspace:
               at: ~/project
           - restore_cache:
               keys:
-                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}-{{ checksum "cache/cache_acheteur_StockUniteLegale_utf8.pkl"}}-{{ checksum "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"}}
+                - cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-yesterday"}
           - restore_cache:
               keys:
-                - cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockUniteLegale_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"}}
+                - cache_uniteLegale-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
               keys:
-                - cache_stockEtablissement-{{ .Branch }}-{{ checksum "reset_cache_stockEtablissement.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl"}}
+                - cache_stockEtablissement-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
               keys: 
                 - data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
@@ -184,7 +188,7 @@ jobs:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
           - restore_cache:
               keys:
-                - cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df.pkl"}}
+                - cache_df-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - run:
               name: Enrichissement flux
               no_output_timeout: 35m
@@ -192,22 +196,22 @@ jobs:
                   . venv/bin/activate
                   python3 enrichissement.py
           - save_cache:
-              key: cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_acheteur_uniteLegale.txt"}}-{{ checksum "cache/cache_acheteur_StockUniteLegale_utf8.pkl"}}-{{ checksum "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"}}
+              key: cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}
               paths:
                 - "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"
                 - "cache/cache_acheteur_StockUniteLegale_utf8.pkl"
           - save_cache:
-              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockUniteLegale_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"}}
+              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "cache/cache_StockUniteLegale_utf8.pkl"
                 - "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"
           - save_cache:
-              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "reset_cache_uniteLegale.txt"}}-{{checksum "cache/cache_StockEtablissement_utf8.pkl"}}-{{checksum "cache/cache_NOTIN_StockEtablissement_utf8.pkl"}}
+              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "cache/cache_StockEtablissement_utf8.pkll"
                 - "cache/cache_NOTIN_StockEtablissement_utf8.pkl"
           - save_cache:
-              key: cache_df-{{ .Branch }}-{{ checksum "reset_cache_df.txt"}}-{{ checksum "data/cache_df.pkl"}}
+              key: cache_df-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "data/cache_df"
           - persist_to_workspace:
