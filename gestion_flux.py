@@ -6,11 +6,14 @@ import json
 import boto3
 import datetime
 import logging.handlers
+import git 
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
 
 logger = logging.getLogger("main.gestion_flux")
 logger.setLevel(logging.DEBUG)
+dir_path = os.path.dirname(os.path.realpath(__file__))
+REPO = git.Repo(dir_path)
 
 
 with open(os.path.join("confs", "config_data.json")) as f:
