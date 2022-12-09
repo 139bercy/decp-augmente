@@ -257,13 +257,7 @@ workflows:
       - send:
           requires:
             - enrichissement_flux
-    triggers:
-      - schedule:
-          cron: 0 6 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci
+
 
   daily-data:
     jobs:
