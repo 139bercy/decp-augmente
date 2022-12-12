@@ -245,9 +245,12 @@ workflows:
       - get_data_daily:
           requires:
             - install_requirements
+      - get_data_weekly:
+          requires:
+            - install_requirements
       - gestion_flux:
           requires:
-            - get_data_daily
+            - get_data_weekly
       - nettoyage_flux:
           requires:
             - gestion_flux
@@ -258,23 +261,16 @@ workflows:
           requires:
             - enrichissement_flux
 
-    triggers:
-      - schedule:
-          cron: 0 6 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci
   daily-data:
     jobs:
       - get_data_daily
     triggers:
       - schedule:
-          cron: 0 4 * * 1-6
+          cron: 0 3 * * *
           filters:
             branches:
               only:
-                - master
+                - flux_ci
   weekly-data:
     jobs:
       - get_data_weekly
@@ -284,7 +280,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - flux_ci
 
   daily-compute:
     jobs:
