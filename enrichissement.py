@@ -74,6 +74,7 @@ def main():
           )
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente_flux_ci")
+    print(f"Taille dataframe après pipeline {df.shape}")
     df.to_csv("decp_augmente_flux.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:

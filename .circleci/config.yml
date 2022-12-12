@@ -196,7 +196,7 @@ jobs:
                   . venv/bin/activate
                   python3 enrichissement.py
           - save_cache:
-              key: cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}
+              key: cache_acheteur_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "cache/cache_acheteur_NOTIN_StockUniteLegale_utf8.pkl"
                 - "cache/cache_acheteur_StockUniteLegale_utf8.pkl"
@@ -245,12 +245,9 @@ workflows:
       - get_data_daily:
           requires:
             - install_requirements
-      - get_data_weekly:
-          requires:
-            - install_requirements
       - gestion_flux:
           requires:
-            - get_data_weekly
+            - get_data_daily
       - nettoyage_flux:
           requires:
             - gestion_flux
