@@ -206,7 +206,7 @@ jobs:
                 - "cache/cache_StockUniteLegale_utf8.pkl"
                 - "cache/cache_NOTIN_StockUniteLegale_utf8.pkl"
           - save_cache:
-              key: cache_uniteLegale-{{ .Branch }}-{{ checksum "date-today"}}
+              key: cache_stockEtablissement-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "cache/cache_StockEtablissement_utf8.pkll"
                 - "cache/cache_NOTIN_StockEtablissement_utf8.pkl"
