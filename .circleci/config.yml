@@ -109,7 +109,7 @@ jobs:
           - run: date +%G-%V > date-weekly
           - restore_cache:
               keys:
-                - hashkeys-{{ .Branch }}-{{ checksum "date-yesterday"}}
+                - hashkeys2-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
               keys: 
                 - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
@@ -123,7 +123,7 @@ jobs:
                   . venv/bin/activate
                   python3 gestion_flux.py
           - save_cache:
-              key: hashkeys-{{ .Branch }}-{{ checksum "date-today"}}
+              key: hashkeys2-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
                 - "data/hash_keys_modifications.pkl"
                 - "data/hash_keys_no_modifications.pkl"
@@ -213,7 +213,7 @@ jobs:
           - save_cache:
               key: cache_df-{{ .Branch }}-{{ checksum "date-today"}}
               paths:
-                - "data/cache_df"
+                - "data/cache_df.pkl"
           - persist_to_workspace:
               root: ~/project
               paths:
