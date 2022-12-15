@@ -488,7 +488,7 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
-    df['anneeNotification'] = df['anneeNotification'].astype(float)
+    df['anneeNotification'] = df['anneeNotification'].apply(lambda x : float(x) if str(x).isdigit() else np.NaN)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
     df['dateNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['dateNotification'])

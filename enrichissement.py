@@ -46,8 +46,22 @@ def main():
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
-        concat_and_unduplicate(df) # Pas nécessaire conceptuellement, si le flux est vide on aurait a priori pas besoin de ré upload le même fichier que la veille sur data eco
+        path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
+        file_cache_exists = os.path.isfile(path_to_df_cache)
+        if file_cache_exists :
+            with open(os.path.join(path_to_data, conf_data['cache_df']), "rb") as file_cache:
+                df = pickle.load(file_cache)
+        # Pas nécessaire conceptuellement, si le flux est vide on aurait a priori pas besoin de ré upload le même fichier que la veille sur data eco
         # Cependant, c'est un premier jet pour satisfaire la CI en place dans l'objectif d'arriver à une solution rapidement.
+        print(f"Cache chargé de taille {df.shape}")
+        # Save DataFrame pour la prochaine fois
+        with open(path_to_df_cache, "wb") as file_cache:
+            pickle.dump(df, file_cache)
+        # Pour que les noms soient les même etc, il faut également garder la suite du process.
+        df = (df.pipe(manage_column_final)
+                .pipe(change_sources_name)
+            )
+
         df.to_csv("decp_augmente_flux.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
