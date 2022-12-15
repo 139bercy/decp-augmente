@@ -259,22 +259,23 @@ workflows:
             - enrichissement_flux
 
   daily-jobs:
-    - install_requirements
-    - get_data_daily:
-        requires:
-          - install_requirements
-    - gestion_flux:
-        requires:
-          - get_data_daily
-    - nettoyage_flux:
-        requires:
-          - gestion_flux
-    - enrichissement_flux:
-        requires:
-          - nettoyage_flux
-    - send:
-        requires:
-          - enrichissement_flux 
+    jobs:
+      - install_requirements
+      - get_data_daily:
+          requires:
+            - install_requirements
+      - gestion_flux:
+          requires:
+            - get_data_daily
+      - nettoyage_flux:
+          requires:
+            - gestion_flux
+      - enrichissement_flux:
+          requires:
+            - nettoyage_flux
+      - send:
+          requires:
+            - enrichissement_flux 
     triggers:
       - schedule:
           cron: 0 6 * * 2-6
