@@ -39,7 +39,6 @@ def main(test_check=False):
     logger.info("Ouverture du fichier decp.json")
     with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
         data = json.load(json_data)
-
     if test_check:
         # Modification pour prendre un subset de données
         n_data = len(data["marches"])
@@ -62,7 +61,8 @@ def main(test_check=False):
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(data)
     logger.info("Fin du traitement")
-
+    with open("df_v2.pkl", "wb") as f:
+        pickle.dump(df, f)
     df = regroupement_marche_complet(df)
 
     logger.info("Début du traitement: Gestion des titulaires")
@@ -481,7 +481,8 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
-    df['anneeNotification'] = df['anneeNotification'].astype(float)
+    #df['anneeNotification'] = df['anneeNotification'].astype(float)
+    df['anneeNotification'] = df['anneeNotification'].apply(lambda x : float(x) if str(x).isdigit() else np.NaN)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
     df['dateNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['dateNotification'])
@@ -627,12 +628,18 @@ def indice_marche_avec_modification(data: dict) -> list:
     Retour:
         - list
     """
+    s = 0
     liste_indices = []
     for i in range(len(data['marches'])):
         # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
         data["marches"][i]["id_technique"] = i
-        if data["marches"][i]["modifications"]:
-            liste_indices += [i]
+        try : 
+            s+=1
+            if data["marches"][i]["modifications"]:
+                liste_indices += [i]
+        except:
+            print('EXCEPT ', s)
+            data["marches"][i]
     return liste_indices
 
 
