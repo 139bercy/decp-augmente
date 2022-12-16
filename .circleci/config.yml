@@ -129,6 +129,9 @@ jobs:
           - run: date +%F > date
           - run: date +%G-%V > date-weekly
           - restore_cache:
+              keys: 
+                - data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}
+          - restore_cache:
               keys:
                 - hashkeys3-{{ .Branch }}-{{ checksum "date-yesterday"}}
           - restore_cache:
@@ -269,17 +272,3 @@ workflows:
       - gestion_flux:
           requires:
             - get_data_daily_v2
-
-  daily-jobs:
-    jobs:
-      - install_requirements
-      - get_data_daily:
-          requires:
-            - install_requirements
-      - gestion_flux:
-          requires:
-            - get_data_daily
-
-  daily-data-v2:
-    jobs:
-      - get_data_daily_v2
