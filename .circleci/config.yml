@@ -68,6 +68,27 @@ jobs:
            paths:
              - "data"
 
+  get_data_daily_v2:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - run: date +%F > date
+        - restore_cache:
+              keys:
+                - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
+        - run: 
+            name: Telechargements des données
+            no_output_timeout: 1h
+            command: |
+                . venv/bin/activate
+                python3 gestion_flux.py
+        - save_cache:
+            key: data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}
+            paths:
+              - "data"
+
   get_data_weekly:
      docker:
        - image: 139bercy/decp-rama
@@ -242,21 +263,12 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - get_data_daily:
+      - get_data_daily_v2:
           requires:
             - install_requirements
       - gestion_flux:
           requires:
             - get_data_daily
-      - nettoyage_flux:
-          requires:
-            - gestion_flux
-      - enrichissement_flux:
-          requires:
-            - nettoyage_flux
-      - send:
-          requires:
-            - enrichissement_flux
 
   daily-jobs:
     jobs:
@@ -267,56 +279,7 @@ workflows:
       - gestion_flux:
           requires:
             - get_data_daily
-      - nettoyage_flux:
-          requires:
-            - gestion_flux
-      - enrichissement_flux:
-          requires:
-            - nettoyage_flux
-      - send:
-          requires:
-            - enrichissement_flux 
-    triggers:
-      - schedule:
-          cron: 0 6 * * 2-6
-          filters:
-            branches:
-              only:
-                - flux_ci
 
-  daily-data:
+  daily-data-v2:
     jobs:
-      - get_data_daily
-    triggers:
-      - schedule:
-          cron: 0 3 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci
-  weekly-data:
-    jobs:
-      - get_data_weekly
-    triggers:
-      - schedule:
-          cron: 0 4 * * 1
-          filters:
-            branches:
-              only:
-                - flux_ci
-
-  daily-compute:
-    jobs:
-      - get_data_daily
-      - get_data_weekly
-      - install_requirements
-      - gestion_flux:
-          requires:
-            - install_requirements
-    triggers:
-      - schedule:
-          cron: 0 7 * * 2-6
-          filters:
-            branches:
-              only:
-                - master
+      - get_data_daily_v2
