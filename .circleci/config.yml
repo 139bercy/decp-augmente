@@ -269,6 +269,6 @@ workflows:
       - gestion_flux:
           requires:
             - get_data_daily_v2
-      - nettoyage:
+      - nettoyage_flux:
           requires:
             - gestion_flux
