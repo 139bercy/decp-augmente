@@ -788,9 +788,10 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     for objet_marche in liste_objet: # C'est du dedoublonnage en fait ça
         # Récupération du dataframe modification et du dataframe source
         # On créée la colonne "idtech"
-        marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
-        marche_init["idtech"] = marche.iloc[-1].id_technique
-        marches_init.append(marche_init)
+        if type(objet_marche) == str:
+            marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
+            marche_init["idtech"] = marche.iloc[-1].id_technique
+            marches_init.append(marche_init)
     if marches_init :  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
         df_to_concatene = pd.concat([x for x in marches_init], copy=False)
         df.update(df_to_concatene)
