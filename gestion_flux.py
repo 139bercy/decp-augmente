@@ -34,11 +34,13 @@ def main():
     with open(decp_path, encoding='utf-8') as json_data:
         data = json.load(json_data)
 
-    df_decp = json_normalize(data['marches'])
+    df_decp = json_normalize(data['marches']['marches'])
     sources_filter = ["data.gouv.fr_pes"]
     logger.info(f"Filtrage par source {sources_filter}")
     df_decp = df_decp[df_decp.source.isin(sources_filter)]
     print(df_decp.head())
+    print(df_decp.shape)
+    print(df_decp.modifications)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
