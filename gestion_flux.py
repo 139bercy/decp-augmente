@@ -42,7 +42,7 @@ def main():
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
-
+    print(df_modif)
     #Gestion de la partie avec les modifications
     logger.info("Création clef de hash pour les marchés ayant des modifications de decp.json")
     df_modif = create_hash_key_for_modifications(df_modif)
