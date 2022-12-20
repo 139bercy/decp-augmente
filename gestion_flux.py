@@ -212,7 +212,9 @@ def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
 
     """
     mask_modifications = df_decp.modifications.apply(lambda x:len(x) if type(x)==list else 0)>0 # safe function because sometimes there is nan in data.
+    print(mask_modifications.sum())
     df_decp_modif = df_decp[mask_modifications]
+    print(df_decp_modif)
     df_decp_no_modif = df_decp[~mask_modifications]
 
     return df_decp_modif, df_decp_no_modif
