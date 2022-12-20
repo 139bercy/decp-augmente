@@ -36,7 +36,9 @@ def main():
 
     df_decp = json_normalize(data['marches'])
     sources_filter = ["data.gouv.fr_pes"]
+    logger.info(f"Filtrage par source {sources_filter}")
     df_decp = df_decp[df_decp.source.isin(sources_filter)]
+    print(df_decp.head())
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)

@@ -16,5 +16,5 @@ with open(os.path.join(directory_data, "decp.json"), "r") as file:
 
 fv1_json = {"marches":fv2_json}
 
-with open(os.path.join(directory_data, "decp.json"), "w") as file:
+with open(os.path.join(directory_data, "decpv2.json"), "w") as file:
     json.dump(fv1_json, file)

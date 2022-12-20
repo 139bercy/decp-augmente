@@ -77,6 +77,9 @@ jobs:
         - run: date +%F > date
         - restore_cache:
               keys:
+                - data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}-{{checksum "date"}}
+        - restore_cache:
+              keys:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
         - run: 
             name: Telechargements des données
@@ -85,7 +88,7 @@ jobs:
                 . venv/bin/activate
                 python3 get_daily_data_v2.py
         - save_cache:
-            key: data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}
+            key: data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}-{{checksum "date"}}
             paths:
               - "data"
 
@@ -282,6 +285,7 @@ workflows:
       - send:
           requires:
             - enrichissement_flux
+
   weekly-data:
     jobs:
       - get_data_weekly
