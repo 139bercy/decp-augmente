@@ -197,7 +197,7 @@ def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
     Contenu qui a un format particulier donc on souhaitait le traiter à part.
 
     """
-    mask_modifications = df_decp.modifications.apply(len)>0
+    mask_modifications = df_decp.modifications.apply(lambda x:len(x) if type(x)==list else 0)>0 # safe function because sometimes there is nan in data.
     df_decp_modif = df_decp[mask_modifications]
     df_decp_no_modif = df_decp[~mask_modifications]
 
