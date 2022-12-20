@@ -16,6 +16,7 @@ with open(os.path.join(directory_data, "decp.json"), "r") as file:
     fv2_json = json.load(file)
 
 fv1_json = {"marches":fv2_json}
+print(fv1_json.keys())
 
 with open(os.path.join(directory_data, "decpv2.json"), "w") as file:
     json.dump(fv1_json, file)
