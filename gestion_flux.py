@@ -156,7 +156,7 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     df_modification_explode = explode_according_to_keys(df_decp_modif.modif_up, columns_modification)
     # A ce stade, les titulaires sont encore des listes de dictionnaires, donc non hashables. Transformons-les.
     print(df_modification_explode)
-    if "titulaires" in df_modification_explode.columns(): # Safe
+    if "titulaires" in df_modification_explode.columns: # Safe
         df_modification_explode['titulaires_transfo'] = df_modification_explode.loc[:, "titulaires"].apply(transform_titulaires)
     subset_to_hash_modif = conf_glob["gestion_flux"]["subset_for_hash_modifications"]
     # Safe hash key 
