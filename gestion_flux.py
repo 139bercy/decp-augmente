@@ -35,7 +35,8 @@ def main():
         data = json.load(json_data)
 
     df_decp = json_normalize(data['marches'])
-    print('Taille du dataframe decp : ', df_decp.shape)
+    sources_filter = ["data.gouv.fr_pes"]
+    df_decp = df_decp[df_decp.source.isin(sources_filter)]
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
@@ -154,6 +155,13 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     # A ce stade, les titulaires sont encore des listes de dictionnaires, donc non hashables. Transformons-les.
     df_modification_explode['titulaires_transfo'] = df_modification_explode.loc[:, "titulaires"].apply(transform_titulaires)
     subset_to_hash_modif = conf_glob["gestion_flux"]["subset_for_hash_modifications"]
+    # Safe hash key 
+    cols_remove = []
+    for col in subset_to_hash_modif: # On itère dans une liste d'une 10aine d'éléments
+        if col not in df_modification_explode.columns.tolist():
+            cols_remove.append(col)
+    for col_remove in cols_remove:
+        subset_to_hash_modif.remove(col_remove)
     # Mettre le subset_to_hash_modif dans un JSON externable ?
     hash_modif = hash_pandas_object(df_modification_explode.loc[:, subset_to_hash_modif], index=False) # index doit toujours rester à False, sinon la clef de hash prends en compte l'index (ce qu'on ne veut pas)
     df_decp_modif['hash_key'] = hash_modif
