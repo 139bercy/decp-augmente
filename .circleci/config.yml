@@ -235,7 +235,7 @@ jobs:
           - persist_to_workspace:
               root: ~/project
               paths:
-                - "decp_augmente_flux.csv"
+                - "decp_augmente_flux_s1.csv"
 
 
   send:
