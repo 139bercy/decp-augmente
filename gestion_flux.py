@@ -210,7 +210,6 @@ def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
 
     """
     # Depuis dataeco tout est du str. Il faut le convertir.
-    df_decp.modifications = df_decp.modifications.apply(lambda x: ast.literal_eval(x))
     mask_modifications = df_decp.modifications.apply(lambda x:len(x) if type(x)==list else 0)>0 # safe function because sometimes there is nan in data.
     print(mask_modifications.sum())
     df_decp_modif = df_decp[mask_modifications]
