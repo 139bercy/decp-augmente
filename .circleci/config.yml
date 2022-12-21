@@ -10,6 +10,7 @@ jobs:
     resource_class: large
     steps:
       - checkout
+      - run:
           name: Concat des CSV de FLUX_ci_v2
           command: |
             lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; cat decp_augmente_flux_s*.csv > decp_augmente_flux_v2.csv ; quit"
