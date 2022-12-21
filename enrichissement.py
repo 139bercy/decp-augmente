@@ -62,7 +62,7 @@ def main():
                 .pipe(change_sources_name)
             )
 
-        df.to_csv("decp_augmente_flux_s1.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+        df.to_csv("decp_augmente_flux_s4.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -89,7 +89,7 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente_flux_ci")
     print(f"Taille dataframe après pipeline {df.shape}")
-    df.to_csv("decp_augmente_flux_s1.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
+    df.to_csv("decp_augmente_flux_s4.csv", quoting=csv.QUOTE_NONNUMERIC, sep=";")
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:
