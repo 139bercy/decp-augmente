@@ -3,11 +3,11 @@ import os
 import numpy as np
 import pickle
 import json
-import boto3
 import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
+import ast
 
 logger = logging.getLogger("main.gestion_flux")
 logger.setLevel(logging.DEBUG)
@@ -38,9 +38,6 @@ def main():
     sources_filter = ["data.gouv.fr_pes"]
     logger.info(f"Filtrage par source {sources_filter}")
     df_decp = df_decp[df_decp.source.isin(sources_filter)]
-    print(df_decp.head())
-    print(df_decp.shape)
-    print(df_decp.modifications)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
@@ -211,6 +208,8 @@ def split_dataframes_according_to_modifications(df_decp : pd.DataFrame):
     Contenu qui a un format particulier donc on souhaitait le traiter à part.
 
     """
+    # Depuis dataeco tout est du str. Il faut le convertir.
+    df_decp.modifications = df_decp.modifications.apply(lambda x: ast.literal_eval(x))
     mask_modifications = df_decp.modifications.apply(lambda x:len(x) if type(x)==list else 0)>0 # safe function because sometimes there is nan in data.
     print(mask_modifications.sum())
     df_decp_modif = df_decp[mask_modifications]

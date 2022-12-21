@@ -77,9 +77,6 @@ jobs:
         - run: date +%F > date
         - restore_cache:
               keys:
-                - data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}-{{checksum "date"}}
-        - restore_cache:
-              keys:
                 - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}
         - run: 
             name: Telechargements des données
@@ -88,7 +85,7 @@ jobs:
                 . venv/bin/activate
                 python3 get_daily_data_v2.py
         - save_cache:
-            key: data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}-{{checksum "date"}}
+            key: data-rama-v2-{{ .Branch }}-{{checksum "date"}}-{{checksum "get_daily_data_v2.py"}}
             paths:
               - "data"
 
@@ -131,6 +128,8 @@ jobs:
           - run: date --date='1 day ago' +%F > date-yesterday
           - run: date +%F > date
           - run: date +%G-%V > date-weekly
+          - attach_workspace:
+              at: ~/project
           - restore_cache:
               keys: 
                 - data-rama-v2-{{ .Branch }}-{{checksum "get_daily_data_v2.py"}}-{{checksum "date"}}
@@ -244,6 +243,25 @@ jobs:
                 - "decp_augmente_flux.csv"
 
 
+  retrieve_data_v2:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - attach_workspace:
+            at: ~/project
+        - run:
+            name: Recuperation données du lftp
+            command: |
+              lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e " set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; get decpv2.json "
+              mkdir data
+              mv decpv2.json data/decpv2.json
+        - persist_to_workspace:
+            root: ~/project
+            paths:
+              - "data/decpv2.json"
+
   send:
     docker:
       - image: 139bercy/decp-rama
@@ -259,14 +277,14 @@ jobs:
       - run:
           name: Transfert des données vers data.economie
           command: |
-            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente_flux_s1.csv ; quit"
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente.csv ; quit"
 
 workflows:
   version: 2
   main:
     jobs:
       - install_requirements
-      - get_data_daily_v2:
+      - retrieve_data_v2:
           requires:
             - install_requirements
       - get_data_weekly:
