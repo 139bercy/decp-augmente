@@ -255,7 +255,7 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - get_data_daily_v2:
+      - retrieve_data_v2:
           requires:
             - install_requirements
       - get_data_weekly:
@@ -264,7 +264,7 @@ workflows:
       - gestion_flux:
           requires:
             - get_data_weekly
-            - get_data_daily_v2
+            - retrieve_data_v2
       - nettoyage_flux:
           requires:
             - gestion_flux
