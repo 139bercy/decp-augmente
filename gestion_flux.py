@@ -35,7 +35,7 @@ def main():
         data = json.load(json_data)
 
     df_decp = json_normalize(data['marches'])
-    sources_filter = ["marches-publics.info"]
+    sources_filter = ["data.gouv.fr_aife", "grandlyon", "ternum_bfc"]
     logger.info(f"Filtrage par source {sources_filter}")
     df_decp = df_decp[df_decp.source.isin(sources_filter)]
     print(df_decp.head())
