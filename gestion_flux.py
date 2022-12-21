@@ -39,12 +39,9 @@ def main():
     logger.info(f"Filtrage par source {sources_filter}")
     df_decp = df_decp[df_decp.source.isin(sources_filter)]
     print(df_decp.head())
-    print(df_decp.shape)
-    print(df_decp.modifications)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
 
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
-    print(df_modif)
     #Gestion de la partie avec les modifications
     logger.info("Création clef de hash pour les marchés ayant des modifications de decp.json")
     df_modif = create_hash_key_for_modifications(df_modif)
