@@ -13,7 +13,7 @@ jobs:
       - run:
           name: Concat des CSV de FLUX_ci_v2
           command: |
-            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; cat decp_augmente_flux_s*.csv > decp_augmente_flux_v2.csv ; quit"
+            lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; cat  decp_augmente_flux_s1.csv decp_augmente_flux_s2.csv decp_augmente_flux_s3.csv decp_augmente_flux_s4.csv > decp_augmente_flux_v2.csv ; put decp_augmente_flux_v2.csv ;quit"
 
 workflows:
   version: 2
