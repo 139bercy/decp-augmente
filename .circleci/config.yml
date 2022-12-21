@@ -54,6 +54,11 @@ jobs:
               mkdir data
               cd data
               lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e " set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; get decpv2.json; bye "
+        - persist_to_workspace:
+            root: ~/project
+            paths:
+              - "data/decpv2.json"
+
 
   get_data_daily_v2:
       docker:
