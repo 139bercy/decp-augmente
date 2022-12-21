@@ -253,10 +253,11 @@ jobs:
             at: ~/project
         - run:
             name: Recuperation données du lftp
+            no_output_timeout: 35m
             command: |
-              lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e " set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; get decpv2.json "
               mkdir data
-              mv decpv2.json data/decpv2.json
+              cd data
+              lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e " set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp; get decpv2.json; bye "
         - persist_to_workspace:
             root: ~/project
             paths:
