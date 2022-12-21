@@ -14,19 +14,23 @@ if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     SECRET_KEY = credentials["SECRET_KEY"]
     USER =credentials["USER_SAAGIE"]
     PASSWORD = credentials["PASSWORD_SAAGIE"]
+    ENDPOINT_S3 = credentials["ENDPOINT_S3"]
 else :  # Sur la CI ou Saagie
     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER =os.environ.get("USER_SAAGIE")
     PASSWORD = os.environ.get("PASSWORD_SAAGIE")
+    ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
+
 PROJECT_NAME = "BercyHub - OpenData"
 BUCKET_NAME = "bercy"
 USE_S3 = os.environ.get("USE_S3") # Boolean pour savoir si l'on va utiliser S3 ou non.
 USE_S3 = True
-s3 = boto3.resource('s3', 
+s3 = boto3.resource(service_name = 's3', 
                 aws_access_key_id=ACCESS_KEY, 
                 aws_secret_access_key=SECRET_KEY, 
-                region_name="eu-west-3"
+                region_name="gra",
+                endpoint_url="https://"+str(ENDPOINT_S3)
                 )
 
 def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_bases = ["departements-francais", "region-fr"]):
