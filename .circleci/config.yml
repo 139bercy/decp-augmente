@@ -279,6 +279,35 @@ workflows:
       - send:
           requires:
             - enrichissement_flux
+  daily-compute:
+    jobs:
+      - install_requirements
+      - retrieve_data_v2:
+          requires:
+            - install_requirements
+      - get_data_weekly:
+          requires:
+            - install_requirements
+      - gestion_flux:
+          requires:
+            - get_data_weekly
+            - retrieve_data_v2
+      - nettoyage_flux:
+          requires:
+            - gestion_flux
+      - enrichissement_flux:
+          requires:
+            - nettoyage_flux
+      - send:
+          requires:
+            - enrichissement_flux
+    triggers:
+      - schedule:
+          cron: 0 4 * * *
+          filters:
+            branches:
+              only:
+                - flux_ci_v2_filter2
 
   weekly-data:
     jobs:
@@ -289,4 +318,4 @@ workflows:
           filters:
             branches:
               only:
-                - flux_ci_v2_filter1
+                - flux_ci_v2_filter2
