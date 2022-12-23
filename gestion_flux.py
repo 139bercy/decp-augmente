@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import re
 import numpy as np
 import pickle
 import json
@@ -40,14 +41,16 @@ decp_file_name = conf_data["decp_file_name"]
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
-    if utils.USE_S3: 
+    print(decp_path)
+    if False:
+    #if utils.USE_S3: 
         data = utils.get_object_content(decp_path)
     else : 
-        check_reference_files()
+        #check_reference_files()
         logger.info("Ouverture du fichier decp.json d'aujourd'hui")
-        with open(decp_file_name, encoding='utf-8') as json_data:
+        with open(decp_path, encoding='utf-8') as json_data:
             data = json.load(json_data)
-    
+    client = utils.s3.meta.client
     df_decp = json_normalize(data['marches'])
     print('original', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
@@ -58,10 +61,13 @@ def main():
     logger.info("Création clef de hash pour les marchés ayant des modifications de decp.json")
     df_modif = create_hash_key_for_modifications(df_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes modifications déjà enrichies.")
-    hash_modifications_pickle = conf_data["hash_modifications"] + ".pkl"
-    df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,hash_modifications_pickle)
+    hash_modifications_pickle = conf_data["hash_modifications"] 
+    hash_modifications_base_path = os.path.join(path_to_data, hash_modifications_pickle)
+    hash_modifications_pickle_latest = retrieve_lastest(client, hash_modifications_base_path)
+    df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,hash_modifications_pickle_latest)
     #Sauvegarde clef de hache sur le S3
-    path_cache_modifications = os.path.join(path_to_data, hash_modifications_pickle)
+    today = datetime.date.today()
+    path_cache_modifications = hash_modifications_base_path+"-"+today.strftime("%Y-%m-%d")+".pkl"
     resp = utils.write_object_file_on_s3(path_cache_modifications, df_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_modifications, "wb") as f:
@@ -70,10 +76,12 @@ def main():
     logger.info("Création clef de hash pour les marchés n'ayant pas de modifications de decp.json")
     df_no_modif = create_hash_key_for_no_modification(df_no_modif)
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
-    hash_no_modifications_pickle = conf_data["hash_no_modifications"] + ".pkl"
-    df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle)
+    hash_no_modifications_pickle = conf_data["hash_no_modifications"]
+    hash_no_modifications_base_path = os.path.join(path_to_data, conf_data["hash_no_modifications"])
+    hash_no_modifications_pickle_latest = retrieve_lastest(client, hash_no_modifications_base_path)
+    df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle_latest)
     #Sauvegarde clef de hache sur le S3
-    path_cache_no_modifications = os.path.join(path_to_data, conf_data["hash_no_modifications"]+".pkl")
+    path_cache_no_modifications = hash_no_modifications_base_path+"-"+today.strftime("%Y-%m-%d")+".pkl"
     resp = utils.write_object_file_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
     #Sauvegarde clefs de hache
     with open(path_cache_no_modifications, "wb") as f:
@@ -87,12 +95,33 @@ def main():
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
-    resp = utils.write_object_file_on_s3("df_flux.pkl", df_to_process)
+    name_df_flux = "df_flux"+today.strftime("%Y-%m-%d")+".pkl"
+    resp = utils.write_object_file_on_s3(name_df_flux, df_to_process)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
-    with open("df_flux.pkl", "wb") as file:
+    with open(name_df_flux, "wb") as file:
         pickle.dump(df_to_process, file)
     return None
 
+def retrieve_lastest(client, prefix_object: str):
+        """
+        Cette fonction retourne le nom du dernier object en date correspondant au prefix de prefix_object.
+        
+        Arguments:
+        -----------
+        cient : boto3 client
+        prefix_object : The prefix used to filters objects on the s3 bucket
+
+        """
+        get_last_modified = lambda obj: int(obj['LastModified'].strftime('%s'))
+        objs = client.list_objects_v2(Bucket=utils.BUCKET_NAME, Prefix=prefix_object)['Contents']
+        last_added = [obj for obj in sorted(objs, key=get_last_modified, reverse=True)][0]
+        key = last_added['Key']
+        metadata = last_added['LastModified']
+        assert re.sub("[^0-9]", "", key)== metadata.strftime("%Y%m%d"), "Error : le nom de l'objet et sa date de dernière modification ne correspondent pas"
+
+        print(f"L'objet récupéré est {key}, il a été édité le {metadata}")
+        # Est ce que le nom et la date coïncide ? 
+        return key
 
 def concat_modifications(dictionaries : list):
     """
@@ -191,19 +220,17 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     ----------
     Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traitées.
     """
-    path_to_hash_cache = os.path.join(path_to_data, path_to_hash_pickle)
-    exists_path = os.path.isfile(path_to_hash_cache)
-
-    print(f"Chargement des hash keys {path_to_hash_cache}")
+    exists_path = os.path.isfile(path_to_hash_pickle)
+    print(f"Chargement des hash keys {path_to_hash_pickle}")
     if utils.USE_S3:
-        hash_processed = utils.get_object_content(path_to_hash_cache)
+        hash_processed = utils.get_object_content(path_to_hash_pickle)
         if hash_processed is None: # Equivalent à si le chemin en local n'est pas trouvé
             print("Pas de cache trouvé S3")
             return df, pd.DataFrame()
     else:
-        exists_path = os.path.isfile(path_to_hash_cache)
+        exists_path = os.path.isfile(path_to_hash_pickle)
         if exists_path :
-            with open(path_to_hash_cache, "rb") as file_hash_modif:
+            with open(path_to_hash_pickle, "rb") as file_hash_modif:
                 hash_processed = pickle.load(file_hash_modif)
         
         else:
