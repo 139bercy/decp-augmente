@@ -15,15 +15,17 @@ if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     USER =credentials["USER_SAAGIE"]
     PASSWORD = credentials["PASSWORD_SAAGIE"]
     ENDPOINT_S3 = credentials["ENDPOINT_S3"]
+    PROJECT_NAME = credentials["PROJECT_NAME"]
+    BUCKET_NAME = credentials["BUCKET_NAME"]
 else :  # Sur la CI ou Saagie
     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER =os.environ.get("USER_SAAGIE")
     PASSWORD = os.environ.get("PASSWORD_SAAGIE")
     ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
-
-PROJECT_NAME = "BercyHub - OpenData"
-BUCKET_NAME = "bercy"
+    PROJECT_NAME = os.environ.get("PROJECT_NAME")
+    BUCKET_NAME = os.environ.get("BUCKET_NAME")
+    
 USE_S3 = os.environ.get("USE_S3") # Boolean pour savoir si l'on va utiliser S3 ou non.
 USE_S3 = True
 s3 = boto3.resource(service_name = 's3', 

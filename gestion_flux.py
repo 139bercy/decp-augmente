@@ -42,8 +42,7 @@ decp_file_name = conf_data["decp_file_name"]
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
     print(decp_path)
-    if False:
-    #if utils.USE_S3: 
+    if utils.USE_S3: 
         data = utils.get_object_content(decp_path)
     else : 
         #check_reference_files()
