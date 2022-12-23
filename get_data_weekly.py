@@ -55,24 +55,31 @@ def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
     if local_credentials_exist : # Dans le cas où on fait tourner ça en local
         with open(local_credentials, "r") as f:
             credentials = json.load(f)
-        access_key = credentials["ACCESS_KEY"]
-        secret_key = credentials["SECRET_KEY"]
-        user = credentials["USER_SAAGIE"]
-        password = credentials["PASSWORD_SAAGIE"]
+        ACCESS_KEY = credentials["ACCESS_KEY"]
+        SECRET_KEY = credentials["SECRET_KEY"]
+        USER_SAAGIE = credentials["USER_SAAGIE"]
+        PASSWORD_SAAGIE = credentials["PASSWORD_SAAGIE"]
+        ENDPOINT_S3 = credentials["ENDPOINT_S3"]
+        PROJECT_NAME = credentials["PROJECT_NAME"]
+        BUCKET_NAME = credentials["BUCKET_NAME"]
     else :  # Sur la CI ou Saagie
-        access_key = os.environ.get("ACCESS_KEY")
-        secret_key = os.environ.get("SECRET_KEY")
-        user = os.environ.get("USER_SAAGIE")
-        password = os.environ.get("PASSWORD_SAAGIE")
+        ACCESS_KEY = os.environ.get("ACCESS_KEY")
+        SECRET_KEY = os.environ.get("SECRET_KEY")
+        USER_SAAGIE = os.environ.get("USER_SAAGIE")
+        PASSWORD_SAAGIE = os.environ.get("PASSWORD_SAAGIE")
+        ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
+        PROJECT_NAME = os.environ.get("PROJECT_NAME")
+        BUCKET_NAME = os.environ.get("BUCKET_NAME")
     # Connexion
-    s3 = boto3.resource('s3', 
-                        aws_access_key_id=access_key, 
-                        aws_secret_access_key=secret_key, 
-                        region_name="eu-west-3"
-                        )
-    for file in os.listdir(data_path):
+    s3 = boto3.resource(service_name = 's3', 
+                aws_access_key_id=ACCESS_KEY, 
+                aws_secret_access_key=SECRET_KEY, 
+                region_name="gra",
+                endpoint_url="https://"+str(ENDPOINT_S3)
+                )
+    for file in os.listdir(data_path):        
         logger.info(f"Upload du fichier {file} en cours")
-        object = s3.Object(bucket_name, os.path.join(data_path, file))
+        object = s3.Object(BUCKET_NAME, os.path.join(data_path, file))
         full_path =  os.path.abspath(os.path.join(data_path, file))
         #result = object.put(Body=open(full_path, "rb")) Ne gère pas plus de 5GB.
         try:
