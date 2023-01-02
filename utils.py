@@ -118,7 +118,9 @@ def download_datas():
     most_recents_prefix = ["data/df_cache", "data/hash_keys_modifications", "data/hash_keys_no_modifications"]
     for file in most_recents_prefix:
         last_key = retrieve_lastest(s3.meta.client, file)
-        data_files.append(last_key)
+        if type(last_key) == str :
+            # Autrement dit, si l'on a une correspondance.
+            data_files.append(last_key)
     for obj in data_files:
         print(f"{obj} , {str(obj)} va se télécharger")
         path, filename = os.path.split(obj)
