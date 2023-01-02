@@ -6,6 +6,6 @@
         "seed" : 0
     },
     "enrichissement" : {
-        "debug" : 0
+        "debug" : 1
     }
 }
