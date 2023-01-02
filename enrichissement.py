@@ -37,7 +37,6 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 path_to_data = conf_data["path_to_data"]
 path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
-decp_augmente_file = conf_data["decp_augmente_file_flux"]
 
 if utils.USE_S3:
     folders_to_create = [path_to_cache, path_to_data]
@@ -47,6 +46,7 @@ if utils.USE_S3:
     utils.download_data_enrichissement()
 
 def main():
+    decp_augmente_file = conf_data["decp_augmente_file_flux"]
     today = datetime.date.today()
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
