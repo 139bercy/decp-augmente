@@ -51,7 +51,7 @@ def main():
     today = datetime.date.today()
     flux_file = "df_flux"
     flux_file = utils.retrieve_lastest(utils.s3.meta.client, flux_file)
-    df_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
+    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
         df_flux = utils.get_object_content(flux_file)
@@ -63,7 +63,7 @@ def main():
     if df_flux.empty :
         print('Flux vide')
         if utils.USE_S3:
-            utils.write_object_file_on_s3(df_nettoye_today, df_flux)
+            utils.write_object_file_on_s3(file_nettoye_today, df_flux)
         else : 
             with open('df_nettoye.pkl', 'wb') as df_nettoye:
                 # Export présent pour faciliter l'utilisation du module enrichissement.py
@@ -111,9 +111,9 @@ def main():
     print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     if utils.USE_S3 : 
-        utils.write_object_file_on_s3(df_nettoye_today, df)
+        utils.write_object_file_on_s3(file_nettoye_today, df)
     else:
-        with open(df_nettoye_today, 'wb') as df_nettoye:
+        with open(file_nettoye_today, 'wb') as df_nettoye:
             # Export présent pour faciliter l'utilisation du module enrichissement.py
             pickle.dump(df, df_nettoye)
     df.to_csv("df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".csv")

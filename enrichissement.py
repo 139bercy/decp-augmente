@@ -62,7 +62,9 @@ def main():
     if df.empty:
         logger.info("Flux vide")
         if utils.USE_S3:
-            utils.write_object_file_on_s3(file_decp_augmente_today, df)
+            utils.write_object_file_on_s3(file_decp_augmente_today, df) 
+            # Si le flux est vide on ne ré écrit pas la version de prod.
+
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -91,6 +93,7 @@ def main():
     if utils.USE_S3:
         utils.write_object_file_on_s3(file_decp_augmente_today, df)
         print(f"Fichier {file_decp_augmente_today} enregistré")
+        utils.write_object_file_on_s3("decp_augmente_flux_final.pkl", df)
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:

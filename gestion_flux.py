@@ -9,6 +9,7 @@ import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
+from typing import Union
 import utils
 
 logger = logging.getLogger("main.gestion_flux")
@@ -198,7 +199,7 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
     ----------
     Deux DataFrames, l'un avec les lignes à traiter, l'autre avec les lignes déjà traitées.
     """
-    exists_path = os.path.isfile(path_to_hash_pickle)
+
     print(f"Chargement des hash keys {path_to_hash_pickle}")
     if utils.USE_S3:
         hash_processed = utils.get_object_content(path_to_hash_pickle)
@@ -206,7 +207,8 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
             print("Pas de cache trouvé S3")
             return df, pd.DataFrame()
     else:
-        exists_path = os.path.isfile(path_to_hash_pickle)
+        if type(path_to_hash_pickle) == str :
+            exists_path = os.path.isfile(path_to_hash_pickle)
         if exists_path :
             with open(path_to_hash_pickle, "rb") as file_hash_modif:
                 hash_processed = pickle.load(file_hash_modif)
