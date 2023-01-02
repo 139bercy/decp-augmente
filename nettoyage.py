@@ -3,6 +3,7 @@ import os
 import pickle
 import logging.handlers
 from random import random
+import datetime
 import numpy as np
 import pandas as pd
 import itertools
@@ -47,7 +48,10 @@ def main():
 
     # Chargement du fichier flux
     logger.info("Récupération du flux")
-    flux_file = "df_flux.pkl"
+    today = datetime.date.today()
+    flux_file = "df_flux"
+    flux_file = utils.retrieve_lastest(utils.s3.meta.client, flux_file)
+    df_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
         df_flux = utils.get_object_content(flux_file)
@@ -59,7 +63,7 @@ def main():
     if df_flux.empty :
         print('Flux vide')
         if utils.USE_S3:
-            utils.write_object_file_on_s3("df_nettoye.pkl", df_flux)
+            utils.write_object_file_on_s3(df_nettoye_today, df_flux)
         else : 
             with open('df_nettoye.pkl', 'wb') as df_nettoye:
                 # Export présent pour faciliter l'utilisation du module enrichissement.py
@@ -107,12 +111,12 @@ def main():
     print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
     if utils.USE_S3 : 
-        utils.write_object_file_on_s3("df_nettoye.pkl", df)
+        utils.write_object_file_on_s3(df_nettoye_today, df)
     else:
-        with open('df_nettoye.pkl', 'wb') as df_nettoye:
+        with open(df_nettoye_today, 'wb') as df_nettoye:
             # Export présent pour faciliter l'utilisation du module enrichissement.py
             pickle.dump(df, df_nettoye)
-    df.to_csv("decp_nettoye.csv")
+    df.to_csv("df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".csv")
     logger.info("Ecriture du csv terminé")
 
 
@@ -657,7 +661,7 @@ def recuperation_colonne_a_modifier() -> dict:
         dict
     """
     colonne_to_modify = dict()
-    dict_path = "columns_modifications"
+    dict_path = "columns_modifications.pkl"
     if utils.USE_S3:
         utils.download_file(dict_path, dict_path)
     # On récupère les colonnes détectés dans gestion_flux
@@ -832,6 +836,14 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
     dict_modification = recuperation_colonne_a_modifier()
+        # Safe dict_modification 
+    cols_df = df.columns.tolist()
+    cols_to_del = []
+    for col in dict_modification.keys():
+        if col not in cols_df:
+            cols_to_del.append(col)
+    for col in cols_to_del:
+        dict_modification.pop(col, "None")
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
     # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
     df["id_technique"] = df.index

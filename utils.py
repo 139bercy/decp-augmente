@@ -1,4 +1,5 @@
 import os
+import re
 import boto3
 import json
 import pickle
@@ -83,17 +84,49 @@ def download_cache():
         os.replace(filename , os.path.join(cache_path, filename))
         print(f"{obj.key} , {str(obj.key)} est téléchargé")
     pass
+def retrieve_lastest(client, prefix_object: str):
+        """
+        Cette fonction retourne le nom du dernier object en date correspondant au prefix de prefix_object.
+        
+        Arguments:
+        -----------
+        cient : boto3 client
+        prefix_object : The prefix used to filters objects on the s3 bucket
+
+        """
+        get_last_modified = lambda obj: int(obj['LastModified'].strftime('%s'))
+        objs_ = client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix_object)
+        if "Contents" in objs_.keys() :
+                objs = objs_['Contents']
+                last_added = [obj for obj in sorted(objs, key=get_last_modified, reverse=True)][0]
+                key = last_added['Key']
+                metadata = last_added['LastModified']
+                assert re.sub("[^0-9]", "", key)== metadata.strftime("%Y%m%d"), "Error : le nom de l'objet et sa date de dernière modification ne correspondent pas"
+
+                print(f"L'objet récupéré est {key}, il a été édité le {metadata}")
+                # Est ce que le nom et la date coïncide ? 
+                return key
+        else:
+                print(f"Aucun fichier de prefix {prefix_object} n a été trouvé.")
+                return None
 def download_datas():
     data_path = "data"
     bucket = s3.Bucket(BUCKET_NAME)
-    for obj in bucket.objects.filter(Prefix=data_path):
-        print(f"{obj.key} , {str(obj.key)} va se télécharger")
-        path, filename = os.path.split(obj.key)
-        bucket.download_file(obj.key, filename)
+    data_files = ["data/arrondissement2021.csv", "data/commune2021.csv", "data/StockEtablissement_utf8.csv",
+    "data/StockUniteLegale_utf8.csv", "data/cpv_2008_ver_2013.xlsx", "data/departement2020.csv", 
+    "data/geoflar-communes-2015.csv", "data/region2020.csv" ]
+    most_recents_prefix = ["data/df_cache", "data/hash_keys_modifications", "data/hash_keys_no_modifications"]
+    for file in most_recents_prefix:
+        last_key = retrieve_lastest(s3.meta.client, file)
+        data_files.append(last_key)
+    for obj in data_files:
+        print(f"{obj} , {str(obj)} va se télécharger")
+        path, filename = os.path.split(obj)
+        bucket.download_file(obj, filename)
         if not(os.path.exists(data_path)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
             os.mkdir(data_path)
         os.replace(filename , os.path.join(data_path, filename))
-        print(f"{obj.key} , {str(obj.key)} est téléchargé")
+        print(f"{obj} , {str(obj)} est téléchargé")
     return True
 
 def download_confs():
@@ -133,7 +166,7 @@ def write_object_file_on_s3(file_name: str, object_to_pickle):
 
     Arguments
     -----------
-    path_pickle (str) : Nom du fichier pickle que l'on va stocker sur le S3
+    file_name (str) : Nom du fichier pickle que l'on va stocker sur le S3
     object_to_pickle : Objet à stocker dans le pickle
 
     """

@@ -1,5 +1,6 @@
 import csv
 import json
+import re
 import os
 import pickle
 import logging
@@ -8,6 +9,7 @@ import pandas as pd
 import cProfile
 import pstats
 from geopy.distance import distance, Point
+import datetime
 import utils
 
 logger = logging.getLogger("main.enrichissement")
@@ -44,23 +46,23 @@ if utils.USE_S3:
             os.mkdir(folder)
     utils.download_data_enrichissement()
 
-
-
-
 def main():
-    nettoye_file = "df_nettoye.pkl"
+    today = datetime.date.today()
+    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
+    decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
+    file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        df = utils.get_object_content(nettoye_file)
+        df = utils.get_object_content(file_nettoye_today)
     else:
-        with open(nettoye_file, 'rb') as df_nettoye:
+        with open(file_nettoye_today, 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
 
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
         if utils.USE_S3:
-            utils.write_object_file_on_s3(decp_augmente_file, df)
+            utils.write_object_file_on_s3(file_decp_augmente_today, df)
         if conf_debug["debug"]:
             with open('df_augmente_debug', 'wb') as df_augmente:
                 # Export présent pour faciliter la comparaison
@@ -87,13 +89,16 @@ def main():
 
     logger.info("Début du traitement: Ecriture du csv final: decp_augmente")
     if utils.USE_S3:
-        utils.write_object_file_on_s3(decp_augmente_file, df)
+        utils.write_object_file_on_s3(file_decp_augmente_today, df)
+        print(f"Fichier {file_decp_augmente_today} enregistré")
     # Mise en cache pour être ré_utilisé.
     if conf_debug["debug"]:
         with open('df_augmente_debug', 'wb') as df_augmente:
             # Export présent pour faciliter la comparaison
             pickle.dump(df, df_augmente)
     logger.info("Fin du traitement")
+
+
 
 def concat_unduplicate_and_caching_hash(df):
     """
@@ -105,13 +110,16 @@ def concat_unduplicate_and_caching_hash(df):
     Sinon on doit tout recalculer.
     """
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
+    client = utils.s3.meta.client
     # concat
     path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
-    file_cache_exists = os.path.isfile(path_to_df_cache)
+    latest_cache = utils.retrieve_lastest(client, path_to_df_cache)
+    file_cache_exists = os.path.isfile(latest_cache)
     if file_cache_exists :
-        with open(os.path.join(path_to_data, conf_data['cache_df']), "rb") as file_cache:
+        with open(latest_cache, "rb") as file_cache:
             df_cache = pickle.load(file_cache)
         df = pd.concat([df, df_cache]).reset_index(drop=True)
+
 
     # Save DataFrame pour la prochaine fois
     if utils.USE_S3:

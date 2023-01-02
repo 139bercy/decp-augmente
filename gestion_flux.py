@@ -62,7 +62,7 @@ def main():
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes modifications déjà enrichies.")
     hash_modifications_pickle = conf_data["hash_modifications"] 
     hash_modifications_base_path = os.path.join(path_to_data, hash_modifications_pickle)
-    hash_modifications_pickle_latest = retrieve_lastest(client, hash_modifications_base_path)
+    hash_modifications_pickle_latest = utils.retrieve_lastest(client, hash_modifications_base_path)
     df_modif_to_process, df_modif_processed = differenciate_according_to_hash(df_modif,hash_modifications_pickle_latest)
     #Sauvegarde clef de hache sur le S3
     today = datetime.date.today()
@@ -77,7 +77,7 @@ def main():
     logger.info("Comparaison des clefs de hash calculées avec celles correspondant aux lignes déjà enrichies.")
     hash_no_modifications_pickle = conf_data["hash_no_modifications"]
     hash_no_modifications_base_path = os.path.join(path_to_data, conf_data["hash_no_modifications"])
-    hash_no_modifications_pickle_latest = retrieve_lastest(client, hash_no_modifications_base_path)
+    hash_no_modifications_pickle_latest = utils.retrieve_lastest(client, hash_no_modifications_base_path)
     df_no_modif_to_process, df_no_modif_processed = differenciate_according_to_hash(df_no_modif, hash_no_modifications_pickle_latest)
     #Sauvegarde clef de hache sur le S3
     path_cache_no_modifications = hash_no_modifications_base_path+"-"+today.strftime("%Y-%m-%d")+".pkl"
@@ -94,33 +94,12 @@ def main():
     # Concaténation des dataframes à processer et mise de côté ceux déjà processé
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
-    name_df_flux = "df_flux"+today.strftime("%Y-%m-%d")+".pkl"
+    name_df_flux = "df_flux" + today.strftime("%Y-%m-%d") + ".pkl"
     resp = utils.write_object_file_on_s3(name_df_flux, df_to_process)
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open(name_df_flux, "wb") as file:
         pickle.dump(df_to_process, file)
     return None
-
-def retrieve_lastest(client, prefix_object: str):
-        """
-        Cette fonction retourne le nom du dernier object en date correspondant au prefix de prefix_object.
-        
-        Arguments:
-        -----------
-        cient : boto3 client
-        prefix_object : The prefix used to filters objects on the s3 bucket
-
-        """
-        get_last_modified = lambda obj: int(obj['LastModified'].strftime('%s'))
-        objs = client.list_objects_v2(Bucket=utils.BUCKET_NAME, Prefix=prefix_object)['Contents']
-        last_added = [obj for obj in sorted(objs, key=get_last_modified, reverse=True)][0]
-        key = last_added['Key']
-        metadata = last_added['LastModified']
-        assert re.sub("[^0-9]", "", key)== metadata.strftime("%Y%m%d"), "Error : le nom de l'objet et sa date de dernière modification ne correspondent pas"
-
-        print(f"L'objet récupéré est {key}, il a été édité le {metadata}")
-        # Est ce que le nom et la date coïncide ? 
-        return key
 
 def concat_modifications(dictionaries : list):
     """
