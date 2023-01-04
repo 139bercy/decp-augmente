@@ -202,7 +202,9 @@ def differenciate_according_to_hash(df : pd.DataFrame, path_to_hash_pickle, hash
 
     print(f"Chargement des hash keys {path_to_hash_pickle}")
     if utils.USE_S3:
-        hash_processed = utils.get_object_content(path_to_hash_pickle)
+        hash_processed = None
+        if type(path_to_hash_pickle) == str:
+            hash_processed = utils.get_object_content(path_to_hash_pickle)
         if hash_processed is None: # Equivalent à si le chemin en local n'est pas trouvé
             print("Pas de cache trouvé S3")
             return df, pd.DataFrame()

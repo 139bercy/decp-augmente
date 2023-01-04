@@ -108,7 +108,7 @@ def retrieve_lastest(client, prefix_object: str):
                 return key
         else:
                 print(f"Aucun fichier de prefix {prefix_object} n a été trouvé.")
-                return None
+                return "None"
 def download_datas():
     data_path = "data"
     bucket = s3.Bucket(BUCKET_NAME)

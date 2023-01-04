@@ -511,6 +511,7 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
+    df['anneeNotification'] = np.where(lambda x:str(x).isdigt(), 0, df['anneeNotification']) # Safe casting car parfois on a des formats lunaires.
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
@@ -844,7 +845,7 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
             cols_to_del.append(col)
     for col in cols_to_del:
         dict_modification.pop(col, "None")
-    df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
+    df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False, errors='ignore')
     # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
     df["id_technique"] = df.index
     prise_en_compte_modifications(df)
