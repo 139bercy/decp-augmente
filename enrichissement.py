@@ -48,12 +48,15 @@ if utils.USE_S3:
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
     today = datetime.date.today()
-    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
+    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        df = utils.get_object_content(file_nettoye_today)
+        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-")
+        print(f"Le fichier d entrée est {latest_file_nettoye}, c'est le dernier fichier en sortie de nettoye.")
+        df = utils.get_object_content(latest_file_nettoye)
+        print(f" taille df à la récup: {df.shape}")   
     else:
         with open(file_nettoye_today, 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
@@ -71,7 +74,7 @@ def main():
                 pickle.dump(df, df_augmente)
         return None
 
-    
+    print(f" taille df avant pipeline {df.shape}")    
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
           .pipe(enrichissement_siret)
@@ -112,16 +115,18 @@ def concat_unduplicate_and_caching_hash(df):
     Si un jour on choisit d'exporter une nouvelle colonne il est intéressant d'avoir en cache le dataframe entier.
     Sinon on doit tout recalculer.
     """
+    print(f"Taille dataframe à concat_unduplicate {df.shape}")
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
     client = utils.s3.meta.client
     # concat
     path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
     latest_cache = utils.retrieve_lastest(client, path_to_df_cache)
-    file_cache_exists = os.path.isfile(latest_cache)
-    if file_cache_exists :
-        with open(latest_cache, "rb") as file_cache:
-            df_cache = pickle.load(file_cache)
-        df = pd.concat([df, df_cache]).reset_index(drop=True)
+    if type(latest_cache) == str:
+        file_cache_exists = os.path.isfile(latest_cache)
+        if file_cache_exists :
+            with open(latest_cache, "rb") as file_cache:
+                df_cache = pickle.load(file_cache)
+            df = pd.concat([df, df_cache]).reset_index(drop=True)
 
 
     # Save DataFrame pour la prochaine fois
@@ -412,10 +417,10 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         write_cache(list(set(series_siren_acheteur_valid_but_not_found_in_bdd.tolist())), path_cache_acheteur_not_in_bdd) # On dédoublonne
 
     if utils.USE_S3: # Upload des caches sur le S3
-        utils.write_cache_on_s3(path_cache, dfcache) #Cache n1
-        utils.write_cache_on_s3(path_cache_not_in_bdd, list(set(list_siret_not_found)))
-        utils.write_cache_on_s3(path_cache_acheteur, dfcache_acheteur)
-        utils.write_cache_on_s3(path_cache_acheteur_not_in_bdd, list(set(list_siret_acheteur_not_found)))
+        utils.write_object_file_on_s3(path_cache, dfcache) #Cache n1
+        utils.write_object_file_on_s3(path_cache_not_in_bdd, list(set(list_siret_not_found)))
+        utils.write_object_file_on_s3(path_cache_acheteur, dfcache_acheteur)
+        utils.write_object_file_on_s3(path_cache_acheteur_not_in_bdd, list(set(list_siret_acheteur_not_found)))
 
     logger.info('fin enrichissement_type_entreprise\n')
     return df
@@ -542,8 +547,8 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Enrichissement insee en cours...")
     path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
-    path_to_cache_insee = os.path.join(path_to_data, conf_data["cache_bdd_insee"])
-    path_to_cache_not_in_insee = os.path.join(path_to_data, conf_data["cache_not_in_bdd_insee"])
+    path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
+    path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
     enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee, path_to_cache_not_in_insee)
     logger.info("Enrichissement insee fini")
     logger.info("Enrichissement infogreffe en cours...")
@@ -753,8 +758,8 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
         write_cache(dfcache, path_to_cache_insee)
         write_cache(series_siret_valid_but_not_found_in_bdd.tolist(), path_to_cache_not_in_insee)
     if utils.USE_S3:
-            utils.write_cache_on_s3(path_to_cache_insee, dfcache)
-            utils.write_cache_on_s3(path_to_cache_not_in_insee, sirets_not_found)
+            utils.write_object_file_on_s3(path_to_cache_insee, dfcache)
+            utils.write_object_file_on_s3(path_to_cache_not_in_insee, sirets_not_found)
     return df
 
 def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str, path_to_cache_not_in_bdd: str) -> list:
@@ -802,14 +807,16 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     dfSIRET = dfSIRET[~mask_siret_valid_not_found]
     
     cache_exists = os.path.isfile(path_to_cache_bdd)
+    print(f"Taille avant merge dfSIRET {dfSIRET.shape}")
+    print("Cache : ", path_to_cache_bdd )
     if cache_exists: # Il devrait pas ne pas exister, donc on rentrera toujours dans la boucle. Je laisse la condition pour qu'on comprenne si ça bug un jour en connectant à la CI etc.
         logger.info("Chargement du cache")
         dfcache = loading_cache(path_to_cache_bdd)
         # regarder les siret dans le cache, ceux pas dans le cache on va passer à travers la bdd pour les trouver. Ceux qui ne sont pas dans la BdD sont sauvés dans un 2e cache.
-    
     enrichissement_insee_siret = pd.merge(dfSIRET, dfcache, how='left', on=['siret'], copy=False)
     enrichissement_insee_siret.rename(columns={"siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
+    print(f"Taille après merge dfSIRET {enrichissement_insee_siret.shape}")
     df_nan_siret = pd.concat([enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()], dfSIRET_siret_not_valid, dfSIRET_valide_notfound])
     enrichissement_insee_siret = enrichissement_insee_siret[
         enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
@@ -888,6 +895,7 @@ def get_df_enrichissement(enrichissementScrap: pd.DataFrame, enrichissementInsee
     Returns:
         - pd.DataFrame
     """
+    
     # Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
@@ -958,6 +966,7 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.Dataframe
     """
+    print(f"Taille enrichissement cpv :  {df.shape}")
     # Importation et mise en forme des codes/ref CPV
     logger.info("Début du traitement: Enrichissement cpv")
     path = os.path.join(path_to_data, conf_data["cpv_2008_ver_2013"])
@@ -1026,7 +1035,7 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
 
     df = pd.merge(df, enrichissementAcheteur, how='left', on='acheteur.id', copy=False)
     df = pd.concat([df, dfSIRET_siret_not_valid, df_siret_valid_not_found])
-
+    print(f"Taille enrichissement acheteur :  {df.shape}")
     return df
 
 
@@ -1037,6 +1046,7 @@ def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.Dataframe
     """
+    print(f"Taille reorganisation {df.shape}")
     logger.info("Début du traitement: Reorganisation du dataframe")
     # Ajustement de certaines colonnes
     df.codePostalEtablissement = df.codePostalEtablissement.astype(str).str[:5]

@@ -101,14 +101,17 @@ def retrieve_lastest(client, prefix_object: str):
                 last_added = [obj for obj in sorted(objs, key=get_last_modified, reverse=True)][0]
                 key = last_added['Key']
                 metadata = last_added['LastModified']
-                assert re.sub("[^0-9]", "", key)== metadata.strftime("%Y%m%d"), "Error : le nom de l'objet et sa date de dernière modification ne correspondent pas"
+                metadata_time = metadata.strftime("%Y%m%d")
+                if re.sub("[^0-9]", "", key)!= metadata.strftime("%Y%m%d"):
+                    print("Error : le nom de l'objet et sa date de dernière modification ne correspondent pas")
+                    print(f"Nom {key} \nMetadata {metadata_time}")
 
                 print(f"L'objet récupéré est {key}, il a été édité le {metadata}")
                 # Est ce que le nom et la date coïncide ? 
                 return key
         else:
                 print(f"Aucun fichier de prefix {prefix_object} n a été trouvé.")
-                return "None"
+                return None
 def download_datas():
     data_path = "data"
     bucket = s3.Bucket(BUCKET_NAME)

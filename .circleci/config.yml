@@ -213,24 +213,6 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - gestion_flux:
-          context:
-              - decp-augmente
-          requires:
-              - install_requirements
       - update_file:
           context:
                - decp-augmente
-          requires:
-                - enrichissement_flux
-      - nettoyage_flux:
-          context:
-              - decp-augmente
-          requires:
-              - gestion_flux
-      - enrichissement_flux:
-          context:
-              - decp-augmente
-          requires:
-              - nettoyage_flux
-      
