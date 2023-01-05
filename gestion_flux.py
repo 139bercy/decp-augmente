@@ -178,9 +178,17 @@ def create_hash_key_for_modifications(df_decp_modif : pd.DataFrame):
     with open(name_columns_modification, "wb") as file_modif:
         pickle.dump(columns_modification, file_modif)
     df_modification_explode = explode_according_to_keys(df_decp_modif.modif_up, columns_modification)
+    
+    # Ancienne manière de gérer les titulaires. Une fois que les formats seront stabilisés sur v3 ça peut valoir le coup de remettre en place cette méthode
     # A ce stade, les titulaires sont encore des listes de dictionnaires, donc non hashables. Transformons-les.
-    df_modification_explode['titulaires_transfo'] = df_modification_explode.loc[:, "titulaires"].apply(transform_titulaires)
+    #df_modification_explode['titulaires_transfo'] = df_modification_explode.loc[:, "titulaires"].apply(transform_titulaires)
+
+    # Dans cette manière de faire, plutôt que d'extraire les objets mutables souhaités on transforme la data en str (mutable).
+    # Ce qui ne peut pas amener à de la perte d'information. Seulement à quelques doublons métier, mais qui ne sont donc pas des doublons data à ce stade là du traitement.
+    df_modification_explode['titulaires_str'] = df_modification_explode.loc[:, "titulaires"].apply(str)
+    
     subset_to_hash_modif = conf_glob["gestion_flux"]["subset_for_hash_modifications"]
+    print(subset_to_hash_modif)
     # Mettre le subset_to_hash_modif dans un JSON externable ?
     hash_modif = hash_pandas_object(df_modification_explode.loc[:, subset_to_hash_modif], index=False) # index doit toujours rester à False, sinon la clef de hash prends en compte l'index (ce qu'on ne veut pas)
     df_decp_modif['hash_key'] = hash_modif
