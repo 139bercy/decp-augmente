@@ -53,10 +53,11 @@ def main():
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-")
+        #latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-")
+        latest_file_nettoye = "df_nettoye-2023-01-04.pkl" # Pour debug
         print(f"Le fichier d entrée est {latest_file_nettoye}, c'est le dernier fichier en sortie de nettoye.")
         df = utils.get_object_content(latest_file_nettoye)
-        print(f" taille df à la récup: {df.shape}")   
+        print(f" taille df à la récup: {df.shape}")
     else:
         with open(file_nettoye_today, 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
@@ -119,22 +120,23 @@ def concat_unduplicate_and_caching_hash(df):
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
     client = utils.s3.meta.client
     # concat
-    path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])
-    latest_cache = utils.retrieve_lastest(client, path_to_df_cache)
-    if type(latest_cache) == str:
-        file_cache_exists = os.path.isfile(latest_cache)
-        if file_cache_exists :
-            with open(latest_cache, "rb") as file_cache:
-                df_cache = pickle.load(file_cache)
-            df = pd.concat([df, df_cache]).reset_index(drop=True)
+    path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df']) # chemin du cache sur le s3
+    local_path_df_cache = "df_cache" # Chemin où se trouve le dataframe de cache en local.
+    utils.download_file(path_to_df_cache, local_path_df_cache)
+    file_cache_exists = os.path.isfile(local_path_df_cache)
+    if file_cache_exists :
+        with open(local_path_df_cache, "rb") as file_cache:
+            df_cache = pickle.load(file_cache)
+        df = pd.concat([df, df_cache]).reset_index(drop=True)
 
 
     # Save DataFrame pour la prochaine fois
     if utils.USE_S3:
         utils.write_object_file_on_s3(path_to_df_cache, df)
 
-    with open(path_to_df_cache, "wb") as file_cache:
-            pickle.dump(df, file_cache)
+    else:
+        with open(path_to_df_cache, "wb") as file_cache:
+                pickle.dump(df, file_cache)
     
     return df
 
