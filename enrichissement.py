@@ -54,7 +54,7 @@ def main():
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-2023-01-05.pkl")
+        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-")
         print(f"Le fichier d entrée est {latest_file_nettoye}, c'est le dernier fichier en sortie de nettoye.")
         df = utils.get_object_content(latest_file_nettoye)
         print(f" taille df à la récup: {df.shape}")
