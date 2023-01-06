@@ -27,9 +27,9 @@ else :  # Sur la CI ou Saagie
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER =os.environ.get("USER_SAAGIE")
     PASSWORD = os.environ.get("PASSWORD_SAAGIE")
-    USER_DATAECO = os.environ.get["USER_DATAECO"]
-    PWD_DATAECO = os.environ.get["PASSWORD_DATAECO"]
-    HOST_DATAECO = os.environ.get["HOST_DATAECO"]
+    USER_DATAECO = os.environ.get("USER_DATAECO")
+    PWD_DATAECO = os.environ.get("PASSWORD_DATAECO")
+    HOST_DATAECO = os.environ.get("HOST_DATAECO")
 
  
 if utils.USE_S3:
