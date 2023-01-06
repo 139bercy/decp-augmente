@@ -31,7 +31,7 @@ else :  # Sur la CI ou Saagie
     PWD_DATAECO = os.environ.get["PASSWORD_DATAECO"]
     HOST_DATAECO = os.environ.get["HOST_DATAECO"]
 
-
+ 
 if utils.USE_S3:
     res = utils.download_file(PATH_FILE_CONFIG, PATH_FILE_CONFIG)
     pass

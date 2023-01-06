@@ -62,7 +62,7 @@ def get_files_to_updates():
     changed_files = REPO.git.diff(f"{id_commit}..HEAD", name_only=True) # On récupère uniquement les noms des fichiers qui ont été concernés par des commits depuis le dernier commit mis sur Saagie
     return changed_files.split('\n'), object
     
-def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_utils=["gestion_flux.py", "nettoyage.py", "enrichissement.py"]):
+def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_utils=["gestion_flux.py", "nettoyage.py", "enrichissement.py", "upload_dataeco.py"]):
     """
     Cette fonction met à jour les jobs Saagie. Une fois que les jobs ont été mis à jour ou créés, on stock dans le fichier S3 correspondant l'ID du commit.
     
