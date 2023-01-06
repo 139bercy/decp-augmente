@@ -9,6 +9,7 @@ import pandas as pd
 import cProfile
 import pstats
 from geopy.distance import distance, Point
+from botocore.errorfactory import ClientError
 import datetime
 import utils
 
@@ -53,7 +54,7 @@ def main():
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
         logger.info(" Fichier Flux chargé depuis S3")
-        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-")
+        latest_file_nettoye = utils.retrieve_lastest(utils.s3.meta.client, "df_nettoye-2023-01-05.pkl")
         print(f"Le fichier d entrée est {latest_file_nettoye}, c'est le dernier fichier en sortie de nettoye.")
         df = utils.get_object_content(latest_file_nettoye)
         print(f" taille df à la récup: {df.shape}")
@@ -121,7 +122,11 @@ def concat_unduplicate_and_caching_hash(df):
     # concat
     path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df']) # chemin du cache sur le s3
     local_path_df_cache = "df_cache" # Chemin où se trouve le dataframe de cache en local.
-    utils.download_file(path_to_df_cache, local_path_df_cache)
+    try:
+        utils.download_file(path_to_df_cache, local_path_df_cache)
+    except ClientError:
+        print('Le cache n est pas encore dans le Bucket. Ou une autre erreur est intervenu.')
+        # C'est moins lourd que de tester l'existence de
     file_cache_exists = os.path.isfile(local_path_df_cache)
     if file_cache_exists :
         with open(local_path_df_cache, "rb") as file_cache:
