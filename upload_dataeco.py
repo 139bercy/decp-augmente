@@ -51,6 +51,6 @@ path_file_to_upload_csv = path_file_to_upload[:-4]+".csv"
 df.to_csv(path_file_to_upload_csv, quoting=csv.QUOTE_NONNUMERIC, sep=";", index=False)
 bash_cmd_install = [f"apt install lftp"] # Faute de mieux, on installe lftp ainsi.
 subprocess.call(bash_cmd_install, shell=True)
-bash_cmd = [f"lftp -u {USER_DATAECO}:{PWD_DATAECO} {HOST_DATAECO} -e 'cd decp; put {path_file_to_upload_csv}; quit'"] # Je n'ai pas trouvé de biblio ftp python satisfaisante. Donc ce sera en bash
+bash_cmd = [f"apt install lftp; lftp -u {USER_DATAECO}:{PWD_DATAECO} {HOST_DATAECO} -e 'cd decp; put {path_file_to_upload_csv}; quit'"] # Je n'ai pas trouvé de biblio ftp python satisfaisante. Donc ce sera en bash
 subprocess.call(bash_cmd, shell=True)
 #Commande bash à utiliser pour upload en ftp
