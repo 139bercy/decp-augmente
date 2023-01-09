@@ -47,7 +47,7 @@ else:
 #Ouverture du pkl et conversion en CSV
 with open(path_file_to_upload, "rb") as f:
     df = pickle.load(f)
-path_file_to_upload_csv = path_file_to_upload[:-4]+".csv"
+path_file_to_upload_csv = path_file_to_upload[:-4]+"iiiiii.csv"
 df.to_csv(path_file_to_upload_csv, quoting=csv.QUOTE_NONNUMERIC, sep=";", index=False)
 bash_cmd_install = [f"apt install lftp"] # Faute de mieux, on installe lftp ainsi.
 subprocess.call(bash_cmd_install, shell=True)
