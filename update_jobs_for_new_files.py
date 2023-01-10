@@ -93,9 +93,12 @@ def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_uti
                 if file in files_to_zip_with_utils:
                     zipObj.write('utils.py')
                 zipObj.close()
+
                 if file_name == "upload_dataeco":
-                    saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"apt-get update \n apt-get install lftp \n python {file_name}.py")
-                saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"python {file_name}.py")
+
+                    saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"apt-get update \napt-get install lftp \npython {file_name}.py")
+                else:
+                    saagieapi.jobs.upgrade(job_id=id_job, file=f"{file_name}.zip", command_line=f"python {file_name}.py")
             except :
                 print(f"Il n'existe pas de jobs {file_name}. On le créé avec les paramètres par défaut.")
                 id_projet = saagieapi.projects.get_id(PROJECT_NAME)
