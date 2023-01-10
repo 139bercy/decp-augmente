@@ -49,6 +49,6 @@ with open(path_file_to_upload, "rb") as f:
     df = pickle.load(f)
 path_file_to_upload_csv = path_file_to_upload[:-4]+".csv"
 df.to_csv(path_file_to_upload_csv, quoting=csv.QUOTE_NONNUMERIC, sep=";", index=False)
-bash_cmd = [f" lftp -u {USER_DATAECO}:{PWD_DATAECO} {HOST_DATAECO} -e 'cd decp; put {path_file_to_upload_csv}; quit'"] # Je n'ai pas trouvé de biblio ftp python satisfaisante. Donc ce sera en bash
+bash_cmd = [f" lftp -u {USER_DATAECO}:{PWD_DATAECO} {HOST_DATAECO} -e 'set ftp:ssl-force true ; set ssl:verify-certificate false;cd decp; put {path_file_to_upload_csv}; quit'"] # Je n'ai pas trouvé de biblio ftp python satisfaisante. Donc ce sera en bash
 subprocess.call(bash_cmd, shell=True)
 #Commande bash à utiliser pour upload en ftp
