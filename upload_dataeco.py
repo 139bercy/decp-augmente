@@ -44,7 +44,7 @@ if utils.USE_S3:
     pass
 else:
     print(f"Vous allez upload {path_file_to_upload} depuis votre version local")
-#Ouverture du pkl et conversion en CSV
+#Ouverture du pkl et conversion en CSV 
 with open(path_file_to_upload, "rb") as f:
     df = pickle.load(f)
 path_file_to_upload_csv = path_file_to_upload[:-4]+".csv"
