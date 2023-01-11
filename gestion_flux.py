@@ -9,7 +9,7 @@ import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
-from typing import Union
+import argparse
 import utils
 
 logger = logging.getLogger("main.gestion_flux")
@@ -39,6 +39,14 @@ path_to_data = conf_data["path_to_data"]
 if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_data)
 decp_file_name = conf_data["decp_file_name"]
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
+if args:
+    # On supprime les clefs de hash déjà calculés pour les recalculer et vérifier que tout se passe bien dans la CI.
+    bucket = utils.s3.Bucket(utils.BUCKET_NAME)
+    print('Les clefs de hash sont supprimés du bucket, si vous faites des modifications sur d autres objets présent dans le S3. Il peut être nécessaire de les supprimés en amont.')
+    bucket.objects.filter(Prefix="data/hash_").delete()
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
@@ -51,6 +59,14 @@ def main():
         with open(decp_path, encoding='utf-8') as json_data:
             data = json.load(json_data)
     client = utils.s3.meta.client
+    if args: # On prend un dataset réduit pour les tests CI.
+        n_data = len(data["marches"])
+        n_subset = 150000 # Choix arbitraire.
+        np.random.seed(os.environ.get("SEED"))
+        random_i = list(np.random.choice(n_data, n_subset))
+        accessed_mapping = map(data['marches'].__getitem__, random_i)
+        accessed_list = list(accessed_mapping)
+        data['marches'] = accessed_list
     df_decp = json_normalize(data['marches'])
     print('original', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")

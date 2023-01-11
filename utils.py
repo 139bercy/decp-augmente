@@ -3,6 +3,7 @@ import re
 import boto3
 import json
 import pickle
+import argparse
 import botocore
 
 
@@ -35,6 +36,14 @@ s3 = boto3.resource(service_name = 's3',
                 region_name="gra",
                 endpoint_url="https://"+str(ENDPOINT_S3)
                 )
+
+                
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
+if args: # Dans le cas de la CI
+    BUCKET_NAME = os.environ.get("BUCKET_NAME_TEST")
+    BUCKET_NAME = "testdecp"
 
 def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_bases = ["departements-francais", "region-fr"]):
     """
