@@ -52,9 +52,10 @@ def main():
             data = json.load(json_data)
     client = utils.s3.meta.client
     df_decp = json_normalize(data['marches'])
+    print('BUCKET : ', utils.BUCKET_NAME)
     print('original', df_decp.shape)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
-
+    print("Nb de Nan pour lieu à LIEUO : ", df_decp.loc[:, "lieuExecution.nom"].isna().sum())
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
 
     #Gestion de la partie avec les modifications
@@ -97,6 +98,7 @@ def main():
     #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
     name_df_flux = "df_flux" + today.strftime("%Y-%m-%d") + ".pkl"
     resp = utils.write_object_file_on_s3(name_df_flux, df_to_process)
+    print("LIEUA : ", df_to_process.loc[:, "lieuExecution.nom"].isna().sum())
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open(name_df_flux, "wb") as file:
         pickle.dump(df_to_process, file)

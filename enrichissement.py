@@ -75,7 +75,8 @@ def main():
                 pickle.dump(df, df_augmente)
         return None
 
-    print(f" taille df avant pipeline {df.shape}")    
+    print(f" taille df avant pipeline {df.shape}")
+    print("LIEUA : ", df.loc[:, "lieuExecution.nom"].isna().sum())
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
           .pipe(enrichissement_siret)
@@ -117,6 +118,7 @@ def concat_unduplicate_and_caching_hash(df):
     Sinon on doit tout recalculer.
     """
     print(f"Taille dataframe à concat_unduplicate {df.shape}")
+    print("LIEUD : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
     client = utils.s3.meta.client
     # concat
@@ -166,6 +168,7 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
         "categorieEntreprise": "categorieEtablissement",
     })
     print('COLONNE dans le df : ', df.columns)
+    print("LIEUE : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     return df
 
 
@@ -1060,8 +1063,9 @@ def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
     df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(str).str[:5]
-
+    print('NOTIF C ', df.dateNotification.isna().sum())
     df.anneeNotification = df.anneeNotification.astype(str)
+    print('NOTIF D ', df.dateNotification.isna().sum())
     df.codeDepartementExecution = df.codeDepartementExecution.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental
@@ -1121,6 +1125,7 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.DataFrame
     """
+    print("LIEUB : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     logger.info(" Taille du dataframe à enrichissement géo {df.shape}")
     logger.info("Début du traitement: Enrichissement geographique")
     # Enrichissement latitude & longitude avec adresse la ville
@@ -1161,6 +1166,7 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     df['geolocCommuneEtablissement'] = np.where(
         df['geolocCommuneEtablissement'] == 'nan,nan', np.NaN, df['geolocCommuneEtablissement'])
     df.reset_index(inplace=True, drop=True)
+    print("LIEUC : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     return df
 
 

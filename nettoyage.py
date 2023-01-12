@@ -92,7 +92,9 @@ def main():
         data['marches'] = accessed_list
 
     logger.info("Début du traitement: Conversion des données en pandas")
+    df_flux = df_flux[df_flux.modifications.apply(len)==0]
     df = manage_modifications(df_flux)
+    print("LIEU : ", df.loc[:, "lieuExecution.nom"].isna().sum())
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
@@ -436,6 +438,8 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                 "Zone d'execution du marché")
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
+    print("LIEU3 DEBUT : ", df.loc[:, "lieuExecution.nom"].isna().sum())
+
     logger.info("Création de la colonne département Execution")
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
     liste_correspondance = conf_glob["nettoyage"]["DOM2name"]
@@ -484,6 +488,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     path_reg = os.path.join(path_to_data, conf_data["region-fr"])
     region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
     region.columns = ["reg", "libelle_reg"]
+    print("LIEU3 FIN : ", df.loc[:, "lieuExecution.nom"].isna().sum())
 
     df = pd.merge(df, region, how="left",
                   left_on="codeRegionExecution", right_on="reg")
@@ -511,7 +516,8 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
-    df['anneeNotification'] = np.where(lambda x:str(x).isdigt(), 0, df['anneeNotification']) # Safe casting car parfois on a des formats lunaires.
+    mask_only_digits = df['anneeNotification'].apply(lambda x:str(x).isdigit())
+    df['anneeNotification'] = np.where(mask_only_digits, df['anneeNotification'], 0) # Safe casting car parfois on a des formats lunaires.
     df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
@@ -648,6 +654,7 @@ def regroupement_marche_complet(df):
     df["nombreTitulaireSurMarchePresume"] = 0 # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
     df.update(df_reconstruct)
     df['nombreTitulaireSurMarchePresume'].replace(0,np.nan, inplace=True) # Ajout artificiel pour se caler sur le format de la fonction regroupement_marche_complet() initiale
+    print("LIEU2 : ", df.loc[:, "lieuExecution.nom"].isna().sum())
 
     return df
 
