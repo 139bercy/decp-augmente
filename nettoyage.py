@@ -92,7 +92,6 @@ def main():
         data['marches'] = accessed_list
 
     logger.info("Début du traitement: Conversion des données en pandas")
-    df_flux = df_flux[df_flux.modifications.apply(len)==0]
     df = manage_modifications(df_flux)
     print("LIEU : ", df.loc[:, "lieuExecution.nom"].isna().sum())
     logger.info("Fin du traitement")
