@@ -165,6 +165,7 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
         "natureObjet": "natureObjetMarche",
         "categorieEntreprise": "categorieEtablissement",
     })
+    print('COLONNE dans le df : ', df.columns)
     return df
 
 
