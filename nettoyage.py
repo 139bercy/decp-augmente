@@ -93,7 +93,6 @@ def main():
 
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(df_flux)
-    print("LIEU : ", df.loc[:, "lieuExecution.nom"].isna().sum())
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)

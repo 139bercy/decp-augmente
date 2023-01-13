@@ -1063,9 +1063,7 @@ def reorganisation(df: pd.DataFrame) -> pd.DataFrame:
     df.codePostalAcheteur = df.codePostalAcheteur.astype(str).str[:5]
     df.codeCommuneEtablissement = df.codeCommuneEtablissement.astype(str).str[:5]
     df.codeCommuneAcheteur = df.codeCommuneAcheteur.astype(str).str[:5]
-    print('NOTIF C ', df.dateNotification.isna().sum())
     df.anneeNotification = df.anneeNotification.astype(str)
-    print('NOTIF D ', df.dateNotification.isna().sum())
     df.codeDepartementExecution = df.codeDepartementExecution.astype(str)
 
     # codePostal est enlevé pour le moment car est un code départemental

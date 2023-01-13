@@ -9,7 +9,7 @@ import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
 from pandas import json_normalize
-from typing import Union
+import argparse
 import utils
 
 logger = logging.getLogger("main.gestion_flux")
@@ -50,12 +50,22 @@ def main():
         logger.info("Ouverture du fichier decp.json d'aujourd'hui")
         with open(decp_path, encoding='utf-8') as json_data:
             data = json.load(json_data)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+    args = parser.parse_args()
+    if args: # Dans le cas de la CI
+        seed = int(os.environ.get('SEED'))
+        np.random.seed(seed)
+        n_subset = int(os.environ.get("TAILLE_SUBSET"))
+        random_i = list(np.random.choice(len(data["marches"]), n_subset))
+        accessed_mapping = map(data['marches'].__getitem__, random_i)
+        accessed_list = list(accessed_mapping)
+        data['marches'] = accessed_list
     client = utils.s3.meta.client
     df_decp = json_normalize(data['marches'])
     print('BUCKET : ', utils.BUCKET_NAME)
-    print('original', df_decp.shape)
+    
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
-    print("Nb de Nan pour lieu à LIEUO : ", df_decp.loc[:, "lieuExecution.nom"].isna().sum())
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
 
     #Gestion de la partie avec les modifications

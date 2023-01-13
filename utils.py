@@ -4,6 +4,8 @@ import boto3
 import json
 import pickle
 import botocore
+import argparse
+import logging
 
 
 local_credentials="saagie_cred.json"
@@ -35,7 +37,15 @@ s3 = boto3.resource(service_name = 's3',
                 region_name="gra",
                 endpoint_url="https://"+str(ENDPOINT_S3)
                 )
+logger = logging.getLogger("main.utils")
+logger.setLevel(logging.DEBUG)
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
+if args: # Dans le cas de la CI
+    BUCKET_NAME = os.environ.get("BUCKET_NAME_TEST")
 
+logger.info(f"Le nom du Bucket utilisé est : {BUCKET_NAME}")
 def download_data_nettoyage(path_json_needed="confs/config_data.json", useful_bases = ["departements-francais", "region-fr"]):
     """
     Cette fonction télécharge les bases de données utiles pour nettoyage.py
