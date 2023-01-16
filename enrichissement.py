@@ -38,6 +38,7 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 path_to_data = conf_data["path_to_data"]
 path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
+today = datetime.date.today()
 
 if utils.USE_S3:
     folders_to_create = [path_to_cache, path_to_data]
@@ -48,7 +49,6 @@ if utils.USE_S3:
 
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
-    today = datetime.date.today()
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
     file_nettoye_today  ="df_nettoye-2023-01-05.pkl"
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
@@ -129,6 +129,7 @@ def concat_unduplicate_and_caching_hash(df):
         print('Le cache n est pas encore dans le Bucket. Ou une autre erreur est intervenu.')
         # C'est moins lourd que de tester l'existence de
     file_cache_exists = os.path.isfile(local_path_df_cache)
+    df['date_add_dfcache'] = today.strftime("%Y-%m-%d")
     if file_cache_exists :
         with open(local_path_df_cache, "rb") as file_cache:
             df_cache = pickle.load(file_cache)
