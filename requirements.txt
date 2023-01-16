@@ -14,3 +14,4 @@ wget
 GitPython
 boto3
 saagieapi
+pytest 

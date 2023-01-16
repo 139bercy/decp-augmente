@@ -30,7 +30,6 @@ else :  # Sur la CI ou Saagie
     ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
     PROJECT_NAME = os.environ.get("PROJECT_NAME")
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
-print('b', BUCKET_NAME)    
 USE_S3 = os.environ.get("USE_S3") # Boolean pour savoir si l'on va utiliser S3 ou non.
 USE_S3 = True
 s3 = boto3.resource(service_name = 's3', 

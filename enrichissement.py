@@ -62,7 +62,6 @@ def main():
     else:
         with open(file_nettoye_today, 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
-
     # Gestion flux vide
     if df.empty:
         logger.info("Flux vide")
@@ -129,7 +128,7 @@ def concat_unduplicate_and_caching_hash(df):
         print('Le cache n est pas encore dans le Bucket. Ou une autre erreur est intervenu.')
         # C'est moins lourd que de tester l'existence de
     file_cache_exists = os.path.isfile(local_path_df_cache)
-    df['date_add_dfcache'] = today.strftime("%Y-%m-%d")
+    df['date_ajout_dfcache'] = today.strftime("%Y-%m-%d")
     if file_cache_exists :
         with open(local_path_df_cache, "rb") as file_cache:
             df_cache = pickle.load(file_cache)
@@ -470,8 +469,8 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     pathbdd_acheteur = os.path.join(path_to_cache, conf_data["cache_acheteur_bdd_legale"])
     with open(pathbdd_acheteur, "rb") as f:
         df_bdd_acheteur = pickle.load(f)
-    dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siren , df_bdd_acheteur.denominationUniteLegale))
-    df["nomAcheteur_enrichi"] = df.idAcheteur.map(dict_mapping_acheteur)
+    dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siret , df_bdd_acheteur.denominationUniteLegale))
+    df["nomAcheteur_enrichi"] = df.idAcheteur.map(dict_mapping_acheteur) #idAcheteur est un siret à 14 chiffres, la plupart du temps.
     mask_nan_nom_acheteur = df.loc[:, "nomAcheteur_enrichi"].isna()
     df.loc[mask_nan_nom_acheteur, "nomAcheteur_enrichi"] = df.loc[mask_nan_nom_acheteur, "nomAcheteur"]
     df["nomAcheteur"] = df["nomAcheteur_enrichi"]
