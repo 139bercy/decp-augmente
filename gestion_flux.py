@@ -53,6 +53,8 @@ def main():
     parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
     args = parser.parse_args()
     if args.test: # Dans le cas de la CI
+        bucket = s3.Bucket(utils.BUCKET_NAME)
+        bucket.objects.filter(Prefix="data/hash_keys").delete()
         seed = int(os.environ.get('SEED'))
         np.random.seed(seed)
         n_subset = int(os.environ.get("TAILLE_SUBSET"))
