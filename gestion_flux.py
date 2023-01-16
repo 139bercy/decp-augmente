@@ -42,7 +42,6 @@ decp_file_name = conf_data["decp_file_name"]
 
 def main():
     decp_path = os.path.join(path_to_data, decp_file_name)
-    print(decp_path)
     if utils.USE_S3: 
         data = utils.get_object_content(decp_path)
     else : 
@@ -53,7 +52,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
     args = parser.parse_args()
-    if args: # Dans le cas de la CI
+    if args.test: # Dans le cas de la CI
         seed = int(os.environ.get('SEED'))
         np.random.seed(seed)
         n_subset = int(os.environ.get("TAILLE_SUBSET"))
@@ -63,8 +62,7 @@ def main():
         data['marches'] = accessed_list
     client = utils.s3.meta.client
     df_decp = json_normalize(data['marches'])
-    print('BUCKET : ', utils.BUCKET_NAME)
-    
+    print('BUCKET visé : ', utils.BUCKET_NAME)
     logger.info("Séparation du DataFrame en deux : marchés avec et sans modifications")
     df_modif, df_no_modif = split_dataframes_according_to_modifications(df_decp)
 

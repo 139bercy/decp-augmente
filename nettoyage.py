@@ -59,6 +59,7 @@ def main():
         print('Chargement en local')
         with open(flux_file, "rb") as flux_file:
             df_flux = pickle.load(flux_file)
+    print('BUCKET visé : ', utils.BUCKET_NAME)
     # SI il n'y a pas d'ajout de données.
     if df_flux.empty :
         print('Flux vide')

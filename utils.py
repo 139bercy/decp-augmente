@@ -13,6 +13,7 @@ local_credentials_exist = os.path.exists(local_credentials)
 if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     with open(local_credentials, "r") as f:
         credentials = json.load(f)
+    print('e')
     ACCESS_KEY = credentials["ACCESS_KEY"]
     SECRET_KEY = credentials["SECRET_KEY"]
     USER =credentials["USER_SAAGIE"]
@@ -21,6 +22,7 @@ if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     PROJECT_NAME = credentials["PROJECT_NAME"]
     BUCKET_NAME = credentials["BUCKET_NAME"]
 else :  # Sur la CI ou Saagie
+    print('i')
     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER =os.environ.get("USER_SAAGIE")
@@ -28,7 +30,7 @@ else :  # Sur la CI ou Saagie
     ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
     PROJECT_NAME = os.environ.get("PROJECT_NAME")
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
-    
+print('b', BUCKET_NAME)    
 USE_S3 = os.environ.get("USE_S3") # Boolean pour savoir si l'on va utiliser S3 ou non.
 USE_S3 = True
 s3 = boto3.resource(service_name = 's3', 
@@ -42,7 +44,8 @@ logger.setLevel(logging.DEBUG)
 parser = argparse.ArgumentParser()
 parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
 args = parser.parse_args()
-if args: # Dans le cas de la CI
+if args.test: # Dans le cas de la CI
+    print("On est dans une phase de test")
     BUCKET_NAME = os.environ.get("BUCKET_NAME_TEST")
 
 logger.info(f"Le nom du Bucket utilisé est : {BUCKET_NAME}")
@@ -146,6 +149,7 @@ def download_datas():
 
 def download_confs():
     conf_path = "confs/"
+    print('bb',BUCKET_NAME)
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=conf_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")

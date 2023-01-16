@@ -21,10 +21,10 @@ if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le
     os.mkdir(path_to_conf)
 if utils.USE_S3:
     res = utils.download_confs()
-if res :
-    logger.info("Chargement des fichiers confs depuis le S3")
-else:
-    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
+    if res :
+        logger.info("Chargement des fichiers confs depuis le S3")
+    else:
+        logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
@@ -50,6 +50,7 @@ def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
     today = datetime.date.today()
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
+    file_nettoye_today  ="df_nettoye-2023-01-05.pkl"
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
@@ -144,6 +145,10 @@ def concat_unduplicate_and_caching_hash(df):
         with open(path_to_df_cache, "wb") as file_cache:
                 pickle.dump(df, file_cache)
     
+    # Petit tour de unduplicate stricte. Pourquoi ? Il se peut qu'avec le jeu des caches et des jobs séparés certaines lignes de flux soient éventuellement retraités (notamment lorsqu'un job tombe mais pas les autres).
+    # Bien que je vais modifier la pipeline pour pas que ça se produise, cette sécurité n'est pas de trop et ne coûte quasi rien.
+    df = df.drop_duplicates(keep="first")
+
     return df
 
 def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
@@ -1252,7 +1257,7 @@ if __name__ == "__main__":
         with open('df_nettoye', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
             init_len = len(df)
-        with open("profilingSenrichissement_size{}.txt".format(init_len), "w") as f:
+        with open("profilingSenrichissement_size{}.txt".format(init_len), "w") as f: # Pour optimiser temporellement 
             ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
             ps.sort_stats('cumulative')
             ps.print_stats()
