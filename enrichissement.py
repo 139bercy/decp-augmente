@@ -146,7 +146,7 @@ def concat_unduplicate_and_caching_hash(df):
     # Petit tour de unduplicate stricte. Pourquoi ? Il se peut qu'avec le jeu des caches et des jobs séparés certaines lignes de flux soient éventuellement retraités (notamment lorsqu'un job tombe mais pas les autres).
     # Bien que je vais modifier la pipeline pour pas que ça se produise, cette sécurité n'est pas de trop et ne coûte quasi rien. J'ai mis un max de colonne d'objet hashable.
     df = df.drop_duplicates(keep="first", subset=["source", "id", "objetMarche","codeCPV_Original",
-            "dateNotification", "dureeMois","montant","nomAcheteur", "idAcheteur", "lieuExecutionCode", "lieuExecutionNom", "nature", "procedure", "formePrix"
+            "dateNotification", "dureeMois","montant","nomAcheteur", "idAcheteur", "lieuExecutionCode", "lieuExecutionNom", "nature", "procedure", "formePrix",
             "sirenEtablissement", "id_cotitulaire1", "id_cotitulaire2", "id_cotitulaire3"])
 
     return df
