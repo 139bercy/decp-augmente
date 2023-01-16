@@ -77,7 +77,6 @@ def main():
         return None
 
     print(f" taille df avant pipeline {df.shape}")
-    print("LIEUA : ", df.loc[:, "lieuExecution.nom"].isna().sum())
     df = df.astype(conf_glob["enrichissement"]["type_col_enrichissement"], copy=False)
     df = (df.pipe(cache_management_insee)
           .pipe(enrichissement_siret)
@@ -119,7 +118,6 @@ def concat_unduplicate_and_caching_hash(df):
     Sinon on doit tout recalculer.
     """
     print(f"Taille dataframe à concat_unduplicate {df.shape}")
-    print("LIEUD : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
     client = utils.s3.meta.client
     # concat
@@ -147,7 +145,9 @@ def concat_unduplicate_and_caching_hash(df):
     
     # Petit tour de unduplicate stricte. Pourquoi ? Il se peut qu'avec le jeu des caches et des jobs séparés certaines lignes de flux soient éventuellement retraités (notamment lorsqu'un job tombe mais pas les autres).
     # Bien que je vais modifier la pipeline pour pas que ça se produise, cette sécurité n'est pas de trop et ne coûte quasi rien.
-    df = df.drop_duplicates(keep="first")
+    df = df.drop_duplicates(keep="first", subset=["source", "id", "objetMarche","codeCPV_Original",
+            "dateNotification", "dureeMois","montant","nomAcheteur", "idAcheteur", "lieuExecutionCode", 
+            "sirenEtablissement", "id_cotitulaire1", "id_cotitulaire2", "id_cotitulaire3"])
 
     return df
 
@@ -173,7 +173,6 @@ def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
         "categorieEntreprise": "categorieEtablissement",
     })
     print('COLONNE dans le df : ', df.columns)
-    print("LIEUE : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     return df
 
 
@@ -1128,7 +1127,6 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     Return:
         - pd.DataFrame
     """
-    print("LIEUB : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     logger.info(" Taille du dataframe à enrichissement géo {df.shape}")
     logger.info("Début du traitement: Enrichissement geographique")
     # Enrichissement latitude & longitude avec adresse la ville
@@ -1169,7 +1167,6 @@ def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     df['geolocCommuneEtablissement'] = np.where(
         df['geolocCommuneEtablissement'] == 'nan,nan', np.NaN, df['geolocCommuneEtablissement'])
     df.reset_index(inplace=True, drop=True)
-    print("LIEUC : ", df.loc[:, "lieuExecutionNom"].isna().sum())
     return df
 
 
