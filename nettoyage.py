@@ -844,12 +844,12 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
     dict_modification = recuperation_colonne_a_modifier()
-    # Safe dict_modification 
 
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False, errors='ignore')
     # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
     df["id_technique"] = df.index
     prise_en_compte_modifications(df)
+    # Safe dict_modification 
     cols_df = df.columns.tolist()
     cols_to_del = []
     for col in dict_modification.keys():
