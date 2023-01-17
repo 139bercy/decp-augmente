@@ -91,7 +91,6 @@ def main():
         accessed_mapping = map(data['marches'].__getitem__, random_i)
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
-
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(df_flux)
     logger.info("Fin du traitement")
@@ -653,7 +652,6 @@ def regroupement_marche_complet(df):
     df["nombreTitulaireSurMarchePresume"] = 0 # Je créé la colonne dans df pour que les deux colonnes soit update avec la methode update()
     df.update(df_reconstruct)
     df['nombreTitulaireSurMarchePresume'].replace(0,np.nan, inplace=True) # Ajout artificiel pour se caler sur le format de la fonction regroupement_marche_complet() initiale
-    print("LIEU2 : ", df.loc[:, "lieuExecution.nom"].isna().sum())
 
     return df
 
@@ -684,7 +682,7 @@ def recuperation_colonne_a_modifier() -> dict:
         colonne_to_modify[key] = value
 
     colonne_to_modify["objetModification"] = "objetModification" # Cette colonne est un cas particulier.
-    print(colonne_to_modify)
+    print('Colonne de modification', colonne_to_modify)
     # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
     # Le mapping suivra la forme "xxxModification" : "xxx".
     # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.
@@ -825,9 +823,12 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         marche_init["idtech"] = marche.iloc[-1].id_technique
         marches_init.append(marche_init)
     if marches_init :  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
+        print('oui')
         df_to_concatene = pd.concat([x for x in marches_init], copy=False)
         df.update(df_to_concatene)
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
+        print(dict_modification)
+        print(df)
         df = fusion_source_modification_whole_dataset(df, dict_modification)
     else: # Pour que la colonne idMarche existe quand même.
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique) 
@@ -843,18 +844,20 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
     dict_modification = recuperation_colonne_a_modifier()
-        # Safe dict_modification 
-    cols_df = df.columns.tolist()
-    cols_to_del = []
-    for col in dict_modification.keys():
-        if col not in cols_df:
-            cols_to_del.append(col)
-    for col in cols_to_del:
-        dict_modification.pop(col, "None")
+    # Safe dict_modification 
+
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False, errors='ignore')
     # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
     df["id_technique"] = df.index
     prise_en_compte_modifications(df)
+    cols_df = df.columns.tolist()
+    cols_to_del = []
+    for col in dict_modification.keys():
+        if col not in cols_df:
+            print(col)
+            cols_to_del.append(col)
+    for col in cols_to_del:
+        dict_modification.pop(col, "None")
     df = regroupement_marche(df, dict_modification)
     return df
 
