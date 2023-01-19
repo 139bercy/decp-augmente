@@ -470,7 +470,7 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     with open(pathbdd_acheteur, "rb") as f:
         df_bdd_acheteur = pickle.load(f)
     dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siret , df_bdd_acheteur.denominationUniteLegale))
-    df["nomAcheteur_enrichi"] = df.idAcheteur.map(dict_mapping_acheteur) #idAcheteur est un siret à 14 chiffres, la plupart du temps.
+    df["nomAcheteur_enrichi"] = df.idAcheteur.map(dict_mapping_acheteur) #idAcheteur est un siret à 14 chiffres, la plupart du temps. (98% du temps)
     mask_nan_nom_acheteur = df.loc[:, "nomAcheteur_enrichi"].isna()
     df.loc[mask_nan_nom_acheteur, "nomAcheteur_enrichi"] = df.loc[mask_nan_nom_acheteur, "nomAcheteur"]
     df["nomAcheteur"] = df["nomAcheteur_enrichi"]
@@ -538,7 +538,6 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     del df["siret2Etablissement"]
     #del df_SE2enrichissement_siret
     del df_SE2
-
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
         (df.typeIdentifiantEtablissement != 'SIRET'),
