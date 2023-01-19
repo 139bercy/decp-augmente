@@ -436,24 +436,21 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                 "Zone d'execution du marché")
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
-    print("LIEU3 DEBUT : ", df.loc[:, "lieuExecution.nom"].isna().sum())
 
     logger.info("Création de la colonne département Execution")
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
     liste_correspondance = conf_glob["nettoyage"]["DOM2name"]
     df['codeDepartementExecution'].replace(liste_correspondance, inplace=True)
-
     df['codeDepartementExecution'] = df['codeDepartementExecution'].str[:2]
 
     liste_correspondance_2 = conf_glob["nettoyage"]["name2DOMCOM"]
     df['codeDepartementExecution'].replace(liste_correspondance_2, inplace=True)
-
     # Vérification si c'est bien un code département
-    liste_cp = conf_glob["nettoyage"]["code_CP"].split(',') \
+    # Ajout d'un replace(' ') car sinon on ne prenait pas correctement en compte tous les departements d'un format spécifique
+    liste_cp = conf_glob["nettoyage"]["code_CP"].replace(' ', '').split(',') \
                + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(liste_cp), np.NaN,
                                               df['codeDepartementExecution'])
-
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
     df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN,
@@ -465,6 +462,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str,
                                                                                            "libelle": str})
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
+    departement['dep'] = departement['dep'].astype(str)
     df = pd.merge(df, departement, how="left",
                   left_on="codeDepartementExecution", right_on="dep")
     df.rename(columns={"reg": "codeRegionExecution"}, inplace=True)
@@ -475,8 +473,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                                          df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
     # Vérification des codes région
-    liste_reg = conf_glob["nettoyage"]["code_reg"].split(',')  # 98 = collectivité d'outre mer
-
+    liste_reg = conf_glob["nettoyage"]["code_reg"].replace(' ', '').split(',')  # 98 = collectivité d'outre mer
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(liste_reg), np.NaN, df['codeRegionExecution'])
     # Identification du nom des régions
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
@@ -486,7 +483,6 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     path_reg = os.path.join(path_to_data, conf_data["region-fr"])
     region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
     region.columns = ["reg", "libelle_reg"]
-    print("LIEU3 FIN : ", df.loc[:, "lieuExecution.nom"].isna().sum())
 
     df = pd.merge(df, region, how="left",
                   left_on="codeRegionExecution", right_on="reg")
@@ -528,13 +524,13 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère le mois de notification
     logger.info("Récupération du mois")
     df['moisNotification'] = df.dateNotification.str[5:7]
+    df['moisNotification'] = df.moisNotification.astype(str).str[:4]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
     logger.info(f"Au total, {sum(df['datePublicationDonnees'].isna())} marchés n'ont pas de date de publication des"
                 "données connue")
     logger.info("Fin du traitement")
 
     return df
-
 
 def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     """
