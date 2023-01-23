@@ -250,6 +250,8 @@ workflows:
       - do_pytest:
           context:
               - decp-augmente
+          requires:
+              - install_requirements
       - compute_test:
           context:
                - decp-augmente
