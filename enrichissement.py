@@ -40,6 +40,9 @@ path_to_data = conf_data["path_to_data"]
 path_to_cache = conf_data["path_to_cache"]
 decp_file_name = conf_data["decp_file_name"]
 today = datetime.date.today()
+parser = argparse.ArgumentParser()
+parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+args = parser.parse_args()
 
 if utils.USE_S3:
     folders_to_create = [path_to_cache, path_to_data]
@@ -49,9 +52,6 @@ if utils.USE_S3:
     utils.download_data_enrichissement()
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
-    args = parser.parse_args()
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
     file_nettoye_today  ="df_nettoye-2023-01-05.pkl"
