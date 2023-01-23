@@ -298,16 +298,10 @@ workflows:
       - enrichissement_flux:
           requires:
             - nettoyage_flux
-      - send:
+      - send:précisés
           requires:
             - enrichissement_flux
-    triggers:
-      - schedule:
-          cron: 0 4 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci_v2_filter2
+
 
   weekly-data:
     jobs:
