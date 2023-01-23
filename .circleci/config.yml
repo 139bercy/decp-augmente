@@ -247,11 +247,13 @@ workflows:
   main:
     jobs:
       - install_requirements
+      - do_pytest
       - compute_test:
           context:
                - decp-augmente
           requires:
               - install_requirements
+              - do_pytest
       - update_file:
           context:
               - decp-augmente
