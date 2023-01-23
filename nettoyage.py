@@ -261,6 +261,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     df.sort_values(by="source", inplace=True) # Pourquoi ? La partie métier (Martin Douysset) a demandé à ce qu'en cas de doublon sur plusieurs sources, ceux de l'AIFE
     # (la première en ordre alphabéitque soit conservés).
     # Donc on sort by source et on drop duplicates en gardant les first.
+    df.reset_index(drop=True, inplace=True)
     assert df.loc[0, "source"] == "data.gouv.fr_aife"
     df.drop_duplicates(subset=['_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
@@ -370,6 +371,11 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
 
                 f"ont été corrigé (on compte aussi les montants vides).")
     logger.info("Fin du traitement")
+
+    # On converti tout en int.
+    df.montant = pd.to_numeric(df['montant'], errors='coerce')
+    df.montant.fillna(0, inplace=True)
+    df.montant = df.montant.astype(int)
     return df
 
 
