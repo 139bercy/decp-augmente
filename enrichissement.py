@@ -54,7 +54,6 @@ if utils.USE_S3:
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
-    file_nettoye_today  ="df_nettoye-2023-01-05.pkl"
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
