@@ -55,6 +55,7 @@ def main():
     if args.test: # Dans le cas de la CI
         bucket = utils.s3.Bucket(utils.BUCKET_NAME)
         bucket.objects.filter(Prefix="data/hash_keys").delete()
+        bucket.objects.filter(Prefix="data/cache_df").delete() # Suppression car sinon on fait sauter la limite de RAM de circleCI
         seed = int(os.environ.get('SEED'))
         np.random.seed(seed)
         n_subset = int(os.environ.get("TAILLE_SUBSET"))
@@ -108,7 +109,6 @@ def main():
     #Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
     name_df_flux = "df_flux" + today.strftime("%Y-%m-%d") + ".pkl"
     resp = utils.write_object_file_on_s3(name_df_flux, df_to_process)
-    print("LIEUA : ", df_to_process.loc[:, "lieuExecution.nom"].isna().sum())
     #Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open(name_df_flux, "wb") as file:
         pickle.dump(df_to_process, file)
