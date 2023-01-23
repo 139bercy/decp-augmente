@@ -24,10 +24,3 @@ workflows:
   daily_cat:
     jobs:
       - concat_and_post
-    triggers:
-      - schedule:
-          cron: 0 6 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci_v2_concat
