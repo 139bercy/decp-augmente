@@ -208,6 +208,22 @@ jobs:
           name: Transfert des données vers data.economie
           command: |
             lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente.csv ; quit"
+  do_pytest:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+    - restore_cache:
+          keys:
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+    - run:
+        name: Pytest tests
+        command: | 
+            . venv/bin/activate
+            pytest
+  
+  
   compute_test:
     docker:
       - image: 139bercy/decp-rama
