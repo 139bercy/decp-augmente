@@ -258,7 +258,11 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(f"Taille dataframe avant   manage_duplicates{df.shape}")
     logger.info("Début du traitement: Suppression des doublons")
     nb_ligne_avant_suppression = len(df)
-    df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
+    df.sort_values(by="source", inplace=True) # Pourquoi ? La partie métier (Martin Douysset) a demandé à ce qu'en cas de doublon sur plusieurs sources, ceux de l'AIFE
+    # (la première en ordre alphabéitque soit conservés).
+    # Donc on sort by source et on drop duplicates en gardant les first.
+    assert df.loc[0, "source"] == "data.gouv.fr_aife"
+    df.drop_duplicates(subset=['_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
                                'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
                                'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
