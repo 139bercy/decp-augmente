@@ -301,13 +301,7 @@ workflows:
       - send:
           requires:
             - enrichissement_flux
-    triggers:
-      - schedule:
-          cron: 0 4 * * *
-          filters:
-            branches:
-              only:
-                - flux_ci_v2_filter3
+
 
   weekly-data:
     jobs:
