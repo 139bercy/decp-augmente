@@ -247,7 +247,9 @@ workflows:
   main:
     jobs:
       - install_requirements
-      - do_pytest
+      - do_pytest:
+          context:
+              - decp-augmente
       - compute_test:
           context:
                - decp-augmente
