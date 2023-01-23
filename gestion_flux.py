@@ -55,7 +55,6 @@ def main():
     if args.test: # Dans le cas de la CI
         bucket = utils.s3.Bucket(utils.BUCKET_NAME)
         bucket.objects.filter(Prefix="data/hash_keys").delete()
-        bucket.objects.filter(Prefix="data/cache_df").delete() # Suppression car sinon on fait sauter la limite de RAM de circleCI
         seed = int(os.environ.get('SEED'))
         np.random.seed(seed)
         n_subset = int(os.environ.get("TAILLE_SUBSET"))

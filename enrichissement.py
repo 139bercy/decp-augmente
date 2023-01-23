@@ -12,6 +12,7 @@ from geopy.distance import distance, Point
 from botocore.errorfactory import ClientError
 import datetime
 import utils
+import argparse
 
 logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
@@ -48,6 +49,9 @@ if utils.USE_S3:
     utils.download_data_enrichissement()
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+    args = parser.parse_args()
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
     file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
     file_nettoye_today  ="df_nettoye-2023-01-05.pkl"
@@ -134,14 +138,19 @@ def concat_unduplicate_and_caching_hash(df):
             df_cache = pickle.load(file_cache)
         df = pd.concat([df, df_cache]).reset_index(drop=True)
 
-
+    
+    if not args.test:
     # Save DataFrame pour la prochaine fois
-    if utils.USE_S3:
-        utils.write_object_file_on_s3(path_to_df_cache, df)
+    # Pourquoi cette condition ? Lorsque l'on est en mode prod elle est essentielle.
+    # Par contre dans le mode CI, on est limité par la RAM gratuite Circle CI, donc on n'enregistre pas
+    # le cache actuel dans le df sinon le job CI peut sauter. J'en ai enregistré un en amont qui sera donc fixe
+    # dans le S3, ainsi on respecte bien l'intrégité de la pipeline.
+        if utils.USE_S3:
+            utils.write_object_file_on_s3(path_to_df_cache, df)
 
-    else:
-        with open(path_to_df_cache, "wb") as file_cache:
-                pickle.dump(df, file_cache)
+        else:
+            with open(path_to_df_cache, "wb") as file_cache:
+                    pickle.dump(df, file_cache)
     
     # Petit tour de unduplicate stricte. Pourquoi ? Il se peut qu'avec le jeu des caches et des jobs séparés certaines lignes de flux soient éventuellement retraités (notamment lorsqu'un job tombe mais pas les autres).
     # Bien que je vais modifier la pipeline pour pas que ça se produise, cette sécurité n'est pas de trop et ne coûte quasi rien. J'ai mis un max de colonne d'objet hashable.
