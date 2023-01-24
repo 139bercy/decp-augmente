@@ -49,7 +49,7 @@ if utils.USE_S3:
     for folder in folders_to_create:
         if not(os.path.exists(folder)):
             os.mkdir(folder)
-    utils.download_data_enrichissement()
+    #utils.download_data_enrichissement()
 
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
@@ -461,12 +461,20 @@ def renommage_et_recategorisation(df : pd.DataFrame):
         df_bdd = pickle.load(f)
     # Il faut recréer la colonne siren qui n'existe plus actuellement.
     # Pour les établissements
-    df_bdd["siren"] =  df_bdd['siretEtablissement'].apply(lambda x:x[:-5])
+    df_bdd["siren"] =  df_bdd['siretEtablissement'].apply(lambda x:x[:-5]) # Pour les titulaires on travaille avec les SIREN
     dict_mapping = dict(zip(df_bdd.siren, df_bdd.denominationUniteLegale)) 
     df['denominationUniteLegale'] = df.sirenEtablissement.map(dict_mapping)
     # Si il n'y a pas de correspondance, on garde la valeur d'entrée. 
     mask_nan_nom = df.denominationUniteLegale.isna()
     df.loc[mask_nan_nom, "denominationUniteLegale"] = df.loc[mask_nan_nom, "denominationSociale_x"]
+
+    # Actuellement les id cotitulaires sont des SIRET (14 digits), Contrairement aux titulaires.
+    dict_mapping_co = dict(zip(df_bdd.siretEtablissement, df_bdd.denominationUniteLegale)) 
+    # Manière plus élégante de traiter les non correspondances.
+    df['denominationSociale_cotitulaire1'] = df.id_cotitulaire1.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire1'])
+    df['denominationSociale_cotitulaire2'] = df.id_cotitulaire2.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire2'])
+    df['denominationSociale_cotitulaire3'] = df.id_cotitulaire3.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire3'])
+
 
     # Reprise de la variable catégorieEntreprise.
     dict_mapping_cat_ent = dict(zip(df_bdd.siren, df_bdd.categorieEntreprise))

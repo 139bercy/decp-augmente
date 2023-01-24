@@ -86,8 +86,8 @@ def test_manage_missing_code(create_dataframe):
     df = nettoyage.manage_titulaires(df)
     df = nettoyage.manage_amount(df)
     df = nettoyage.manage_missing_code(df)
-    df.codeCPV.tolist() == ['00000000', "30192000-1"]
-    df.nic.tolist() == ['00010', '00080']
+    assert df.codeCPV.tolist() == ['00000000', "30192000-1"]
+    assert df.nic.tolist() == ['00010', '00080']
    
 def test_manage_region(create_dataframe):
     df = nettoyage.manage_region(create_dataframe)

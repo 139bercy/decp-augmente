@@ -221,5 +221,10 @@ Une fois les tests passés on upload les jobs Saagie via le job "update_file" qu
 Le fichier python utile est *upade_jobs_for_new_files.py*, il est assez explicite. <br>
 Côté Saagie le script à l'intérieur des jobs (et donc de la pipeline) est alors modifié et sera éxécuté à l'heure prévue sur la plateforme.
 
+### Buckets
+Il y a deux Buckets (S3) : l'un pour tout ce que l'on va stocker pour la prod.
+Et un autre spécifique aux tests et la CI.
+:guardsman: Avant de modifier des fichiers sur le S3, être sûr que l'on pointe vers le Bucket désiré.
+
 ### Réalisation d'un dashboard 
    [ ] Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
