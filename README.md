@@ -83,7 +83,7 @@ On ne laisse passer à travers df_flux.pkl que les données correspondant aux no
 
 On distingue les lignes avec et sans modifications car elles ne contiennent pas les même informations.
 
-:rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light:
+<center> :rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light: </center>
 
 ### Nettoyage 
 Explication de l'ensemble du traitement réalisé pour la partie nettoyage des données. 
@@ -201,7 +201,7 @@ pour savoir quelles colonnes exporter.
 Fin de la chaine, après enrichissement le script permet de mettre sur le serveur dataeco le résultat des pipelines.
 Ainsi, le fichier uploadé via lftp est visible à l'adresse data eco souhaitée.
 #### upade_jobs_for_new_files.py
-Permet d'upload les fichiers sur Saagie pendant la CD
+Permet d'upload les fichiers sur Saagie pendant la CD. Upload les fichiers modifiés depuis le dernier commit enregistré dans id_commit.txt sur le S3.
 #### backup.py
 Sauve le cache tous les x jours (variable x sur Saagie)
 #### delete_old_files.py
@@ -211,6 +211,9 @@ Gère tout ce qui est lié au S3.
 
 
 ## Comment fonctionne la CICD sur ce projet ?
+
+La branche utilisée actuellement pour la CICD est : <br> <center> :last_quarter_moon_with_face: cicd_saagie_pytest. :first_quarter_moon_with_face: 
+</center>
 
 ### CI
 Lorsqu'on push le code sur Github, on effectue via un workflow CircleCI des tests de non régression (via le job pytest).
@@ -225,6 +228,12 @@ Côté Saagie le script à l'intérieur des jobs (et donc de la pipeline) est al
 Il y a deux Buckets (S3) : l'un pour tout ce que l'on va stocker pour la prod.
 Et un autre spécifique aux tests et la CI.
 :guardsman: Avant de modifier des fichiers sur le S3, être sûr que l'on pointe vers le Bucket désiré.
+
+### Quelques remarques
+- Si la CI crash pour une erreur lié au S3 il se peut que ce soit simplement une erreur réseau ou que le S3 ou la ressource souhaitée sont indisponibles momentanément.
+- Les tests d'enrichissement dépendent, entre autres, des caches présent dans le bucket test. Si vous modifiez ces derniers, considérez l'influence que cela a sur les tests.
+- Si vous effectuez des modifications sur la gestion des données et que vous souhaitez que ces modifications s'appliquent à toutes les données, même celles déjà traitées il faudra alors au minimum supprimer du S3 les objet au prefix "data/hash_keys" (modifications et non modifications) ainsi que data/cache_df. Puis relancer la pipeline sur Saagie, la pipeline est alors "ré-initialisée" et tournera sur toutes les données, avec les nouveaux traitements.  <br> 
+Pour être sûr que vous avez bien tout ré-initialisé, allez dans les logs du job gestion_flux. Vous devez y trouver que la shape du dataframe déjà processé vaut (0,0) pour les lignes sans modifs et (0,0) également pour les lignes avec modifs.
 
 ### Réalisation d'un dashboard 
    [ ] Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
