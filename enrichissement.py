@@ -49,7 +49,7 @@ if utils.USE_S3:
     for folder in folders_to_create:
         if not(os.path.exists(folder)):
             os.mkdir(folder)
-    #utils.download_data_enrichissement()
+    utils.download_data_enrichissement()
 
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
