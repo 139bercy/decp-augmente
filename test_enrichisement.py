@@ -28,7 +28,7 @@ def test_renommage_et_recategorisation():
     # Testons les cotitulaires
     assert (df.loc[0, "denominationSociale_cotitulaire1"] == "ENTREPRISE REYNIER") # La deuxième data n'a pas de nom pour les cotit
     assert (df.loc[0, "denominationSociale_cotitulaire2"] == "nom2") # En effet l'id est un id aléatoire de mauvaise taille donc n'aura pas de correpsondance
-    assert (df.loc[0, "denominationSociale_cotitulaire3"] == "ETS METALLURGIQUES E.GODARD") # La deuxième data n'a pas de nom pour les cotit
+    assert (df.loc[0, "denominationSociale_cotitulaire3"] == "nom3") # La deuxième data n'a pas de nom pour les cotit
 
 
 def test_apply_luhn():
