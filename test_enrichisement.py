@@ -4,43 +4,17 @@ import enrichissement
 import pytest
 
 """Peut prendre du temps si on ne commente pas la ligne utils.download_data_enrichissement() dans enrichissement.
-Pour les tests il vaut mieux avoir les fichiers en local puis comenter la ligne et executer pytest.
+Pour les tests il vaut mieux avoir les fichiers en local puis commenter la ligne et executer pytest.
 
 Ces tests sont principalement des tests de non-régression. Qu'on s'assure que les modifications faites ne perturbent pas certains fonctionnement.
 """
-
-@pytest.fixture
-def create_dataframe():
-    """ Create a dataframe which feats with requirements from conf_glob['enrichissement']['type_col_enrichissement_siret']
-     /!\ Pas nécessaire en fait /!\
-    """
-    dftest = pd.DataFrame()
-    dftest['id'] = ["a", "b"]
-    dftest['idMarche'] = ["0", "1"]
-    dftest['source'] = ['AA', 'BB']
-    dftest['uid'] = ['aa', 'bb']
-    dftest['uuid'] = ['aaa', 'bbb']
-    dftest['_type'] = ['typea', 'typeb']
-    dftest['codeCPV'] = [np.nan, '30192000-1']
-    dftest['objetMarche'] = ['Blabla1', 'BlaBla2']
-    dftest['datePublicationDonnees'] = ['2023-01-16', '2022-01-16']
-    dftest['lieuExecutionCode'] = ['83220', '97209']
-    dftest['lieuExecutionTypeCode'] = ['Code postal', 'Code Postal']
-    dftest['lieuExecutionNom'] = ['Le Pradet', 'Fort-de-France']
-    dftest['dureeMois'] = [2,30]
-    dftest['montantCalcule'] = [100000, 3000000]
-    dftest['montant'] = [100000, 3000000]
-    dftest['formePrix'] = ['Forme1', 'Forme2']
-    dftest['typeIdentifiantEtablissement'] = ['SIRET', 'SIRET']
-    dftest['siretEtablissement'] = ['38820748200026', '78263178200201']
-    return dftest
-
 
 
 def test_enrichissement_acheteur():
     df = pd.DataFrame(columns=["siret", "acheteur.id"], data=[['21740276700016', '21740276700016']])
     df = enrichissement.enrichissement_acheteur(df)
     assert df.loc[0, "libelleCommuneAcheteur"] == "TANINGES"
+
 
 def test_renommage_et_recategorisation():
     df = pd.DataFrame(columns=["nomAcheteur", "idAcheteur", "sirenEtablissement", "denominationSociale_x", "id_cotitulaire1", "denominationSociale_cotitulaire1", 
@@ -56,6 +30,7 @@ def test_renommage_et_recategorisation():
     assert (df.loc[0, "denominationSociale_cotitulaire2"] == "nom2") # En effet l'id est un id aléatoire de mauvaise taille donc n'aura pas de correpsondance
     assert (df.loc[0, "denominationSociale_cotitulaire3"] == "ETS METALLURGIQUES E.GODARD") # La deuxième data n'a pas de nom pour les cotit
 
+
 def test_apply_luhn():
     df = pd.DataFrame(columns=["idAcheteur", "sirenEtablissement", "siretEtablissement", "typeIdentifiantEtablissement"], data=[['24840025100158', "877785295", "87778529500000", "SIRET"]])   
     df = enrichissement.apply_luhn(df)
@@ -63,6 +38,7 @@ def test_apply_luhn():
     assert df.sirenEtablissementValide.values == True
     assert df.siretEtablissementValide.values == "False" # En effet il est faux, les deux premiers sont extrait de vrais entités (cf les deux fonctions plus haut). le siret est créé sans considération dela formule.
     # Pourquoi a-t-on un string au lieu d'un boolean ? A cause du np.where où l'une des possibilités est un string. Ce qui donne une colonne de string. Donc un "False"
+
 
 def test_enrichissement_cpv():
     df = pd.DataFrame(columns=['codeCPV'], data=['33121100-5', "45421000-4"])
