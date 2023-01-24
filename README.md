@@ -78,12 +78,12 @@ Schéma de principe de la pipeline.
 Cette partie permet de gérer quelles données ont déjà été vus (donc analysées) et quelles sont les nouvelles données à traiter.
 
 #### Clef de hash
-    Pour ce faire on utilise des clefs de hash. On calcule la clef de hash pour chaque ligne extraite de decpv2.json et on les compare à un historique des clefs de hash déjà mémorisées.
-    On ne laisse passer à travers df_flux.pkl que les données correspondant aux nouvelles clefs de hash.
+Pour ce faire on utilise des clefs de hash. On calcule la clef de hash pour chaque ligne extraite de decpv2.json et on les compare à un historique des clefs de hash déjà mémorisées.
+On ne laisse passer à travers df_flux.pkl que les données correspondant aux nouvelles clefs de hash.
 
-    On distingue les lignes avec et sans modifications car elles ne contiennent pas les même informations.
- 
-    :rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light:
+On distingue les lignes avec et sans modifications car elles ne contiennent pas les même informations.
+
+:rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light:
 
 ### Nettoyage 
 Explication de l'ensemble du traitement réalisé pour la partie nettoyage des données. 
