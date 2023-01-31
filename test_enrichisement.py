@@ -29,7 +29,7 @@ def test_renommage_et_recategorisation():
     assert (df.loc[0, "denominationSociale_cotitulaire1"] == "ENTREPRISE REYNIER") # La deuxième data n'a pas de nom pour les cotit
     assert (df.loc[0, "denominationSociale_cotitulaire2"] == "nom2") # En effet l'id est un id aléatoire de mauvaise taille donc n'aura pas de correpsondance
     assert (df.loc[0, "denominationSociale_cotitulaire3"] == "nom3") # La deuxième data n'a pas de nom pour les cotit
-    assert(df.loc[1, "siretEtablissement"] == "0111877785295" )
+    assert(df.loc[1, "siretEtablissement"] == "00111877785295" )
 
 def test_apply_luhn():
     df = pd.DataFrame(columns=["idAcheteur", "sirenEtablissement", "siretEtablissement", "typeIdentifiantEtablissement"], data=[['24840025100158', "877785295", "87778529500000", "SIRET"]])   
