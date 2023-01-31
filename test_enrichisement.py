@@ -17,10 +17,10 @@ def test_enrichissement_acheteur():
 
 
 def test_renommage_et_recategorisation():
-    df = pd.DataFrame(columns=["nomAcheteur", "idAcheteur", "sirenEtablissement", "denominationSociale_x", "id_cotitulaire1", "denominationSociale_cotitulaire1", 
+    df = pd.DataFrame(columns=["nomAcheteur", "idAcheteur", "siretEtablissement","sirenEtablissement", "denominationSociale_x", "id_cotitulaire1", "denominationSociale_cotitulaire1", 
     "id_cotitulaire2", "denominationSociale_cotitulaire2", "id_cotitulaire3", "denominationSociale_cotitulaire3"], 
-    data=[['MauvaisNom', '24840025100158', "877785295", "UneDenomination", "99692002100028", "nom_cotit1", "005564", "nom2", "01575266000041", "nom3" ],
-    ['MauvaisNom', '24840025100158', "877785295", "UneDenomination", np.nan, np.nan, np.nan, np.nan, np.nan] ])
+    data=[['MauvaisNom', '24840025100158', "2222877785295","877785295", "UneDenomination", "99692002100028", "nom_cotit1", "005564", "nom2", "01575266000041", "nom3" ],
+    ['MauvaisNom', '24840025100158',"111877785295", "877785295", "UneDenomination", np.nan, np.nan, np.nan, np.nan, np.nan] ])
     df = enrichissement.renommage_et_recategorisation(df)
     assert (df.nomAcheteur.values == ["COMMUNAUTE D'AGGLOMERATION DU GRAND AVIGNON"]*2).all()
     assert (df.denominationUniteLegale.values == ["MK ETANCHEITE"]*2).all()
@@ -29,7 +29,7 @@ def test_renommage_et_recategorisation():
     assert (df.loc[0, "denominationSociale_cotitulaire1"] == "ENTREPRISE REYNIER") # La deuxième data n'a pas de nom pour les cotit
     assert (df.loc[0, "denominationSociale_cotitulaire2"] == "nom2") # En effet l'id est un id aléatoire de mauvaise taille donc n'aura pas de correpsondance
     assert (df.loc[0, "denominationSociale_cotitulaire3"] == "nom3") # La deuxième data n'a pas de nom pour les cotit
-
+    assert(df.loc[1, "siretEtablissement"] == "0111877785295" )
 
 def test_apply_luhn():
     df = pd.DataFrame(columns=["idAcheteur", "sirenEtablissement", "siretEtablissement", "typeIdentifiantEtablissement"], data=[['24840025100158', "877785295", "87778529500000", "SIRET"]])   
