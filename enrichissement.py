@@ -453,6 +453,10 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     Cette fonction a pour objectif de nommer correctement les entreprises de marchés à partir du SIREN de StockUniteLegal. Le nom
     devient alors celui disponible sur la base SIREN et non celui rentré par les fournisseurs. Si l'information n'est pas trouvée. Le nom rentré par les fournisseurs sera utilisé.
     Cette fonction repasse également sur la catégorieEntreprise qui jusqu'alors était relié au SIRET et non au SIREN.
+    
+    Cette fonction ajuste également les idAcheteurs transformés par les différents casting. (un siret commençant par un 0 perd celui ci au curs du process).
+    Les idAcheteurs proches de 14 chiffres sont complétés par des 0 au début.
+    De même pour les siretEtablissement.
     """
     
     pathbdd = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
@@ -490,6 +494,19 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     mask_nan_nom_acheteur = df.loc[:, "nomAcheteur_enrichi"].isna()
     df.loc[mask_nan_nom_acheteur, "nomAcheteur_enrichi"] = df.loc[mask_nan_nom_acheteur, "nomAcheteur"]
     df["nomAcheteur"] = df["nomAcheteur_enrichi"]
+
+    ## Ajout des 0
+    def safe_zfill(x):
+        """
+        On souhaite remplir que les siret qui sont entre 13 et 10 caractères (choix arbitraire). Mais pas ceux qui sont au-dessus.
+        """
+        if (len(x)<14) and len(x)>9:
+            return x.zfill(14)
+        else :
+            return x
+
+    df['siretEtablissement'] = df['siretEtablissement'].apply(safe_zfill)
+    df['idAcheteur'] = df['idAcheteur'].apply(safe_zfill)
 
     return df
 
@@ -1250,6 +1267,7 @@ def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
         "data.gouv.fr_aife": "API AIFE",
         "data.gouv.fr_pes": "PES Marchés",
         "marches-publics.info": "AWS-Achat",
+        "decp_aws":"AWS-Achat", 
         "megalis-bretagne": "Megalis Bretagne",
         "atexo-maximilien": "Maximilien IdF",
         "ternum-bfc": "Territoires numériques BFC",

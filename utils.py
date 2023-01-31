@@ -13,7 +13,7 @@ local_credentials_exist = os.path.exists(local_credentials)
 if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     with open(local_credentials, "r") as f:
         credentials = json.load(f)
-    print('e')
+    print('Fichier local')
     ACCESS_KEY = credentials["ACCESS_KEY"]
     SECRET_KEY = credentials["SECRET_KEY"]
     USER =credentials["USER_SAAGIE"]
@@ -22,7 +22,7 @@ if local_credentials_exist : # Dans le cas où on fait tourner ça en local
     PROJECT_NAME = credentials["PROJECT_NAME"]
     BUCKET_NAME = credentials["BUCKET_NAME"]
 else :  # Sur la CI ou Saagie
-    print('i')
+    print('Variable d environnement')
     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER =os.environ.get("USER_SAAGIE")
