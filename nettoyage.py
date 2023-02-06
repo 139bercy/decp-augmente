@@ -372,10 +372,8 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
                 f"ont été corrigé (on compte aussi les montants vides).")
     logger.info("Fin du traitement")
 
-    # On converti tout en int.
-    df.montant = pd.to_numeric(df['montant'], errors='coerce')
-    df.montant.fillna(0, inplace=True)
-    df.montant = df.montant.astype(int)
+    # On ne veut plus convertir en int. Mais plutôt utiliser round. 
+    df['montant'] = df['montant'].round(decimals=0)
     return df
 
 
@@ -829,12 +827,9 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         marche_init["idtech"] = marche.iloc[-1].id_technique
         marches_init.append(marche_init)
     if marches_init :  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
-        print('oui')
         df_to_concatene = pd.concat([x for x in marches_init], copy=False)
         df.update(df_to_concatene)
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
-        print(dict_modification)
-        print(df)
         df = fusion_source_modification_whole_dataset(df, dict_modification)
     else: # Pour que la colonne idMarche existe quand même.
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique) 
