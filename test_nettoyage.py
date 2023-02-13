@@ -57,7 +57,7 @@ def create_dataframe():
 
 def test_manage_modifications(create_dataframe):
     df = nettoyage.manage_modifications(create_dataframe)
-    assert (df.montant.tolist() == [1000, 3])
+    assert (df.montant.tolist() == [1000, 3.5])
     assert (df.dateSignature.tolist() == ['2023-01-01', np.nan])
 
 
