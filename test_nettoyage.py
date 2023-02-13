@@ -26,7 +26,7 @@ def create_dataframe():
     dftest['lieuExecution.typeCode'] = ['Code postal', 'Code Postal']
     dftest['lieuExecution.nom'] = ['Le Pradet', 'Fort-de-France']
     dftest['dureeMois'] = [2, 3]
-    dftest['montant'] = [0, 3]
+    dftest['montant'] = [0, 3.5]
     dftest['dateNotification'] = ['2021-01-01', 'MauvaiseDate']
     dftest['formePrix'] = ['Forme1', 'Forme2']
     dftest['titulaires'] = [[{'typeIdentifiant': 'SIRET',

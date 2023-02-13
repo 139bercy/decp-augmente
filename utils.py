@@ -148,7 +148,7 @@ def download_datas():
 
 def download_confs():
     conf_path = "confs/"
-    print('bb',BUCKET_NAME)
+    print('bucket ',BUCKET_NAME)
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=conf_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")

@@ -373,7 +373,8 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     logger.info("Fin du traitement")
 
     # On ne veut plus convertir en int. Mais plutôt utiliser round. 
-    df['montant'] = df['montant'].round(decimals=0)
+    df['montant'] = df['montant'].apply(lambda x:round(x)) # Pourquoi on n'utilise pas directement round de pandas ?
+    # Car on ne gagne pas beaucoup en rapidité et la méthode pandas laisse le format float. Alors qu'on veut un display int.
     return df
 
 
