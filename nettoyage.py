@@ -3,26 +3,32 @@ import os
 import pickle
 import logging.handlers
 from random import random
+import datetime
 import numpy as np
 import pandas as pd
 import itertools
 import argparse
 from pandas import json_normalize
-
 import cProfile
 import pstats
+import utils
 
-# Initialize parser
-parser = argparse.ArgumentParser()
-parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
-args = parser.parse_args()
-
+logger = logging.getLogger("main.nettoyage")
+logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
+
+path_to_conf = "confs"
+if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+    os.mkdir(path_to_conf)
+if utils.USE_S3:
+    res = utils.download_confs()
+    if res :
+        logger.info("Chargement des fichiers confs depuis le S3")
+else:
+    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
 
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
-path_to_data = conf_data["path_to_data"]
-decp_file_name = conf_data["decp_file_name"]
 
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
@@ -30,17 +36,46 @@ with open(os.path.join("confs", "var_glob.json")) as f:
 with open(os.path.join("confs", "var_debug.json")) as f:
     conf_debug = json.load(f)["nettoyage"]
 
-logger = logging.getLogger("main.nettoyage")
-logger.setLevel(logging.DEBUG)
+path_to_data = conf_data["path_to_data"]
+decp_file_name = conf_data["decp_file_name"]
+path_to_data = conf_data["path_to_data"] # Ré écris
 
+def main():
 
-def main(test_check=False):
-    check_reference_files()
-    logger.info("Ouverture du fichier decp.json")
-    with open(os.path.join(path_to_data, decp_file_name), encoding='utf-8') as json_data:
-        data = json.load(json_data)
-    if test_check:
-        # Modification pour prendre un subset de données
+    if utils.USE_S3:
+        if not(os.path.exists(path_to_data)): # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
+            os.mkdir(path_to_data)
+        utils.download_data_nettoyage()
+
+    # Chargement du fichier flux
+    logger.info("Récupération du flux")
+    today = datetime.date.today()
+    flux_file = "df_flux"
+    flux_file = utils.retrieve_lastest(utils.s3.meta.client, flux_file)
+    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl"
+    if utils.USE_S3:
+        logger.info(" Fichier Flux chargé depuis S3")
+        df_flux = utils.get_object_content(flux_file)
+    else : 
+        print('Chargement en local')
+        with open(flux_file, "rb") as flux_file:
+            df_flux = pickle.load(flux_file)
+    print('BUCKET visé : ', utils.BUCKET_NAME)
+    # SI il n'y a pas d'ajout de données.
+    if df_flux.empty :
+        print('Flux vide')
+        if utils.USE_S3:
+            utils.write_object_file_on_s3(file_nettoye_today, df_flux)
+        else : 
+            with open('df_nettoye.pkl', 'wb') as df_nettoye:
+                # Export présent pour faciliter l'utilisation du module enrichissement.py
+                pickle.dump(df_flux, df_nettoye)
+        logger.info("Flux vide")
+        return df_flux
+
+    # Modification pour un prendre subset de données 
+
+    if conf_debug["subset"]:
         n_data = len(data["marches"])
         n_subset = conf_debug["n_subset"]
         logger.info(
@@ -57,14 +92,12 @@ def main(test_check=False):
         accessed_mapping = map(data['marches'].__getitem__, random_i)
         accessed_list = list(accessed_mapping)
         data['marches'] = accessed_list
-
     logger.info("Début du traitement: Conversion des données en pandas")
-    df = manage_modifications(data)
+    df = manage_modifications(df_flux)
     logger.info("Fin du traitement")
     with open("df_v2.pkl", "wb") as f:
         pickle.dump(df, f)
     df = regroupement_marche_complet(df)
-
     logger.info("Début du traitement: Gestion des titulaires")
     df = (df.pipe(manage_titulaires)
           .pipe(manage_duplicates)
@@ -77,12 +110,15 @@ def main(test_check=False):
           .pipe(replace_char)
           )
     logger.info("Fin du traitement")
-
+    print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
-    with open('df_nettoye', 'wb') as df_nettoye:
-        # Export présent pour faciliter l'utilisation du module enrichissement.py
-        pickle.dump(df, df_nettoye)
-    df.to_csv("decp_nettoye.csv")
+    if utils.USE_S3 : 
+        utils.write_object_file_on_s3(file_nettoye_today, df)
+    else:
+        with open(file_nettoye_today, 'wb') as df_nettoye:
+            # Export présent pour faciliter l'utilisation du module enrichissement.py
+            pickle.dump(df, df_nettoye)
+    df.to_csv("df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".csv")
     logger.info("Ecriture du csv terminé")
 
 
@@ -97,7 +133,7 @@ def check_reference_files():
     useless_keys = ["path_to_project", "path_to_data", "path_to_cache", "cache_bdd_insee",
                      "cache_not_in_bdd_insee",
                      "cache_bdd_legale",
-                     "cache_not_in_bdd_legale"]
+                     "cache_not_in_bdd_legale", "cache_acheteur_bdd_legale", "cache_acheteur_not_in_bdd_legale"]
 
     path = os.path.join(os.getcwd(), path_data)
     for key in list(conf_data.keys()):
@@ -186,7 +222,6 @@ def manage_titulaires(df: pd.DataFrame):
     L'autre point de cette fonction est de gérer les marchés lorsqu'il y a plusieurs titulaires. Avant on créait des lignes pour chaque nouveau titulaire, maintenant
     on a des nvls colonnes pour les cotitulaires. On garde l'unicité de 1 ligne = 1 marché qui était perdu avant.
     """
-
     df = df[~(df['titulaires'].isna() & df['concessionnaires'].isna())]
     df.titulaires = np.where(df["titulaires"].isnull(), df.concessionnaires, df.titulaires)
     df.montant = np.where(df["montant"].isnull(), df.valeurGlobale, df.montant)
@@ -224,9 +259,15 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
+    logger.info(f"Taille dataframe avant   manage_duplicates{df.shape}")
     logger.info("Début du traitement: Suppression des doublons")
     nb_ligne_avant_suppression = len(df)
-    df.drop_duplicates(subset=['source', '_type', 'nature', 'procedure', 'dureeMois',
+    df.sort_values(by="source", inplace=True) # Pourquoi ? La partie métier (Martin Douysset) a demandé à ce qu'en cas de doublon sur plusieurs sources, ceux de l'AIFE
+    # (la première en ordre alphabéitque soit conservés).
+    # Donc on sort by source et on drop duplicates en gardant les first.
+    df.reset_index(drop=True, inplace=True)
+    assert df.loc[0, "source"] == "data.gouv.fr_aife"
+    df.drop_duplicates(subset=['_type', 'nature', 'procedure', 'dureeMois',
                                'datePublicationDonnees', 'lieuExecution.code', 'lieuExecution.typeCode',
                                'lieuExecution.nom', 'id', 'objet', 'codeCPV', 'dateNotification', 'montant',
                                'formePrix', 'acheteur.id', 'acheteur.nom', 'typeIdentifiant', 'idTitulaires',
@@ -334,6 +375,10 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
 
                 f"ont été corrigé (on compte aussi les montants vides).")
     logger.info("Fin du traitement")
+
+    # On ne veut plus convertir en int. Mais plutôt utiliser round. 
+    df['montant'] = df['montant'].apply(lambda x:round(x)) # Pourquoi on n'utilise pas directement round de pandas ?
+    # Car on ne gagne pas beaucoup en rapidité et la méthode pandas laisse le format float. Alors qu'on veut un display int.
     return df
 
 
@@ -345,7 +390,6 @@ def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-
     logger.info("Début du traitement: Gestion des Id null")
     # Ecriture dans les logs
     logger.info("Nombre d'identifiant manquants et remplacés: {}".format(sum(df["id"].isnull())))
@@ -401,27 +445,25 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         pd.DataFrame
     """
-
     logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). "
                 "Zone d'execution du marché")
     # Régions / Départements #
     # Création de la colonne pour distinguer les départements
+
     logger.info("Création de la colonne département Execution")
     df['codeDepartementExecution'] = df['lieuExecution.code'].str[:3]
     liste_correspondance = conf_glob["nettoyage"]["DOM2name"]
     df['codeDepartementExecution'].replace(liste_correspondance, inplace=True)
-
     df['codeDepartementExecution'] = df['codeDepartementExecution'].str[:2]
 
     liste_correspondance_2 = conf_glob["nettoyage"]["name2DOMCOM"]
     df['codeDepartementExecution'].replace(liste_correspondance_2, inplace=True)
-
     # Vérification si c'est bien un code département
-    liste_cp = conf_glob["nettoyage"]["code_CP"].split(',') \
+    # Ajout d'un replace(' ') car sinon on ne prenait pas correctement en compte tous les departements d'un format spécifique
+    liste_cp = conf_glob["nettoyage"]["code_CP"].replace(' ', '').split(',') \
                + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(liste_cp), np.NaN,
                                               df['codeDepartementExecution'])
-
     # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
     df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN,
@@ -433,6 +475,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str,
                                                                                            "libelle": str})
     df['codeDepartementExecution'] = df['codeDepartementExecution'].astype(str)
+    departement['dep'] = departement['dep'].astype(str)
     df = pd.merge(df, departement, how="left",
                   left_on="codeDepartementExecution", right_on="dep")
     df.rename(columns={"reg": "codeRegionExecution"}, inplace=True)
@@ -443,8 +486,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                                          df['codeRegionExecution'])
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
     # Vérification des codes région
-    liste_reg = conf_glob["nettoyage"]["code_reg"].split(',')  # 98 = collectivité d'outre mer
-
+    liste_reg = conf_glob["nettoyage"]["code_reg"].replace(' ', '').split(',')  # 98 = collectivité d'outre mer
     df['codeRegionExecution'] = np.where(~df['codeRegionExecution'].isin(liste_reg), np.NaN, df['codeRegionExecution'])
     # Identification du nom des régions
     df['codeRegionExecution'] = df['codeRegionExecution'].astype(str)
@@ -471,7 +513,7 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
-
+    logger.info(f"Taille dataframe avant manage_date {df.shape}")
     logger.info("Début du traitement: Récupération de l'année et du mois du marché public + "
                 "Correction des années aberrantes")
     # Date / Temps #
@@ -481,8 +523,9 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère l'année de notification
     logger.info("Récupération de l'année")
     df['anneeNotification'] = df.dateNotification.str[0:4]
-    #df['anneeNotification'] = df['anneeNotification'].astype(float)
-    df['anneeNotification'] = df['anneeNotification'].apply(lambda x : float(x) if str(x).isdigit() else np.NaN)
+    mask_only_digits = df['anneeNotification'].apply(lambda x:str(x).isdigit())
+    df['anneeNotification'] = np.where(mask_only_digits, df['anneeNotification'], 0) # Safe casting car parfois on a des formats lunaires.
+    df['anneeNotification'] = df['anneeNotification'].astype(float)
     # On supprime les erreurs (0021 ou 2100 par exemple)
     df['dateNotification'] = np.where(df['anneeNotification'] < 1980, np.NaN, df['dateNotification'])
     df['dateNotification'] = np.where(df['anneeNotification'] > 2100, np.NaN, df['dateNotification'])
@@ -494,13 +537,13 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     # On récupère le mois de notification
     logger.info("Récupération du mois")
     df['moisNotification'] = df.dateNotification.str[5:7]
+    df['moisNotification'] = df.moisNotification.astype(str).str[:4]
     df.datePublicationDonnees = np.where(df.datePublicationDonnees == '', np.NaN, df.datePublicationDonnees)
     logger.info(f"Au total, {sum(df['datePublicationDonnees'].isna())} marchés n'ont pas de date de publication des"
                 "données connue")
     logger.info("Fin du traitement")
 
     return df
-
 
 def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -599,6 +642,7 @@ def regroupement_marche_complet(df):
     """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
     les marchés en fonction de leur objets/date de publication des données et montant.
     Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
+    logger.info(f"Taille dataframe avant regroupement_marche_complet {df.shape}")
     # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]] .groupby(["objet",
                                                     "datePublicationDonnees", "montant"])["id"])
@@ -621,45 +665,37 @@ def regroupement_marche_complet(df):
     return df
 
 
-def indice_marche_avec_modification(data: dict) -> list:
-    """
-    Renvoie la liste des indices des marchés contenant une modification
-
-    Retour:
-        - list
-    """
-    liste_indices = []
-    for i in range(len(data['marches'])):
-        # Ajout d'un identifiant technique -> Permet d'avoir une colonne id unique par marché
-        data["marches"][i]["id_technique"] = i
-        if data["marches"][i]["modifications"]:
-            liste_indices += [i]
-    return liste_indices
-
-
-def recuperation_colonne_a_modifier(data: dict, liste_indices: list) -> dict:
+def recuperation_colonne_a_modifier() -> dict:
     """
     Renvoie les noms des differentes colonnes recevant une modification
-    sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification}
+    sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification}.
+    Les colonnes qui sont concernés ont déjà été détectés dans gestion_flux.
 
     Retour:
         dict
     """
-    liste_colonne = []
-    colonne_to_modify = {}
-    for indice in liste_indices:
-        # colonne_modifiees = list(data["marches"][indice]["modifications"][0].keys())
-        for col in data["marches"][indice]["modifications"][0].keys():
-            if "Modification" not in col:
-                col += "Modification"
-            if col not in liste_colonne:
-                liste_colonne += [col]
-    for col in liste_colonne:
-        if "Modification" in col and col != "objetModification":
-            name_col = col.replace("Modification", "")
-            colonne_to_modify[col] = name_col
+    colonne_to_modify = dict()
+    dict_path = "columns_modifications.pkl"
+    if utils.USE_S3:
+        utils.download_file(dict_path, dict_path)
+    # On récupère les colonnes détectés dans gestion_flux
+    with open(dict_path, "rb") as file_modif:
+        columns_modification = pickle.load(file_modif)
+    for column in columns_modification:
+        if "Modification" in column:
+            key = column
+            value = column.replace("Modification", "")
         else:
-            colonne_to_modify[col] = col
+            key = column + "Modification"
+            value = column
+        colonne_to_modify[key] = value
+
+    colonne_to_modify["objetModification"] = "objetModification" # Cette colonne est un cas particulier.
+    print('Colonne de modification', colonne_to_modify)
+    # On va utiliser cette fonction pour faire un mapping des noms issus des modifications avec les noms habituels.
+    # Le mapping suivra la forme "xxxModification" : "xxx".
+    # Sauf que "objet" concerne l'objet d'un marché, or "objetModification" l'objet de la modification.
+    # Donc "objetModification" ne doit pas remplacer l'objet du marché.
     return colonne_to_modify
 
 def concat_modifications(dictionaries : list):
@@ -762,7 +798,7 @@ def fusion_source_modification_whole_dataset(df_source : pd.DataFrame, dict_modi
     """
     # Maintenant toutes les modifications sont uniques.
     for column_modif in dict_modification.keys():
-        column_to_change = dict_modification[column_modif]# Les colonnes auquelles il y a des modifications à apporter 
+        column_to_change = dict_modification[column_modif]# Les colonnes auxquelles il y a des modifications à apporter 
         # ont été construites ainsi nomcolonne+"Modification". 
         # Donc on retire Modificaiton pour pointer vers la bonne colonne                            
         mask_raw_to_change = df_source[column_modif].apply(lambda x:x!='').fillna(False)
@@ -792,29 +828,42 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     for objet_marche in liste_objet: # C'est du dedoublonnage en fait ça
         # Récupération du dataframe modification et du dataframe source
         # On créée la colonne "idtech"
-        if type(objet_marche) == str: # Lorsque y'a un Nan (ça arrive) ça fait tout buguer, alors on évite ce cas là.
-            marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
-            marche_init["idtech"] = marche.iloc[-1].id_technique
-            marches_init.append(marche_init)
-    df_to_concatene = pd.concat([x for x in marches_init], copy=False)
-    df.update(df_to_concatene)
-    df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
-    df = fusion_source_modification_whole_dataset(df, dict_modification)
+        marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
+        marche_init["idtech"] = marche.iloc[-1].id_technique
+        marches_init.append(marche_init)
+    if marches_init :  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
+        df_to_concatene = pd.concat([x for x in marches_init], copy=False)
+        df.update(df_to_concatene)
+        df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
+        df = fusion_source_modification_whole_dataset(df, dict_modification)
+    else: # Pour que la colonne idMarche existe quand même.
+        df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique) 
     return df
 
 
-def manage_modifications(data: dict) -> pd.DataFrame:
+def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     Conversion du json en pandas et incorporation des modifications
 
     Retour:
         pd.DataFrame
     """
-    l_indice = indice_marche_avec_modification(data)
-    dict_modification = recuperation_colonne_a_modifier(data, l_indice)
-    df = json_normalize(data['marches'])
-    df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
+    logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
+    dict_modification = recuperation_colonne_a_modifier()
+
+    df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False, errors='ignore')
+    # Création d'un id technique qui existait dans les versions précédentes. Pour que chaque marché ait un id unique.
+    df["id_technique"] = df.index
     prise_en_compte_modifications(df)
+    # Safe dict_modification 
+    cols_df = df.columns.tolist()
+    cols_to_del = []
+    for col in dict_modification.keys():
+        if col not in cols_df:
+            print(col)
+            cols_to_del.append(col)
+    for col in cols_to_del:
+        dict_modification.pop(col, "None")
     df = regroupement_marche(df, dict_modification)
     return df
 
@@ -826,7 +875,7 @@ if __name__ == "__main__":
         profiler.enable()
         main(True)
         profiler.disable()
-        with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye:
+        with open('df_nettoye_new_regroupement_marche', 'rb') as df_nettoye: # Forcément du local, pas besoin de gérer ça sur S3
             df = pickle.load(df_nettoye)
             init_len = len(df)
         with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:

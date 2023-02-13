@@ -1,10 +1,8 @@
 import nettoyage
 import enrichissement
+import gestion_flux
 import logging
 import logging.config
-import cProfile
-import pstats
-import pickle
 import argparse
 
 logger = logging.getLogger("main")
@@ -26,6 +24,8 @@ args = parser.parse_args()
 
 
 def main():
+    logger.info("Début du script de gestion de flux")
+    gestion_flux.main()
     logger.info("Début du script de nettoyage")
     nettoyage.main(args.test)
     logger.info("Fin du script de nettoyage")
