@@ -27,7 +27,7 @@ def main():
     logger.info("Début du script de gestion de flux")
     gestion_flux.main()
     logger.info("Début du script de nettoyage")
-    nettoyage.main(args.test)
+    nettoyage.main()
     logger.info("Fin du script de nettoyage")
     logger.info("Début du script d'enrichissement des données")
     enrichissement.main()
