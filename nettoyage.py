@@ -145,7 +145,7 @@ def manage_data_quality(df : pd.DataFrame):
 
 
 
-    pass
+    return df 
 
 def check_reference_files():
     """
