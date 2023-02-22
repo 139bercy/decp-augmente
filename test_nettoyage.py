@@ -17,7 +17,7 @@ def create_dataframe():
                                  'montant': 50}, {'dateNotificationModification': '2023-01-17',
                                                   'objetModification': 'AU 21/12/2022, le CH de Sarreguemines pourra bénéficier du lot 189.1 avec une qté de 100',
                                                   'datePublicationDonneesModification': '2023-01-18',
-                                                  'montantModification': 1000, 'dateSignature': '2023-01-01'}], '']
+                                                  'montantModification': 77777778, 'dateSignature': '2023-01-01'}], '']
     dftest['uid'] = ['aa', 'bb']
     dftest['uuid'] = ['aaa', 'bbb']
     dftest['_type'] = ['typea', 'typeb']
@@ -83,9 +83,9 @@ def test_manage_amount(create_dataframe):
     df = nettoyage.manage_modifications(create_dataframe)
     df = nettoyage.manage_titulaires(df)
     df = nettoyage.manage_amount(df)
-    assert df.montantCalcule.tolist() == [1000,
+    assert df.montantCalcule.tolist() == [77777778,
                                           0]  # 1000 étant au dessus de la borne inf il n'est pas modifié. 3 étant en dessous il est mis à 0
-
+    assert df.montant_inexploitable.tolist() == [True, False]
 
 def test_manage_missing_code(create_dataframe):
     df = nettoyage.manage_modifications(create_dataframe)
