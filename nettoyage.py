@@ -93,6 +93,7 @@ def main():
         data['marches'] = accessed_list
     logger.info("Début du traitement: Conversion des données en pandas")
     df = manage_modifications(df_flux)
+    df = manage_data_quality(df)
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
@@ -119,6 +120,32 @@ def main():
     df.to_csv("df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".csv")
     logger.info("Ecriture du csv terminé")
 
+
+def manage_data_quality(df : pd.DataFrame):
+    """
+    Cette fonction sépare en deux le dataframe d'entrée. Les données ne respectant pas les formats indiquées par les 
+    règles de gestion de la DAJ sont mise de côtés. Les règles de gestions sont dans un mail du 15 février 2023.
+    /!\ Dans les règles de gestion, certaines valeur de champ d'identification unique du marché ne sont pas accessibles 
+    dans la donnée brut. On va donc ne traiter dans cette fonction que les variables accessibles de manières brutes
+    et lorsque les règles portent sur des variables non brutzq on appliquera les règles à ce moment là. (ex : idtitulaire)
+    /!\\
+    
+    Arguments
+    ----------
+    df :  le dataframe des données bruts.
+
+
+    Return 
+    -----------
+    df (dataFrame) : le dataframe des données à enrichir.
+
+    """
+    
+
+
+
+
+    pass
 
 def check_reference_files():
     """
@@ -375,6 +402,30 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
     # On ne veut plus convertir en int. Mais plutôt utiliser round. 
     df['montant'] = df['montant'].apply(lambda x:round(x) if str(x).isdigit() else x) # Pourquoi on n'utilise pas directement round de pandas ?
     # Car on ne gagne pas beaucoup en rapidité et la méthode pandas laisse le format float. Alors qu'on veut un display int.
+    
+
+    def detect_inexploitable(montant):
+        """
+        Cette fonction indique si un montant est exploitable ou non selon l'algorithme spécifié par la DAJ
+        """
+        montant_str = str(int(float(montant)))  # Valeur du int non comprise
+        if float(montant) > 3000000000 or float(montant) < 1:
+            return True # True car inexploitable
+        elif montant_str.startswith('123456789'):
+            return True
+        threshold = len(montant_str)-2
+        for i_caractere in range(len(montant_str)):
+            begin_caract = montant_str[i_caractere]
+            subset = montant_str[i_caractere:i_caractere+threshold]
+            unique_caract_subset = ''.join(set(subset))
+            if (len(unique_caract_subset)==1) and (begin_caract!='0'):
+                return True 
+        else:
+            return False
+    
+    df['montant_inexploitable'] = df.montant.apply(lambda x:detect_inexploitable(x))
+    
+
     return df
 
 

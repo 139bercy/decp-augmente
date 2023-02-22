@@ -71,7 +71,7 @@ Schéma de principe de la pipeline.
 
 <img src="schema_pipeline.jpg" alt="Schéma de principe de la pipeline de données" width="400px"/>
 
-:hammer: Tous les fichiers (matérialisés par des flèches) transitent par le S3. :hammer:
+:hammer: Tous les fichiers nécessaires (matérialisés par des flèches) transitent par le S3. :hammer:
 ## Etapes de la donnée 
 
 ### Gestion flux
