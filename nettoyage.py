@@ -408,7 +408,12 @@ def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
         """
         Cette fonction indique si un montant est exploitable ou non selon l'algorithme spécifié par la DAJ
         """
-        montant_str = str(int(float(montant)))  # Valeur du int non comprise
+        # Normalement, on ne devrait plus avoir de Nan car les règles de détection de la DAJ sont en amont de cette fonction. Cependant pour la démonstration d'intégration de nouvelle fonctionnalité avec Djabril ce n'est pas le cas.
+        # On fait juste ce test vite fait
+        try :
+            montant_str = str(int(float(montant)))  # Valeur du int non comprise
+        except:
+            return True
         if float(montant) > 3000000000 or float(montant) < 1:
             return True # True car inexploitable
         elif montant_str.startswith('123456789'):
