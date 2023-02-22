@@ -1,3 +1,4 @@
+import argparse
 import csv
 import json
 import re
@@ -158,6 +159,7 @@ def concat_unduplicate_and_caching_hash(df):
             "sirenEtablissement", "id_cotitulaire1", "id_cotitulaire2", "id_cotitulaire3"])
 
     return df
+
 
 def manage_column_final(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -320,16 +322,17 @@ def actualiser_cache_entreprise(df_to_analyse: pd.DataFrame, path_to_db: str, df
     df_to_analys correspondant aux lignes qui n'ont pas matchés avec la base csv
     
     """
-    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
-        
-        #Spécificité de cette fonction, on doit pre process la donnée du chunk pour la comparer
+    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns,
+                                dtype=dtypes):
+        # Spécificité de cette fonction, on doit pre process la donnée du chunk pour la comparer
         gm_chunk["nicSiegeUniteLegale"] = gm_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
         gm_chunk["siren"] = gm_chunk["siren"].astype(str).str\
             .cat(gm_chunk["nicSiegeUniteLegale"].astype(str), sep='') # La colonne s'appelle siren mais c'est un siret en réalité. 
         gm_chunk.rename(columns={"siren":"siretEtablissement"}, inplace= True) # Si on ne renomme pas ici ça va perturber la suite du process en créant une autre colonne siretEtablissement par la suite
         # Ajouter à df cache les infos qu'il faut
-        matching = gm_chunk.loc[gm_chunk.siretEtablissement.isin(df_to_analyse.tolist())].copy() # La copie du dataframe qui match parmis le chunk en cours
-        df_to_analyse = df_to_analyse[~df_to_analyse.isin(matching.siretEtablissement.tolist())] 
+        matching = gm_chunk.loc[gm_chunk.siretEtablissement.isin(
+            df_to_analyse.tolist())].copy()  # La copie du dataframe qui match parmis le chunk en cours
+        df_to_analyse = df_to_analyse[~df_to_analyse.isin(matching.siretEtablissement.tolist())]
         dfcache = dfcache.append(matching)
 
     return dfcache, df_to_analyse
@@ -377,15 +380,16 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     cache_exists = os.path.isfile(path_cache)
     if cache_exists:
         dfcache = loading_cache(path_cache)
-        dfcache = dfcache.rename(columns={"siren" : "siretEtablissement"})
-        series_siren_not_in_cache, series_siren_in_cache = split_on_column_match(df, dfcache, column="siretEtablissement")        
-        need_refresh_cache = not(series_siren_not_in_cache.empty)
+        dfcache = dfcache.rename(columns={"siren": "siretEtablissement"})
+        series_siren_not_in_cache, series_siren_in_cache = split_on_column_match(df, dfcache,
+                                                                                 column="siretEtablissement")
+        need_refresh_cache = not (series_siren_not_in_cache.empty)
         if need_refresh_cache:
             logger.info("Enrichissement type entreprise: Besoin d'actualiser cache pour les titulaires")
             dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(series_siren_not_in_cache, path, dfcache, columns=usecols, dtypes=dtype)
             dfcache = dfcache.rename(columns={"siren" : "siretEtablissement"})
             dfcache = dfcache.drop_duplicates(subset=['siretEtablissement'], keep='first')
-            #Update cache de la lsite des sirets valides mais non trouvés
+            # Update cache de la lsite des sirets valides mais non trouvés
             list_siret_not_found += series_siren_valid_but_not_found_in_bdd.tolist()
 
             # Actualise les caches
@@ -393,8 +397,11 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
             write_cache(list(set(list_siret_not_found)), path_cache_not_in_bdd) # On dédoublonne
     else:
         # crécupérer le dataframe correspondant au cache
-        dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(df.siretEtablissement, path, dfcache=pd.DataFrame(), columns=usecols, dtypes=dtype)
-        dfcache = dfcache.drop_duplicates(subset=['siretEtablissement'], keep='first') # La colonne s'appelle encore siren dans le cache
+        dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(df.siretEtablissement, path,
+                                                                                       dfcache=pd.DataFrame(),
+                                                                                       columns=usecols, dtypes=dtype)
+        dfcache = dfcache.drop_duplicates(subset=['siretEtablissement'],
+                                          keep='first')  # La colonne s'appelle encore siren dans le cache
         # Créer les cache
         write_cache(dfcache, path_cache)
         write_cache(list(set(series_siren_valid_but_not_found_in_bdd.tolist())), path_cache_not_in_bdd)
@@ -569,7 +576,7 @@ def apply_luhn(df: pd.DataFrame) -> pd.DataFrame:
     df = pd.merge(df, df_SE2, how='left', on='siret2Etablissement', copy=False)
     logger.info("Nombre de Siret Etablissement jugé invalide:{}".format(len(df) - sum(df.siretEtablissementValide)))
     del df["siret2Etablissement"]
-    #del df_SE2enrichissement_siret
+    # del df_SE2enrichissement_siret
     del df_SE2
     # On rectifie pour les codes non-siret
     df.siretEtablissementValide = np.where(
@@ -595,7 +602,8 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
     path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
     path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
-    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee, path_to_cache_not_in_insee)
+    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee,
+                                                             path_to_cache_not_in_insee)
     logger.info("Enrichissement insee fini")
     logger.info("Enrichissement infogreffe en cours...")
     enrichissementScrap = get_enrichissement_scrap(nanSiren, archiveErrorSIRET)
@@ -634,7 +642,7 @@ def get_siretdf_from_original_data(df: pd.DataFrame) -> pd.DataFrame:
     dfSIRET.rename(columns={
         "idTitulaires": "siret",
         "typeIdentifiant": "siren"}, inplace=True)
-    dfSIRET.siren = dfSIRET.siret.str[:9] # 9 = taille du Siren
+    dfSIRET.siren = dfSIRET.siret.str[:9]  # 9 = taille du Siren
     dfSIRET.denominationSociale = dfSIRET.denominationSociale.astype(str)
 
     return dfSIRET
@@ -682,6 +690,7 @@ def loading_cache(path_to_cache):
         df = pickle.load(df_cache)
     return df
 
+
 def actualiser_cache(dfSiret_to_add, path_to_db, dfcache, columns, dtypes, chunksize=1000000):
     """
     La fonction parcourt la bdd Insee par chunk. Pour chaque chunk on regarde si il y a des correspondances de siret entre dfSiret_to_add et la bdd insee.
@@ -705,16 +714,19 @@ def actualiser_cache(dfSiret_to_add, path_to_db, dfcache, columns, dtypes, chunk
     
     for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
         # Ajouter à df cache les infos qu'il faut
-        matching = gm_chunk.loc[gm_chunk.siret.isin(dfSiret_to_add.tolist())].copy() # La copie du dataframe qui match parmis le chunk en cours
-        dfSiret_to_add = dfSiret_to_add[~dfSiret_to_add.isin(matching.siret.tolist())] 
+        matching = gm_chunk.loc[gm_chunk.siret.isin(
+            dfSiret_to_add.tolist())].copy()  # La copie du dataframe qui match parmis le chunk en cours
+        dfSiret_to_add = dfSiret_to_add[~dfSiret_to_add.isin(matching.siret.tolist())]
         dfcache = dfcache.append(matching)
     return dfcache, dfSiret_to_add
+
 
 def write_cache(dfcache, path_to_cache):
     with open(path_to_cache, 'wb') as pathcache:
         pickle.dump(dfcache, pathcache)
     logger.info("Cache sauvegardé")
     return None
+
 
 def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], key_columns_csv="siret"):
     """
@@ -768,7 +780,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     dfSIRET_siret_not_valid = df_keys[mask_siret_not_valid]
     dfSIRET_siret_not_valid['sirenAcheteurValide'] = False
     df_keys = df_keys[~mask_siret_not_valid]
-    #Le second cache des siret valide not found est traité en premier.
+    # Le second cache des siret valide not found est traité en premier.
     cache_siret_not_found_exists = os.path.isfile(path_to_cache_not_in_insee)
     if cache_siret_not_found_exists:
         sirets_not_found = loading_cache(path_to_cache_not_in_insee)
@@ -778,18 +790,20 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     dfSIRET_valide_notfound = df_keys[mask_siret_valid_not_found]
     # On retire les siret valides mais non trouvés lors des précédents passages du df.
     df_keys = df_keys[~mask_siret_valid_not_found]
-    
+
     cache_exists = os.path.isfile(path_to_cache_insee)
     if cache_exists:
         dfcache = loading_cache(path_to_cache_insee)
         series_SIRET_not_in_cache, seriesSIRETincache = split_on_column_match(df_keys, dfcache, column="siret")
-        need_refresh_cache = not(series_SIRET_not_in_cache.empty)
+        need_refresh_cache = not series_SIRET_not_in_cache.empty
         if need_refresh_cache:
             logger.info("Enrichissement avec insee : Besoin d'actualiser cache")
             # Ceux pas dans le cache, ajouter au cache leur correspondant bddinsee
-            dfcache, series_siret_valid_but_not_found_in_bdd = actualiser_cache(series_SIRET_not_in_cache, path_to_bdd_insee, dfcache, columns=columns, dtypes=dtypes)
+            dfcache, series_siret_valid_but_not_found_in_bdd = actualiser_cache(series_SIRET_not_in_cache,
+                                                                                path_to_bdd_insee, dfcache,
+                                                                                columns=columns, dtypes=dtypes)
             dfcache = dfcache.drop_duplicates(subset=['siret'], keep='first')
-            #Update cache de la lsite des sirets valides mais non trouvés
+            # Update cache de la lsite des sirets valides mais non trouvés
             sirets_not_found += series_siret_valid_but_not_found_in_bdd.tolist()
             # Actualise les caches
             write_cache(dfcache, path_to_cache_insee)
@@ -798,7 +812,9 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     else : 
         logger.info("Enrichissement avec insee : Création du cache")
         # crécupérer le dataframe correspondant au cache
-        dfcache, series_siret_valid_but_not_found_in_bdd = actualiser_cache(df_keys.siret, path_to_bdd_insee, dfcache=pd.DataFrame(), columns=columns, dtypes=dtypes)
+        dfcache, series_siret_valid_but_not_found_in_bdd = actualiser_cache(df_keys.siret, path_to_bdd_insee,
+                                                                            dfcache=pd.DataFrame(), columns=columns,
+                                                                            dtypes=dtypes)
         dfcache = dfcache.drop_duplicates(subset=['siret'], keep='first')
         # Créer les cache
         write_cache(dfcache, path_to_cache_insee)
@@ -808,7 +824,9 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
             utils.write_object_file_on_s3(path_to_cache_not_in_insee, sirets_not_found)
     return df
 
-def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str, path_to_cache_not_in_bdd: str) -> list:
+
+def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_cache_bdd: str,
+                             path_to_cache_not_in_bdd: str) -> list:
     """
     Ajout des informations Adresse/Activité des entreprises via la base siren Insee par un système de double cache.
     Pour bien comprendre la fonction, il y a plusieurs cas possibles concernant un SIRET. Il y a le cas où le siret est valide et match avec la bdd insee (on gère ça avec le premier cache)
@@ -837,21 +855,21 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     mask_siret_not_valid = (~dfSIRET.siret.apply(is_luhn_valid)) | (dfSIRET.siret == '00000000000000')
     dfSIRET_siret_not_valid = dfSIRET[mask_siret_not_valid]
     dfSIRET = dfSIRET[~mask_siret_not_valid]
-    
+
     # Traitons les caches maintenant
 
-    #Le second cache des siret valide not found est traité en premier.
+    # Le second cache des siret valide not found est traité en premier.
     cache_siret_not_found_exists = os.path.isfile(path_to_cache_not_in_bdd)
     if cache_siret_not_found_exists:
         sirets_not_found = loading_cache(path_to_cache_not_in_bdd)
     else:
         sirets_not_found = []
-    
+
     mask_siret_valid_not_found = dfSIRET.siret.isin(sirets_not_found)
     dfSIRET_valide_notfound = dfSIRET[mask_siret_valid_not_found]
     # On retire les siret valides mais non trouvés lors des précédents passages du df.
     dfSIRET = dfSIRET[~mask_siret_valid_not_found]
-    
+
     cache_exists = os.path.isfile(path_to_cache_bdd)
     print(f"Taille avant merge dfSIRET {dfSIRET.shape}")
     print("Cache : ", path_to_cache_bdd )
@@ -873,7 +891,6 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     df_nan_siret = df_nan_siret.iloc[:, :3]
     df_nan_siret.reset_index(inplace=True, drop=True)
     return [enrichissementInsee, df_nan_siret]
-    
 
 
 def get_enrichissement_scrap(nanSiren: pd.DataFrame, archiveErrorSIRET: pd.DataFrame) -> pd.DataFrame:
@@ -1034,7 +1051,7 @@ def enrichissement_cpv(df: pd.DataFrame) -> pd.DataFrame:
     del refCPV
     # Rename la variable CODE en codeCPV
     df.rename(columns={"codeCPV": "codeCPV_Original",
-              "CODE": "codeCPV"}, inplace=True)
+                       "CODE": "codeCPV"}, inplace=True)
     return df
 
 
@@ -1050,7 +1067,7 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
     # StockEtablissement_utf8 et les caches
     path_to_cache_bdd = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
     path_to_cache_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
-    
+
     # Chargement des caches qui existent forcément. Donc pas de test sur leur existence
     sirets_not_found = loading_cache(path_to_cache_not_in_bdd)
     mask_siret_valid_not_found = df.siret.isin(sirets_not_found)
@@ -1062,18 +1079,17 @@ def enrichissement_acheteur(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("Début du traitement: Enrichissement acheteur")
     dfAcheteurId = df['acheteur.id'].to_frame()
-    dfAcheteurId = dfAcheteurId.rename(columns={'acheteur.id' : 'siret'})
+    dfAcheteurId = dfAcheteurId.rename(columns={'acheteur.id': 'siret'})
     dfAcheteurId = dfAcheteurId.drop_duplicates(keep='first')
     dfAcheteurId.reset_index(inplace=True, drop=True)
     dfAcheteurId = dfAcheteurId.astype(str)
 
-    
     dfcache = loading_cache(path_to_cache_bdd)
-    
+
     # Colonnes utiles l'enrichissement
-    usecols=['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']
+    usecols = ['siret', 'codePostalEtablissement', 'libelleCommuneEtablissement', 'codeCommuneEtablissement']
     dfcache_acheteur = dfcache[usecols].copy()
-    enrichissementAcheteur =  pd.merge(dfAcheteurId, dfcache_acheteur, on="siret", copy=False)
+    enrichissementAcheteur = pd.merge(dfAcheteurId, dfcache_acheteur, on="siret", copy=False)
     enrichissementAcheteur = enrichissementAcheteur.drop_duplicates(subset=['siret'], keep='first')
     enrichissementAcheteur.columns = ['acheteur.id', 'codePostalAcheteur', 'libelleCommuneAcheteur',
                                       'codeCommuneAcheteur']
@@ -1151,6 +1167,7 @@ def fix_codegeo(code: str) -> str:
     if "." in code[:5]:
         return "0" + code[:4]
     return code[:5]
+
 
 def enrichissement_geo(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -1279,10 +1296,11 @@ def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    if conf_debug["debug"]:
+    # vérification des arguments fournis en entrée de script, si l'argument -t est présent on lance les tests
+    if args.test:
         profiler = cProfile.Profile()
         profiler.enable()
-        main()
+        main(True)
         profiler.disable()
         with open('df_nettoye', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)

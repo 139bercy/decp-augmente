@@ -1,9 +1,9 @@
 {
     "nettoyage" : {
-        "debug" :  0,
-        "subset" : 0,
-        "n_subset" : 0,
-        "seed" : 0
+        "debug" :  1,
+        "subset" : 1,
+        "n_subset" : 10000,
+        "seed" : 64
     },
     "enrichissement" : {
         "debug" : 1
