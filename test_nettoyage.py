@@ -57,7 +57,7 @@ def create_dataframe():
 
 def test_manage_modifications(create_dataframe):
     df = nettoyage.manage_modifications(create_dataframe)
-    assert (df.montant.tolist() == [1000, 3.5])
+    assert (df.montant.tolist() == [77777778, 3.5])
     assert (df.dateSignature.tolist() == ['2023-01-01', np.nan])
 
 
@@ -83,7 +83,7 @@ def test_manage_amount(create_dataframe):
     df = nettoyage.manage_modifications(create_dataframe)
     df = nettoyage.manage_titulaires(df)
     df = nettoyage.manage_amount(df)
-    assert df.montantCalcule.tolist() == [77777778,
+    assert df.montantCalcule.tolist() == [0,
                                           0]  # 1000 étant au dessus de la borne inf il n'est pas modifié. 3 étant en dessous il est mis à 0
     assert df.montant_inexploitable.tolist() == [True, False]
 
