@@ -627,10 +627,9 @@ def enrichissement_siret(df: pd.DataFrame) -> pd.DataFrame:
     archiveErrorSIRET = getArchiveErrorSIRET()
 
     logger.info("Enrichissement insee en cours...")
-    path_to_bdd_insee = os.path.join(path_to_data, conf_data["base_sirene_insee"])
     path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
     path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
-    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_bdd_insee, path_to_cache_insee,
+    enrichissementInsee, nanSiren = get_enrichissement_insee(dfSIRET, path_to_cache_insee,
                                                              path_to_cache_not_in_insee)
     logger.info("Enrichissement insee fini")
     logger.info("Enrichissement infogreffe en cours...")
