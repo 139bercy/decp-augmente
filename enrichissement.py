@@ -19,11 +19,11 @@ logger = logging.getLogger("main.enrichissement")
 logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
 path_to_conf = "confs"
-if not(os.path.exists(path_to_conf)): # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
+if not (os.path.exists(path_to_conf)):  # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_conf)
 if utils.USE_S3:
     res = utils.download_confs()
-    if res :
+    if res:
         logger.info("Chargement des fichiers confs depuis le S3")
     else:
         logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
@@ -48,13 +48,15 @@ args = parser.parse_args()
 if utils.USE_S3:
     folders_to_create = [path_to_cache, path_to_data]
     for folder in folders_to_create:
-        if not(os.path.exists(folder)):
+        if not (os.path.exists(folder)):
             os.mkdir(folder)
     utils.download_data_enrichissement()
 
+
 def main():
     decp_augmente_file = conf_data["decp_augmente_file_flux"]
-    file_nettoye_today = "df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".pkl" # Pour du debuguage principalement lorsqu'on va ouvrir en local
+    file_nettoye_today = "df_nettoye" + "-" + today.strftime(
+        "%Y-%m-%d") + ".pkl"  # Pour du debuguage principalement lorsqu'on va ouvrir en local
     decp_augmente_file = os.path.splitext(decp_augmente_file)[0]
     file_decp_augmente_today = decp_augmente_file + "-" + today.strftime("%Y-%m-%d") + ".pkl"
     if utils.USE_S3:
@@ -70,7 +72,7 @@ def main():
     if df.empty:
         logger.info("Flux vide")
         if utils.USE_S3:
-            utils.write_object_file_on_s3(file_decp_augmente_today, df) 
+            utils.write_object_file_on_s3(file_decp_augmente_today, df)
             # Si le flux est vide on ne ré écrit pas la version de prod.
 
         if conf_debug["debug"]:
@@ -110,7 +112,6 @@ def main():
     logger.info("Fin du traitement")
 
 
-
 def concat_unduplicate_and_caching_hash(df):
     """
     Cette fonction concatène ensemble les dataframes (celui du flux et celui du Stock).
@@ -124,8 +125,8 @@ def concat_unduplicate_and_caching_hash(df):
     logger.info(f"Taille dataframe à concat_unduplicate {df.shape}")
     client = utils.s3.meta.client
     # concat
-    path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df']) # chemin du cache sur le s3
-    local_path_df_cache = "df_cache" # Chemin où se trouve le dataframe de cache en local.
+    path_to_df_cache = os.path.join(path_to_data, conf_data['cache_df'])  # chemin du cache sur le s3
+    local_path_df_cache = "df_cache"  # Chemin où se trouve le dataframe de cache en local.
     try:
         utils.download_file(path_to_df_cache, local_path_df_cache)
     except ClientError:
@@ -133,30 +134,32 @@ def concat_unduplicate_and_caching_hash(df):
         # C'est moins lourd que de tester l'existence de
     file_cache_exists = os.path.isfile(local_path_df_cache)
     df['date_ajout_dfcache'] = today.strftime("%Y-%m-%d")
-    if file_cache_exists :
+    if file_cache_exists:
         with open(local_path_df_cache, "rb") as file_cache:
             df_cache = pickle.load(file_cache)
         df = pd.concat([df, df_cache]).reset_index(drop=True)
 
-    
     if not args.test:
-    # Save DataFrame pour la prochaine fois
-    # Pourquoi cette condition ? Lorsque l'on est en mode prod elle est essentielle.
-    # Par contre dans le mode CI, on est limité par la RAM gratuite Circle CI, donc on n'enregistre pas
-    # le cache actuel dans le df sinon le job CI peut sauter. J'en ai enregistré un en amont qui sera donc fixe
-    # dans le S3, ainsi on respecte bien l'intrégité de la pipeline.
+        # Save DataFrame pour la prochaine fois
+        # Pourquoi cette condition ? Lorsque l'on est en mode prod elle est essentielle.
+        # Par contre dans le mode CI, on est limité par la RAM gratuite Circle CI, donc on n'enregistre pas
+        # le cache actuel dans le df sinon le job CI peut sauter. J'en ai enregistré un en amont qui sera donc fixe
+        # dans le S3, ainsi on respecte bien l'intrégité de la pipeline.
         if utils.USE_S3:
             utils.write_object_file_on_s3(path_to_df_cache, df)
 
         else:
             with open(path_to_df_cache, "wb") as file_cache:
-                    pickle.dump(df, file_cache)
-    
+                pickle.dump(df, file_cache)
+
     # Petit tour de unduplicate stricte. Pourquoi ? Il se peut qu'avec le jeu des caches et des jobs séparés certaines lignes de flux soient éventuellement retraités (notamment lorsqu'un job tombe mais pas les autres).
     # Bien que je vais modifier la pipeline pour pas que ça se produise, cette sécurité n'est pas de trop et ne coûte quasi rien. J'ai mis un max de colonne d'objet hashable.
-    df = df.drop_duplicates(keep="first", subset=["source", "id", "objetMarche","codeCPV_Original",
-            "dateNotification", "dureeMois","montant","nomAcheteur", "idAcheteur", "lieuExecutionCode", "lieuExecutionNom", "nature", "procedure", "formePrix",
-            "sirenEtablissement", "id_cotitulaire1", "id_cotitulaire2", "id_cotitulaire3"])
+    df = df.drop_duplicates(keep="first", subset=["source", "id", "objetMarche", "codeCPV_Original",
+                                                  "dateNotification", "dureeMois", "montant", "nomAcheteur",
+                                                  "idAcheteur", "lieuExecutionCode", "lieuExecutionNom", "nature",
+                                                  "procedure", "formePrix",
+                                                  "sirenEtablissement", "id_cotitulaire1", "id_cotitulaire2",
+                                                  "id_cotitulaire3"])
 
     return df
 
@@ -212,7 +215,8 @@ def jointure_base_departement_region() -> pd.DataFrame:
     """
     # Import de la base département
     path_dep = os.path.join(path_to_data, conf_data["departements-francais"])
-    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'], dtype={"dep": str, "reg": str, "libelle": str})
+    departement = pd.read_csv(path_dep, sep=",", usecols=['dep', 'reg', 'libelle'],
+                              dtype={"dep": str, "reg": str, "libelle": str})
     # Import de la base Région
     path_reg = os.path.join(path_to_data, conf_data["region-fr"])
     region = pd.read_csv(path_reg, sep=",", usecols=["reg", "libelle"], dtype={"reg": str, "libelle": str})
@@ -220,7 +224,8 @@ def jointure_base_departement_region() -> pd.DataFrame:
     # Merge des deux bases
     df_dep_reg = pd.merge(departement, region, how="left", left_on="reg", right_on="reg", copy=False)
     df_dep_reg.columns = ["code_departement", "code_region", "Nom", "Region"]
-    df_dep_reg.code_region = np.where(df_dep_reg.code_region.isin(["1", "2", "3", "4", "6"]), "0" + df_dep_reg.code_region, df_dep_reg.code_region)
+    df_dep_reg.code_region = np.where(df_dep_reg.code_region.isin(["1", "2", "3", "4", "6"]),
+                                      "0" + df_dep_reg.code_region, df_dep_reg.code_region)
     return df_dep_reg
 
 
@@ -242,17 +247,18 @@ def enrichissement_departement(df: pd.DataFrame) -> pd.DataFrame:
     df_dep_reg.code_departement = df_dep_reg.code_departement.astype(str)
     df = pd.merge(df, df_dep_reg, how="left", left_on="departementAcheteur", right_on="code_departement", copy=False)
     df = df.rename(columns={
-                   'Nom': "libelleDepartementAcheteur",
-                   'Region': "libelleRegionAcheteur",
-                   'code_region': "codeRegionAcheteur"
-                   })
+        'Nom': "libelleDepartementAcheteur",
+        'Region': "libelleRegionAcheteur",
+        'code_region': "codeRegionAcheteur"
+    })
     df = df.drop(["code_departement"], axis=1)
-    df = pd.merge(df, df_dep_reg, how="left", left_on="departementEtablissement", right_on="code_departement", copy=False)
+    df = pd.merge(df, df_dep_reg, how="left", left_on="departementEtablissement", right_on="code_departement",
+                  copy=False)
     df = df.rename(columns={
-                   'Nom': "libelleDepartementEtablissement",
-                   'Region': "libelleRegionEtablissement",
-                   'code_region': "codeRegionEtablissement"
-                   })
+        'Nom': "libelleDepartementEtablissement",
+        'Region': "libelleRegionEtablissement",
+        'code_region': "codeRegionEtablissement"
+    })
     df = df.drop(["code_departement"], axis=1)
     return df
 
@@ -265,7 +271,8 @@ def enrichissement_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame
     """
-    logger.info("Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
+    logger.info(
+        "Début du traitement: Ajout des codes/libelles des arrondissements pour les acheteurs et les etablissements")
     df = get_code_arrondissement(df)
     df = get_libelle_arrondissement(df)
     return df
@@ -298,7 +305,8 @@ def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
     Retour:
         - pd.DataFrame"""
     path_to_arrondissement = os.path.join(path_to_data, conf_data["arrondissement-fr"])
-    arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'], dtype={"ARR": str, "LIBELLE": str})
+    arrondissement = pd.read_csv(path_to_arrondissement, sep=",", usecols=['ARR', 'LIBELLE'],
+                                 dtype={"ARR": str, "LIBELLE": str})
     df = pd.merge(df, arrondissement, how="left", left_on="codeArrondissementAcheteur", right_on="ARR", copy=False)
     df = df.drop(["ARR"], axis=1)
     df = df.rename(columns={"LIBELLE": "libelleArrondissementAcheteur"})
@@ -308,7 +316,8 @@ def get_libelle_arrondissement(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def actualiser_cache_entreprise(df_to_analyse: pd.DataFrame, path_to_db: str, dfcache: pd.DataFrame, columns: list, dtypes: list, chunksize=1000000):
+def actualiser_cache_entreprise(df_to_analyse: pd.DataFrame, path_to_db: str, dfcache: pd.DataFrame, columns: list,
+                                dtypes: list, chunksize=1000000):
     """
     La fonction permet d'actualiser le cache pour enrichissement_entreprise qui utilise la base StockUniteLegale.
 
@@ -320,15 +329,17 @@ def actualiser_cache_entreprise(df_to_analyse: pd.DataFrame, path_to_db: str, df
     --------------
     dfcache (DataFrame) correspondant au cache
     df_to_analys correspondant aux lignes qui n'ont pas matchés avec la base csv
-    
+
     """
     for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns,
                                 dtype=dtypes):
         # Spécificité de cette fonction, on doit pre process la donnée du chunk pour la comparer
         gm_chunk["nicSiegeUniteLegale"] = gm_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
-        gm_chunk["siren"] = gm_chunk["siren"].astype(str).str\
-            .cat(gm_chunk["nicSiegeUniteLegale"].astype(str), sep='') # La colonne s'appelle siren mais c'est un siret en réalité. 
-        gm_chunk.rename(columns={"siren":"siretEtablissement"}, inplace= True) # Si on ne renomme pas ici ça va perturber la suite du process en créant une autre colonne siretEtablissement par la suite
+        gm_chunk["siren"] = gm_chunk["siren"].astype(str).str \
+            .cat(gm_chunk["nicSiegeUniteLegale"].astype(str),
+                 sep='')  # La colonne s'appelle siren mais c'est un siret en réalité.
+        gm_chunk.rename(columns={"siren": "siretEtablissement"},
+                        inplace=True)  # Si on ne renomme pas ici ça va perturber la suite du process en créant une autre colonne siretEtablissement par la suite
         # Ajouter à df cache les infos qu'il faut
         matching = gm_chunk.loc[gm_chunk.siretEtablissement.isin(
             df_to_analyse.tolist())].copy()  # La copie du dataframe qui match parmis le chunk en cours
@@ -337,13 +348,16 @@ def actualiser_cache_entreprise(df_to_analyse: pd.DataFrame, path_to_db: str, df
 
     return dfcache, df_to_analyse
 
-def actualiser_cache_entreprise_acheteur(df_to_analyse: pd.DataFrame, path_to_db: str, dfcache: pd.DataFrame, columns: list, dtypes: list, chunksize=1000000):
-    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
-              #Spécificité de cette fonction, on doit pre process la donnée du chunk pour la comparer
+
+def actualiser_cache_entreprise_acheteur(df_to_analyse: pd.DataFrame, path_to_db: str, dfcache: pd.DataFrame,
+                                         columns: list, dtypes: list, chunksize=1000000):
+    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns,
+                                dtype=dtypes):
+        # Spécificité de cette fonction, on doit pre process la donnée du chunk pour la comparer
         gm_chunk["nicSiegeUniteLegale"] = gm_chunk["nicSiegeUniteLegale"].astype(str).str.zfill(5)
-        gm_chunk["siret"] = gm_chunk["siren"].astype(str).str\
-            .cat(gm_chunk["nicSiegeUniteLegale"].astype(str), sep='')  
-        
+        gm_chunk["siret"] = gm_chunk["siren"].astype(str).str \
+            .cat(gm_chunk["nicSiegeUniteLegale"].astype(str), sep='')
+
         matching = gm_chunk.loc[gm_chunk.siret.isin(df_to_analyse.tolist())].copy()
         df_to_analyse = df_to_analyse[~df_to_analyse.isin(matching.siret.tolist())]
         dfcache = dfcache.append(matching)
@@ -364,8 +378,9 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     # Recuperation de la base
     path = os.path.join(path_to_data, conf_data["base_ajout_type_entreprise"])
     # La base est volumineuse. Pour "optimiser la mémoire", on va segmenter l'import
-    usecols=["siren", "categorieEntreprise", "nicSiegeUniteLegale", "denominationUniteLegale"]
-    dtype={"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string', "denominationUniteLegale":"string"}
+    usecols = ["siren", "categorieEntreprise", "nicSiegeUniteLegale", "denominationUniteLegale"]
+    dtype = {"siren": 'string', "categorieEntreprise": 'string', "nicSiegeUniteLegale": 'string',
+             "denominationUniteLegale": "string"}
     path_cache = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
     path_cache_not_in_bdd = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_legale"])
     cache_siren_not_found_exists = os.path.isfile(path_cache_not_in_bdd)
@@ -386,15 +401,18 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         need_refresh_cache = not (series_siren_not_in_cache.empty)
         if need_refresh_cache:
             logger.info("Enrichissement type entreprise: Besoin d'actualiser cache pour les titulaires")
-            dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(series_siren_not_in_cache, path, dfcache, columns=usecols, dtypes=dtype)
-            dfcache = dfcache.rename(columns={"siren" : "siretEtablissement"})
+            dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(series_siren_not_in_cache,
+                                                                                           path, dfcache,
+                                                                                           columns=usecols,
+                                                                                           dtypes=dtype)
+            dfcache = dfcache.rename(columns={"siren": "siretEtablissement"})
             dfcache = dfcache.drop_duplicates(subset=['siretEtablissement'], keep='first')
             # Update cache de la lsite des sirets valides mais non trouvés
             list_siret_not_found += series_siren_valid_but_not_found_in_bdd.tolist()
 
             # Actualise les caches
             write_cache(dfcache, path_cache)
-            write_cache(list(set(list_siret_not_found)), path_cache_not_in_bdd) # On dédoublonne
+            write_cache(list(set(list_siret_not_found)), path_cache_not_in_bdd)  # On dédoublonne
     else:
         # crécupérer le dataframe correspondant au cache
         dfcache, series_siren_valid_but_not_found_in_bdd = actualiser_cache_entreprise(df.siretEtablissement, path,
@@ -410,7 +428,7 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     df = df.merge(
         dfcache[['categorieEntreprise', 'siretEtablissement']], how='left', on='siretEtablissement', copy=False)
     df["categorieEntreprise"] = np.where(df["categorieEntreprise"].isnull(), "NC", df["categorieEntreprise"])
-    df = pd.concat([df,dfSIRET_valide_notfound])
+    df = pd.concat([df, dfSIRET_valide_notfound])
 
     logger.info('Mettons en cache les données sur les acheteurs\n')
     # On s'occupe des titulaires puis des acheteurs de deux manières distinctes pour clarifier et simplifier le traitement.
@@ -422,31 +440,38 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
         list_siret_acheteur_not_found = loading_cache(path_cache_acheteur_not_in_bdd)
     else:
         list_siret_acheteur_not_found = []
-    mask_siret_acheteur_valid_not_found = df.idAcheteur.isin(list_siret_acheteur_not_found) #idAcheteur est la colonne pour les siret des acheteurs
+    mask_siret_acheteur_valid_not_found = df.idAcheteur.isin(
+        list_siret_acheteur_not_found)  # idAcheteur est la colonne pour les siret des acheteurs
     dfSIRET_acheteur_valide_notfound = df[mask_siret_acheteur_valid_not_found]
     df_acheteur = df[~mask_siret_acheteur_valid_not_found].copy()
     cache_exists = os.path.isfile(path_cache_acheteur)
     if cache_exists:
         dfcache_acheteur = loading_cache(path_cache_acheteur)
-        series_siret_acheteur_not_in_cache, series_siret_acheteur_in_cache = split_on_column_match(df_acheteur, dfcache_acheteur, column="idAcheteur")
-        need_refresh_cache = not(series_siret_acheteur_not_in_cache.empty)
-        if need_refresh_cache : 
+        series_siret_acheteur_not_in_cache, series_siret_acheteur_in_cache = split_on_column_match(df_acheteur,
+                                                                                                   dfcache_acheteur,
+                                                                                                   column="idAcheteur")
+        need_refresh_cache = not (series_siret_acheteur_not_in_cache.empty)
+        if need_refresh_cache:
             logger.info("Enrichissement type entreprise: Besoin d'actualiser cache pour les acheteurs")
-            dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(series_siret_acheteur_not_in_cache, path, dfcache_acheteur,  columns=usecols, dtypes=dtype)
+            dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(
+                series_siret_acheteur_not_in_cache, path, dfcache_acheteur, columns=usecols, dtypes=dtype)
 
             list_siret_acheteur_not_found += series_siren_acheteur_valid_but_not_found_in_bdd.tolist()
-        # Actualise les caches
+            # Actualise les caches
             write_cache(dfcache_acheteur, path_cache_acheteur)
             write_cache(list(set(list_siret_acheteur_not_found)), path_cache_acheteur_not_in_bdd)
     else:
-        dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(df_acheteur.idAcheteur, path, dfcache=pd.DataFrame(), columns=usecols, dtypes=dtype)
-        dfcache_acheteur = dfcache_acheteur.drop_duplicates(subset=['siret'], keep='first') # La colonne s'appelle encore siren dans le cache
+        dfcache_acheteur, series_siren_acheteur_valid_but_not_found_in_bdd = actualiser_cache_entreprise_acheteur(
+            df_acheteur.idAcheteur, path, dfcache=pd.DataFrame(), columns=usecols, dtypes=dtype)
+        dfcache_acheteur = dfcache_acheteur.drop_duplicates(subset=['siret'],
+                                                            keep='first')  # La colonne s'appelle encore siren dans le cache
         # Créer les cache
         write_cache(dfcache_acheteur, path_cache_acheteur)
-        write_cache(list(set(series_siren_acheteur_valid_but_not_found_in_bdd.tolist())), path_cache_acheteur_not_in_bdd) # On dédoublonne
+        write_cache(list(set(series_siren_acheteur_valid_but_not_found_in_bdd.tolist())),
+                    path_cache_acheteur_not_in_bdd)  # On dédoublonne
 
-    if utils.USE_S3: # Upload des caches sur le S3
-        utils.write_object_file_on_s3(path_cache, dfcache) #Cache n1
+    if utils.USE_S3:  # Upload des caches sur le S3
+        utils.write_object_file_on_s3(path_cache, dfcache)  # Cache n1
         utils.write_object_file_on_s3(path_cache_not_in_bdd, list(set(list_siret_not_found)))
         utils.write_object_file_on_s3(path_cache_acheteur, dfcache_acheteur)
         utils.write_object_file_on_s3(path_cache_acheteur_not_in_bdd, list(set(list_siret_acheteur_not_found)))
@@ -455,37 +480,40 @@ def enrichissement_type_entreprise(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def renommage_et_recategorisation(df : pd.DataFrame):
+def renommage_et_recategorisation(df: pd.DataFrame):
     """
     Cette fonction a pour objectif de nommer correctement les entreprises de marchés à partir du SIREN de StockUniteLegal. Le nom
     devient alors celui disponible sur la base SIREN et non celui rentré par les fournisseurs. Si l'information n'est pas trouvée. Le nom rentré par les fournisseurs sera utilisé.
     Cette fonction repasse également sur la catégorieEntreprise qui jusqu'alors était relié au SIRET et non au SIREN.
-    
+
     Cette fonction ajuste également les idAcheteurs transformés par les différents casting. (un siret commençant par un 0 perd celui ci au curs du process).
     Les idAcheteurs proches de 14 chiffres sont complétés par des 0 au début.
     De même pour les siretEtablissement.
     """
-    
+
     pathbdd = os.path.join(path_to_cache, conf_data["cache_bdd_legale"])
 
     with open(pathbdd, "rb") as f:
         df_bdd = pickle.load(f)
     # Il faut recréer la colonne siren qui n'existe plus actuellement.
     # Pour les établissements
-    df_bdd["siren"] =  df_bdd['siretEtablissement'].apply(lambda x:x[:-5]) # Pour les titulaires on travaille avec les SIREN
-    dict_mapping = dict(zip(df_bdd.siren, df_bdd.denominationUniteLegale)) 
+    df_bdd["siren"] = df_bdd['siretEtablissement'].apply(
+        lambda x: x[:-5])  # Pour les titulaires on travaille avec les SIREN
+    dict_mapping = dict(zip(df_bdd.siren, df_bdd.denominationUniteLegale))
     df['denominationUniteLegale'] = df.sirenEtablissement.map(dict_mapping)
-    # Si il n'y a pas de correspondance, on garde la valeur d'entrée. 
+    # Si il n'y a pas de correspondance, on garde la valeur d'entrée.
     mask_nan_nom = df.denominationUniteLegale.isna()
     df.loc[mask_nan_nom, "denominationUniteLegale"] = df.loc[mask_nan_nom, "denominationSociale_x"]
 
     # Actuellement les id cotitulaires sont des SIRET (14 digits), Contrairement aux titulaires.
-    dict_mapping_co = dict(zip(df_bdd.siretEtablissement, df_bdd.denominationUniteLegale)) 
+    dict_mapping_co = dict(zip(df_bdd.siretEtablissement, df_bdd.denominationUniteLegale))
     # Manière plus élégante de traiter les non correspondances.
-    df['denominationSociale_cotitulaire1'] = df.id_cotitulaire1.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire1'])
-    df['denominationSociale_cotitulaire2'] = df.id_cotitulaire2.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire2'])
-    df['denominationSociale_cotitulaire3'] = df.id_cotitulaire3.map(dict_mapping_co).fillna(df['denominationSociale_cotitulaire3'])
-
+    df['denominationSociale_cotitulaire1'] = df.id_cotitulaire1.map(dict_mapping_co).fillna(
+        df['denominationSociale_cotitulaire1'])
+    df['denominationSociale_cotitulaire2'] = df.id_cotitulaire2.map(dict_mapping_co).fillna(
+        df['denominationSociale_cotitulaire2'])
+    df['denominationSociale_cotitulaire3'] = df.id_cotitulaire3.map(dict_mapping_co).fillna(
+        df['denominationSociale_cotitulaire3'])
 
     # Reprise de la variable catégorieEntreprise.
     dict_mapping_cat_ent = dict(zip(df_bdd.siren, df_bdd.categorieEntreprise))
@@ -496,8 +524,9 @@ def renommage_et_recategorisation(df : pd.DataFrame):
     pathbdd_acheteur = os.path.join(path_to_cache, conf_data["cache_acheteur_bdd_legale"])
     with open(pathbdd_acheteur, "rb") as f:
         df_bdd_acheteur = pickle.load(f)
-    dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siret , df_bdd_acheteur.denominationUniteLegale))
-    df["nomAcheteur_enrichi"] = df.idAcheteur.map(dict_mapping_acheteur) #idAcheteur est un siret à 14 chiffres, la plupart du temps. (98% du temps)
+    dict_mapping_acheteur = dict(zip(df_bdd_acheteur.siret, df_bdd_acheteur.denominationUniteLegale))
+    df["nomAcheteur_enrichi"] = df.idAcheteur.map(
+        dict_mapping_acheteur)  # idAcheteur est un siret à 14 chiffres, la plupart du temps. (98% du temps)
     mask_nan_nom_acheteur = df.loc[:, "nomAcheteur_enrichi"].isna()
     df.loc[mask_nan_nom_acheteur, "nomAcheteur_enrichi"] = df.loc[mask_nan_nom_acheteur, "nomAcheteur"]
     df["nomAcheteur"] = df["nomAcheteur_enrichi"]
@@ -507,15 +536,16 @@ def renommage_et_recategorisation(df : pd.DataFrame):
         """
         On souhaite remplir que les siret qui sont entre 13 et 10 caractères (choix arbitraire). Mais pas ceux qui sont au-dessus.
         """
-        if (len(x)<14) and len(x)>9:
+        if (len(x) < 14) and len(x) > 9:
             return x.zfill(14)
-        else :
+        else:
             return x
 
     df['siretEtablissement'] = df['siretEtablissement'].apply(safe_zfill)
     df['idAcheteur'] = df['idAcheteur'].apply(safe_zfill)
 
     return df
+
 
 # Algorithme de Luhn
 
@@ -664,26 +694,29 @@ def split_on_column_match(dfSIRET: pd.DataFrame, dfcache: pd.DataFrame, column: 
     """
     La fonction retourne deux series, la premier correspond aux éléments de dfSIRET n'étant pas dans dfcache (selon la colonne en entrée).
     Le second correspond aux éléments étant dans le cache.
-    
+
 
     Arguments
     -------------
     dfSIRET : dataframe a analyser
     dfcache : dataframe correspondant au cache
     column : nom de la colonne sur laquelle on split en deux dfSIRET
-    
+
     Returns
     -----------
     Deux series.
     """
-    dict_mapping = {"idAcheteur":"siret"} # Mapping entre les colonnes du dataframme processé et ceux de la bdd legal
-    if column in dict_mapping.keys(): # Si jamais un mapping de nom est nécessaire
+    dict_mapping = {"idAcheteur": "siret"}  # Mapping entre les colonnes du dataframme processé et ceux de la bdd legal
+    if column in dict_mapping.keys():  # Si jamais un mapping de nom est nécessaire
 
         mask_boolean_on_column = dfSIRET.loc[:, str(column)].isin(dfcache.loc[:, dict_mapping[str(column)]].tolist())
-        return dfSIRET.loc[~mask_boolean_on_column, str(column)].copy(), dfSIRET.loc[mask_boolean_on_column, str(column)].copy()
+        return dfSIRET.loc[~mask_boolean_on_column, str(column)].copy(), dfSIRET.loc[
+            mask_boolean_on_column, str(column)].copy()
     else:
         mask_boolean_on_column = dfSIRET.loc[:, str(column)].isin(dfcache.loc[:, str(column)].tolist())
-        return dfSIRET.loc[~mask_boolean_on_column, str(column)].copy(), dfSIRET.loc[mask_boolean_on_column, str(column)].copy()
+        return dfSIRET.loc[~mask_boolean_on_column, str(column)].copy(), dfSIRET.loc[
+            mask_boolean_on_column, str(column)].copy()
+
 
 def loading_cache(path_to_cache):
     with open(path_to_cache, 'rb') as df_cache:
@@ -696,8 +729,8 @@ def actualiser_cache(dfSiret_to_add, path_to_db, dfcache, columns, dtypes, chunk
     La fonction parcourt la bdd Insee par chunk. Pour chaque chunk on regarde si il y a des correspondances de siret entre dfSiret_to_add et la bdd insee.
     Si il y a un match, on ajoute alors les lignes de la bdd insee au dataframe cache. Sinon c'est que les siret sont à la fois valide, mais non présent dans le cache.
     On les sépare (on retire ceux trouvé de dfSIRET_to_add) pour pouvoir les mettre dans un second cache.
-    
-    
+
+
     Arguments
     ----------
     dfSiret_to_add (Series) avec une unique colonne
@@ -711,8 +744,9 @@ def actualiser_cache(dfSiret_to_add, path_to_db, dfcache, columns, dtypes, chunk
     dfcache (DataFrame) : le nouveau cache actualisé
     dfSiret_to_add (DataFrame) : correspond aux sirets non trouvé dans la BdD
     """
-    
-    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns, dtype=dtypes):
+
+    for gm_chunk in pd.read_csv(path_to_db, chunksize=chunksize, sep=',', encoding='utf-8', usecols=columns,
+                                dtype=dtypes):
         # Ajouter à df cache les infos qu'il faut
         matching = gm_chunk.loc[gm_chunk.siret.isin(
             dfSiret_to_add.tolist())].copy()  # La copie du dataframe qui match parmis le chunk en cours
@@ -752,18 +786,18 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
     path_to_cache_insee = os.path.join(path_to_cache, conf_data["cache_bdd_insee"])
     path_to_cache_not_in_insee = os.path.join(path_to_cache, conf_data["cache_not_in_bdd_insee"])
     columns = [
-    'siren',
-    'nic',
-    'siret',
-    'typeVoieEtablissement',
-    'libelleVoieEtablissement',
-    'codePostalEtablissement',
-    'libelleCommuneEtablissement',
-    'codeCommuneEtablissement',
-    'activitePrincipaleEtablissement',
-    'nomenclatureActivitePrincipaleEtablissement',
-    'denominationUsuelleEtablissement']  # Colonne à utiliser dans la base Siren
-    
+        'siren',
+        'nic',
+        'siret',
+        'typeVoieEtablissement',
+        'libelleVoieEtablissement',
+        'codePostalEtablissement',
+        'libelleCommuneEtablissement',
+        'codeCommuneEtablissement',
+        'activitePrincipaleEtablissement',
+        'nomenclatureActivitePrincipaleEtablissement',
+        'denominationUsuelleEtablissement']  # Colonne à utiliser dans la base Siren
+
     dtypes = {
         'siret': 'string',
         'typeVoieEtablissement': 'string',
@@ -771,7 +805,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
         'codePostalEtablissement': 'string',
         'libelleCommuneEtablissement': 'string',
         'codeCommuneEtablissement': 'object',
-        'denominationUsuelleEtablissement' : 'string'
+        'denominationUsuelleEtablissement': 'string'
     }
 
     df_keys = pd.concat([df.loc[:, "idTitulaires"], df.loc[:, "acheteur.id"]])
@@ -809,7 +843,7 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
             write_cache(dfcache, path_to_cache_insee)
             write_cache(sirets_not_found, path_to_cache_not_in_insee)
 
-    else : 
+    else:
         logger.info("Enrichissement avec insee : Création du cache")
         # crécupérer le dataframe correspondant au cache
         dfcache, series_siret_valid_but_not_found_in_bdd = actualiser_cache(df_keys.siret, path_to_bdd_insee,
@@ -820,8 +854,8 @@ def cache_management_insee(df, key_columns_df=["idTitulaires", "acheteur.id"], k
         write_cache(dfcache, path_to_cache_insee)
         write_cache(series_siret_valid_but_not_found_in_bdd.tolist(), path_to_cache_not_in_insee)
     if utils.USE_S3:
-            utils.write_object_file_on_s3(path_to_cache_insee, dfcache)
-            utils.write_object_file_on_s3(path_to_cache_not_in_insee, sirets_not_found)
+        utils.write_object_file_on_s3(path_to_cache_insee, dfcache)
+        utils.write_object_file_on_s3(path_to_cache_not_in_insee, sirets_not_found)
     return df
 
 
@@ -832,12 +866,12 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     Pour bien comprendre la fonction, il y a plusieurs cas possibles concernant un SIRET. Il y a le cas où le siret est valide et match avec la bdd insee (on gère ça avec le premier cache)
     Le cas où le siret est invalide ou OOOOOOOO (siret artificiel inscrit en amont dans enrichissement.py) il n'y a aucune chance de trouver ça dans la bdd insee donc.
     Le dernier cas où un siret est valide mais pas présent en bdd, pour ceux-ci on créé un second cache.
-    Dans un cache (dfcache) sont stockés les informations en rpovenance de la bdD insee que l'on gère 
+    Dans un cache (dfcache) sont stockés les informations en rpovenance de la bdD insee que l'on gère
     Dans le second cache (sirets_not_found) sont stockés les siret valides que l'on doit gérer mais qui ne sotn pas dans la bdd insee
 
     Arguments
     -----------------
-    dfSIRET 
+    dfSIRET
     path_to_data chemin vers le fichier csv de la BdD Insee Etablissement_utf8
     path_to_cache_bdd chemin vers le cache du fichier csv de la BdD Insee 'Etablissement_utf8'
     path_to_cache_not_inbdd:  chemin vers le cache des siret non trouvé dans le fichier csv de la BdD Insee Etablissement_utf8
@@ -872,8 +906,8 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
 
     cache_exists = os.path.isfile(path_to_cache_bdd)
     print(f"Taille avant merge dfSIRET {dfSIRET.shape}")
-    print("Cache : ", path_to_cache_bdd )
-    if cache_exists: # Il devrait pas ne pas exister, donc on rentrera toujours dans la boucle. Je laisse la condition pour qu'on comprenne si ça bug un jour en connectant à la CI etc.
+    print("Cache : ", path_to_cache_bdd)
+    if cache_exists:  # Il devrait pas ne pas exister, donc on rentrera toujours dans la boucle. Je laisse la condition pour qu'on comprenne si ça bug un jour en connectant à la CI etc.
         logger.info("Chargement du cache")
         dfcache = loading_cache(path_to_cache_bdd)
         # regarder les siret dans le cache, ceux pas dans le cache on va passer à travers la bdd pour les trouver. Ceux qui ne sont pas dans la BdD sont sauvés dans un 2e cache.
@@ -881,7 +915,9 @@ def get_enrichissement_insee(dfSIRET: pd.DataFrame, path_to_data: str, path_to_c
     enrichissement_insee_siret.rename(columns={"siren_x": "siren"}, inplace=True)
     enrichissement_insee_siret.drop(columns=["siren_y"], axis=1, inplace=True)
     print(f"Taille après merge dfSIRET {enrichissement_insee_siret.shape}")
-    df_nan_siret = pd.concat([enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()], dfSIRET_siret_not_valid, dfSIRET_valide_notfound])
+    df_nan_siret = pd.concat(
+        [enrichissement_insee_siret[enrichissement_insee_siret.activitePrincipaleEtablissement.isnull()],
+         dfSIRET_siret_not_valid, dfSIRET_valide_notfound])
     enrichissement_insee_siret = enrichissement_insee_siret[
         enrichissement_insee_siret.activitePrincipaleEtablissement.notnull()]
     df_nan_siret = df_nan_siret.loc[:, ["siret", "siren", "denominationSociale"]]
@@ -958,7 +994,7 @@ def get_df_enrichissement(enrichissementScrap: pd.DataFrame, enrichissementInsee
     Returns:
         - pd.DataFrame
     """
-    
+
     # Arrangement des colonnes
     # Gestion bdd insee
     enrichissementInsee.reset_index(inplace=True, drop=True)
@@ -1284,7 +1320,7 @@ def change_sources_name(df: pd.DataFrame) -> pd.DataFrame:
         "data.gouv.fr_aife": "API AIFE",
         "data.gouv.fr_pes": "PES Marchés",
         "marches-publics.info": "AWS-Achat",
-        "decp_aws":"AWS-Achat", 
+        "decp_aws": "AWS-Achat",
         "megalis-bretagne": "Megalis Bretagne",
         "atexo-maximilien": "Maximilien IdF",
         "ternum-bfc": "Territoires numériques BFC",
@@ -1305,7 +1341,7 @@ if __name__ == "__main__":
         with open('df_nettoye', 'rb') as df_nettoye:
             df = pickle.load(df_nettoye)
             init_len = len(df)
-        with open("profilingSenrichissement_size{}.txt".format(init_len), "w") as f: # Pour optimiser temporellement 
+        with open("profilingSenrichissement_size{}.txt".format(init_len), "w") as f:  # Pour optimiser temporellement
             ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
             ps.sort_stats('cumulative')
             ps.print_stats()
