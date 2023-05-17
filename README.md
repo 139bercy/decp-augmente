@@ -216,21 +216,24 @@ Gère tout ce qui est lié au S3.
 
 La branche utilisée actuellement pour la CICD est :
 <div align="center">
-:last_quarter_moon_with_face: cicd_saagie_pytest. :first_quarter_moon_with_face:
+:last_quarter_moon_with_face: master :first_quarter_moon_with_face:
 </div>
 
-### CI
-Lorsqu'on push le code sur Github, on effectue via un workflow CircleCI des tests de non régression (via le job pytest).
+### CI CD (Github)
+Lorsqu'on push le code sur Github, on effectue via un workflow CircleCI des tests de non-régression (via le job pytest).
 Puis, on exécute tout le code sur un échantillon fixe du dataset.
 
+Si les tests réussissent, on upload les jobs Saagie via le job "update_file" qui met à job les jobs présents sur Saagie. 
+Le fichier python utile est *update_jobs_for_new_files.py*, il est assez explicite. <br>
+
 ### CD (Saagie)
-Une fois les tests passés on upload les jobs Saagie via le job "update_file" qui met à job les jobs présent sur Saagie. 
-Le fichier python utile est *upade_jobs_for_new_files.py*, il est assez explicite. <br>
-Côté Saagie le script à l'intérieur des jobs (et donc de la pipeline) est alors modifié et sera éxécuté à l'heure prévue sur la plateforme.
+Côté Saagie le script à l'intérieur des jobs (et donc de la pipeline) est alors modifié et sera exécuté à l'heure prévue sur la plateforme.
 
 ### Buckets
-Il y a deux Buckets (S3) : l'un pour tout ce que l'on va stocker pour la prod.
-Et un autre spécifique aux tests et la CI.
+Il y a deux Buckets (S3) : l'un pour tout ce que l'on va stocker pour la prod. `decp`
+
+Et un autre spécifique aux tests et la CI. `testdecp`
+
 :guardsman: Avant de modifier des fichiers sur le S3, être sûr que l'on pointe vers le Bucket désiré.
 
 ### Quelques remarques
