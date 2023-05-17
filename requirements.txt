@@ -10,4 +10,9 @@ folium
 tqdm
 geopy
 openpyxl
-argparse
+wget
+GitPython
+boto3
+saagieapi
+pytest
+argparse 

@@ -9,9 +9,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies-master-{{ checksum "requirements.txt"}}
-      - run: cp confs/config-circleci.json confs/config_data.json
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
       - run:
           name: Installation des requirements
           command: |
@@ -19,10 +17,9 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+          key: dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
           paths:
             - "venv"
-            - "confs/config_data.json"
 
   linter:
     docker:
@@ -32,7 +29,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
       - run:
           name: Linter
           command: |
@@ -40,7 +37,6 @@ jobs:
             pip install pylint
             PYTHON_FILE="$(ls *.py)"
             pylint $PYTHON_FILE
-
   get_data_daily:
       docker:
         - image: 139bercy/decp-rama
@@ -98,42 +94,99 @@ jobs:
           key: data-input-weekly-v2-{{ checksum "date" }}-{{ checksum "get-data-weekly.sh" }}
           paths:
             - "data"
+  get_data_daily_python:
+      docker:
+        - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Daily data Python
+            command: |
+                . venv/bin/activate
+                python3 get_daily_data.py
+  get_data_weekly_python:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Weekly data Python 
+            command: |
+                . venv/bin/activate
+                python3 get_data_weekly.py
 
-  compute:
-    docker:
-      - image: 139bercy/decp-rama
-    resource_class: large
-    steps:
-      - checkout
-      - restore_cache:
-          keys:
-            - dependencies-{{ .Branch }}-{{ checksum "requirements.txt"}}-{{ checksum "confs/config-circleci.json"}}
-            - dependencies
-      - run: date +%F > date
-      - run: date +%G-%V > date-weekly
-      - restore_cache:
-          keys:
-            - data-input-daily-{{ checksum "date" }}-{{ checksum "get-data-daily.sh" }}
-      - restore_cache:
-          keys:
-            - data-input-weekly-v2-{{ checksum "date-weekly" }}-{{ checksum "get-data-weekly.sh" }}
-      - run:
-          name: Traitement des données
-          no_output_timeout: 2h
-          command: |
-            . venv/bin/activate
-            mkdir cache
-            if [ "$CIRCLE_BRANCH" == "master" ]; then
-              python3 main.py
-            else
-              python3 main.py -t True
-            fi
-      - store_artifacts:
-          path: decp_augmente.log
-      - persist_to_workspace:
-          root: ~/project
-          paths:
-            - "decp_augmente.csv"
+  gestion_flux:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Gestion des flux
+            command: |
+                . venv/bin/activate
+                python3 gestion_flux.py
+  update_file:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Upload des fichiers modifiés sur Saagie
+            command: |
+              . venv/bin/activate
+              python3 update_jobs_for_new_files.py
+  nettoyage_flux:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Nettoyage flux
+            no_output_timeout: 40m
+            command: |
+                . venv/bin/activate
+                python3 nettoyage.py
+  enrichissement_flux:
+      docker:
+          - image: 139bercy/decp-rama
+      resource_class: large
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+              - dependencies2
+        - run:
+            name: Enrichissement flux
+            no_output_timeout: 40m
+            command: |
+                . venv/bin/activate
+                python3 enrichissement.py
 
   send:
     docker:
@@ -141,8 +194,6 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - attach_workspace:
-          at: ~/project
       - run: date +%F > date
       - restore_cache:
           keys:
@@ -150,8 +201,6 @@ jobs:
       - run:
           name: Condition pour les branches
           command: |
-            pwd
-            ls -l
             if [ "$CIRCLE_BRANCH" != "master" ]; then
                 circleci-agent step halt
             fi
@@ -160,56 +209,57 @@ jobs:
           command: |
             lftp -u ${DEPLOY_USER}:${DEPLOY_PASSWORD} ${DEPLOY_HOST} -e "set ftp:ssl-force true ; set ssl:verify-certificate false; cd decp ; put decp_augmente.csv ; quit"
 
+  
+  do_pytest:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+      - run:
+          name: Pytest tests
+          command: | 
+            . venv/bin/activate
+            pytest
+  
+  
+  compute_test:
+    docker:
+      - image: 139bercy/decp-rama
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+            keys:
+              - dependencies2-{{ .Branch }}-{{ checksum "requirements.txt"}}
+      - run:
+          name: Main_test
+          command: |
+              . venv/bin/activate
+              python3 main.py -t True
+
+
 workflows:
   version: 2
   main:
     jobs:
       - install_requirements
-      - compute:
+      - do_pytest:
+          context:
+              - decp-augmente
           requires:
-            - install_requirements
-      - send:
+              - install_requirements
+      - compute_test:
+          context:
+               - decp-augmente
           requires:
-            - compute
-
-  daily-data:
-    jobs:
-      - get_data_daily
-    triggers:
-      - schedule:
-          cron: 0 4 * * 1-6
-          filters:
-            branches:
-              only:
-                - master
-  weekly-data:
-    jobs:
-      - get_data_weekly
-    triggers:
-      - schedule:
-          cron: 0 4 * * 1
-          filters:
-            branches:
-              only:
-                - master
-
-  daily-compute:
-    jobs:
-      - get_data_daily
-      - get_data_weekly
-      - install_requirements
-      - compute:
+              - install_requirements
+              - do_pytest
+      - update_file:
+          context:
+              - decp-augmente
           requires:
-            - install_requirements
-            - get_data_daily
-            - get_data_weekly
-      - send:
-          requires:
-            - compute
-    triggers:
-      - schedule:
-          cron: 0 7 * * 2-6
-          filters:
-            branches:
-              only:
-                - master
+              - compute_test
