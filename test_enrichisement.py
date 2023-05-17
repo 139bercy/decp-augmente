@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import enrichissement
-import pytest
 
 """Peut prendre du temps si on ne commente pas la ligne utils.download_data_enrichissement() dans enrichissement.
 Pour les tests il vaut mieux avoir les fichiers en local puis commenter la ligne et executer pytest.

@@ -10,7 +10,7 @@ from saagieapi import SaagieApi
 # Global variables.
 local_credentials="saagie_cred.json"
 local_credentials_exist = os.path.exists(local_credentials)
-if local_credentials_exist : # Dans le cas où on fait tourner ça en local
+if local_credentials_exist :  # Dans le cas où on fait tourner ça en local
     with open(local_credentials, "r") as f:
         credentials = json.load(f)
     ACCESS_KEY = credentials["ACCESS_KEY"]
@@ -32,6 +32,7 @@ else :  # Sur la CI ou Saagie
 dir_path = os.path.dirname(os.path.realpath(__file__))
 REPO = git.Repo(dir_path)
 
+
 def get_files_to_updates():
     """
     Cette fonction récupère le dernier id du commit pour lequel les fichiers ont été updatés sur Saagie.
@@ -45,11 +46,10 @@ def get_files_to_updates():
     bucket_name = BUCKET_NAME
     file_id_commit = "id_commit.txt"
     s3 = boto3.resource(service_name = 's3', 
-                aws_access_key_id=ACCESS_KEY, 
-                aws_secret_access_key=SECRET_KEY, 
-                region_name="gra",
-                endpoint_url="https://"+str(ENDPOINT_S3)
-                )
+                        aws_access_key_id=ACCESS_KEY,
+                        aws_secret_access_key=SECRET_KEY,
+                        region_name="gra",
+                        endpoint_url="https://"+str(ENDPOINT_S3))
     # On regarde si l'object id_commit existe
     try:
         s3.Object(bucket_name, file_id_commit).load()
@@ -61,8 +61,11 @@ def get_files_to_updates():
     print(f"Le dernier commit à jour sur Saagie est le {id_commit}") 
     changed_files = REPO.git.diff(f"{id_commit}..HEAD", name_only=True) # On récupère uniquement les noms des fichiers qui ont été concernés par des commits depuis le dernier commit mis sur Saagie
     return changed_files.split('\n'), object
-    
-def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_utils=["gestion_flux.py", "nettoyage.py", "enrichissement.py", "upload_dataeco.py"]):
+
+
+def updates_files_on_saagie(modified_files : list,
+                            object,
+                            files_to_zip_with_utils=["gestion_flux.py", "nettoyage.py", "enrichissement.py", "upload_dataeco.py"]):
     """
     Cette fonction met à jour les jobs Saagie. Une fois que les jobs ont été mis à jour ou créés, on stock dans le fichier S3 correspondant l'ID du commit.
     
@@ -76,8 +79,8 @@ def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_uti
 
     """   
     saagieapi =  SaagieApi.easy_connect(url_saagie_platform="https://mefsin-workspace.pcv.saagie.io/projects/platform/1/project/4fbca8d8-b3a5-4f63-97f1-b2ca6362a2b2/jobs",
-                   user=USER,
-                   password=PASSWORD)
+                                        user=USER,
+                                        password=PASSWORD)
 
     for file in modified_files:
         file_name = file[:-3]
@@ -110,7 +113,7 @@ def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_uti
                 zipObj.close()
                 saagieapi.jobs.create(job_name=str(file_name), file=f"{file_name}.zip", command_line=f"python {file_name}.py", project_id=id_projet,
                 category='Extraction',
-                technology='python',# technology id corresponding to your context.id in your technology catalog definition
+                technology='python',  # technology id corresponding to your context.id in your technology catalog definition
                 technology_catalog='Saagie',
                 runtime_version='3.9')
     print('Actualisation du dernier commit traité')
@@ -118,9 +121,10 @@ def updates_files_on_saagie(modified_files : list, object, files_to_zip_with_uti
     result = object.put(Body=str(id_commit))
     return result
 
+
 def main():
     modified_files, object = get_files_to_updates()    
-    res = updates_files_on_saagie(modified_files, object)
+    updates_files_on_saagie(modified_files, object)
     return None
 
 

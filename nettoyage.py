@@ -2,12 +2,10 @@ import json
 import os
 import pickle
 import logging.handlers
-from random import random
 import datetime
 import numpy as np
 import pandas as pd
 import itertools
-from pandas import json_normalize
 import cProfile
 import pstats
 import utils
