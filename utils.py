@@ -12,7 +12,7 @@ local_credentials_exist = os.path.exists(local_credentials)
 if local_credentials_exist:  # Dans le cas où on fait tourner ça en local
     with open(local_credentials, "r") as f:
         credentials = json.load(f)
-    print('e')
+    print('Running localy')
     ACCESS_KEY = credentials["ACCESS_KEY"]
     SECRET_KEY = credentials["SECRET_KEY"]
     USER = credentials["USER_SAAGIE"]
@@ -21,7 +21,7 @@ if local_credentials_exist:  # Dans le cas où on fait tourner ça en local
     PROJECT_NAME = credentials["PROJECT_NAME"]
     BUCKET_NAME = credentials["BUCKET_NAME"]
 else:  # Sur la CI ou Saagie
-    print('i')
+    print('Running on CircleCI or Saagie')
     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     SECRET_KEY = os.environ.get("SECRET_KEY")
     USER = os.environ.get("USER_SAAGIE")
@@ -157,7 +157,7 @@ def download_datas():
 
 def download_confs():
     conf_path = "confs/"
-    print('bb', BUCKET_NAME)
+    print('bucket name : ', BUCKET_NAME)
     bucket = s3.Bucket(BUCKET_NAME)
     for obj in bucket.objects.filter(Prefix=conf_path):
         print(f"{obj.key} , {str(obj.key)} va se télécharger")

@@ -1,7 +1,5 @@
-import json
 import wget
 import boto3
-from boto3.s3.transfer import TransferConfig
 import json
 import os
 from zipfile import ZipFile 
@@ -21,6 +19,7 @@ url_stockEtablissement = "https://files.data.gouv.fr/insee-sirene/StockEtablisse
 url_stockUniteLegale = "https://files.data.gouv.fr/insee-sirene/StockUniteLegale_utf8.zip"
 urls = [url_geoflar, url_cpv, url_departement, url_region, url_commune, url_arrondissement, url_stockEtablissement, url_stockUniteLegale]
 data_path = "data"
+
 
 def load_files_and_unzip(urls):
     """
@@ -46,29 +45,23 @@ def load_files_and_unzip(urls):
             os.remove(file_path) # Supprime les .zip
     return None
 
-def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
+def upload_on_s3(local_credentials="saagie_cred.json"):
     """
     Cette fonction se connecte au bucket S3 et y upload tous les fichiers du folder data sauf decp.json.
     """
     #Upload via s3
     local_credentials_exist = os.path.exists(local_credentials)
-    if local_credentials_exist : # Dans le cas où on fait tourner ça en local
+    if local_credentials_exist :  # Dans le cas où on fait tourner ça en local
         with open(local_credentials, "r") as f:
             credentials = json.load(f)
         ACCESS_KEY = credentials["ACCESS_KEY"]
         SECRET_KEY = credentials["SECRET_KEY"]
-        USER_SAAGIE = credentials["USER_SAAGIE"]
-        PASSWORD_SAAGIE = credentials["PASSWORD_SAAGIE"]
         ENDPOINT_S3 = credentials["ENDPOINT_S3"]
-        PROJECT_NAME = credentials["PROJECT_NAME"]
         BUCKET_NAME = credentials["BUCKET_NAME"]
     else :  # Sur la CI ou Saagie
         ACCESS_KEY = os.environ.get("ACCESS_KEY")
         SECRET_KEY = os.environ.get("SECRET_KEY")
-        USER_SAAGIE = os.environ.get("USER_SAAGIE")
-        PASSWORD_SAAGIE = os.environ.get("PASSWORD_SAAGIE")
         ENDPOINT_S3 = os.environ.get("ENDPOINT_S3")
-        PROJECT_NAME = os.environ.get("PROJECT_NAME")
         BUCKET_NAME = os.environ.get("BUCKET_NAME")
     # Connexion
     s3 = boto3.resource(service_name = 's3', 
@@ -81,12 +74,12 @@ def upload_on_s3(local_credentials="saagie_cred.json", bucket_name="bercy"):
         logger.info(f"Upload du fichier {file} en cours")
         object = s3.Object(BUCKET_NAME, os.path.join(data_path, file))
         full_path =  os.path.abspath(os.path.join(data_path, file))
-        #result = object.put(Body=open(full_path, "rb")) Ne gère pas plus de 5GB.
+        # result = object.put(Body=open(full_path, "rb")) Ne gère pas plus de 5GB.
         try:
             object.upload_file(full_path)
             logger.info(f"Upload du fichier {file} réussi")
-        except:
-            logger.info(f"ERROR : Upload du fichier{file} non réussi")
+        except Exception as e:
+            logger.info(f"ERROR : Upload du fichier {file} non réussi, erreur : {e}")
     return None
 
 def main():

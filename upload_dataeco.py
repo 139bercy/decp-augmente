@@ -2,9 +2,6 @@ import csv
 import json
 import os
 import pickle
-import logging
-import numpy as np
-import pandas as pd
 import utils
 import subprocess
 
@@ -12,7 +9,7 @@ import subprocess
 PATH_FILE_CONFIG = "confs/config_data.json"
 local_credentials="saagie_cred.json"
 local_credentials_exist = os.path.exists(local_credentials)
-if local_credentials_exist : # Dans le cas où on fait tourner ça en local
+if local_credentials_exist :  # Dans le cas où on fait tourner ça en local
     with open(local_credentials, "r") as f:
         credentials = json.load(f)
     ACCESS_KEY = credentials["ACCESS_KEY"]
@@ -30,7 +27,6 @@ else :  # Sur la CI ou Saagie
     USER_DATAECO = os.environ.get("USER_DATAECO")
     PWD_DATAECO = os.environ.get("PASSWORD_DATAECO")
     HOST_DATAECO = os.environ.get("HOST_DATAECO")
-
  
 if utils.USE_S3:
     res = utils.download_file(PATH_FILE_CONFIG, PATH_FILE_CONFIG)
@@ -44,11 +40,11 @@ if utils.USE_S3:
     pass
 else:
     print(f"Vous allez upload {path_file_to_upload} depuis votre version local")
-#Ouverture du pkl et conversion en CSV 
+# Ouverture du pkl et conversion en CSV
 with open(path_file_to_upload, "rb") as f:
     df = pickle.load(f)
 path_file_to_upload_csv = path_file_to_upload[:-4]+".csv"
 df.to_csv(path_file_to_upload_csv, quoting=csv.QUOTE_NONNUMERIC, sep=";", index=False)
 bash_cmd = [f" lftp -u {USER_DATAECO}:{PWD_DATAECO} {HOST_DATAECO} -e 'set ftp:ssl-force true ; set ssl:verify-certificate false;cd decp; put {path_file_to_upload_csv}; quit'"] # Je n'ai pas trouvé de biblio ftp python satisfaisante. Donc ce sera en bash
 subprocess.call(bash_cmd, shell=True)
-#Commande bash à utiliser pour upload en ftp
+# Commande bash à utiliser pour upload en ftp

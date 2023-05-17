@@ -1,10 +1,8 @@
 import pandas as pd
 import os
-import re
 import numpy as np
 import pickle
 import json
-import boto3
 import datetime
 import logging.handlers
 from pandas.util import hash_pandas_object
@@ -96,7 +94,7 @@ def main():
                                                                                     hash_no_modifications_pickle_latest)
     # Sauvegarde clef de hache sur le S3
     path_cache_no_modifications = hash_no_modifications_base_path + "-" + today.strftime("%Y-%m-%d") + ".pkl"
-    resp = utils.write_object_file_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
+    utils.write_object_file_on_s3(path_cache_no_modifications, df_no_modif.hash_key)
     # Sauvegarde clefs de hache
     with open(path_cache_no_modifications, "wb") as f:
         pickle.dump(df_no_modif.hash_key, f)
@@ -110,7 +108,7 @@ def main():
     df_to_process = pd.concat([df_no_modif_to_process, df_modif_to_process]).reset_index(drop=True)
     # Sauvegarde du DataFrame à processer, et donc à envoyer en entrée de nettoyage sur le S3.
     name_df_flux = "df_flux" + today.strftime("%Y-%m-%d") + ".pkl"
-    resp = utils.write_object_file_on_s3(name_df_flux, df_to_process)
+    utils.write_object_file_on_s3(name_df_flux, df_to_process)
     # Sauvegarde du Dataframe à processer, et donc à envoyer en entrée de nettoyage
     with open(name_df_flux, "wb") as file:
         pickle.dump(df_to_process, file)
@@ -133,7 +131,7 @@ def concat_modifications(dictionaries: list):
 
     """
     dict_original = dictionaries[0]
-    for dict in dictionaries:  # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
+    for dict in dictionaries:  # C'est une boucle sur quelques éléments seulement, ça ne devrait pas poser trop de problèmes.
         dict_original.update(dict)
     return [dict_original]
 
@@ -141,7 +139,7 @@ def concat_modifications(dictionaries: list):
 def explode_according_to_keys(df: pd.DataFrame, keys):
     """
     Cette fonction retourne un dataframe avec autant de colonne que de clef dans keys. 
-    La colonne est complétée si une information est trouvé, Nan sinon.
+    La colonne est complétée si une information est trouvée, Nan sinon.
 
     Arguments
     ---------

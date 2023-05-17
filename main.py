@@ -1,7 +1,6 @@
 import nettoyage
 import enrichissement
 import gestion_flux
-import logging
 import logging.config
 import argparse
 
