@@ -263,3 +263,6 @@ workflows:
               - decp-augmente
           requires:
               - compute_test
+          filters:
+              branches:
+                  only: master
