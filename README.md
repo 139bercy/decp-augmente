@@ -1,6 +1,6 @@
 [![CircleCI](https://circleci.com/gh/139bercy/decp-augmente.svg?style=svg)](https://circleci.com/gh/139bercy/decp-augmente)
 
-<img src="decp-augmente.png" alt="decp augmenté - logo"/>
+![Image](decp-augmente.png)
 
 # PROJET DECP - Données Essentielles de la Commande Publique
 
@@ -58,7 +58,7 @@ denominationUniteLegale
 
 #### Avec le S3
 - S'assurer que l'on se connecte au bon S3, pour ce faire il y a deux possibilités : 
-    * Avoir les credentials comme variables d'environnements (nécessaire lorsque on veut faire tourner le script sur CircleCI et Saagie)
+    * Avoir les credentials comme variables d'environnements (nécessaire lorsqu'on veut faire tourner le script sur CircleCI et Saagie)
     * Avoir en local un fichier *saagie_cred.json* avec sous forme de JSON les clefs et valeurs nécessaires (voir entête du script *utils.py*)
 
 ## Fonctionnement général de la pipeline augmenté.
@@ -69,9 +69,11 @@ En amont de cette pipeline les données sont traitées par decp-rama-v2 puis upl
 
 Schéma de principe de la pipeline.
 
-<img src="schema_pipeline.jpg" alt="Schéma de principe de la pipeline de données" width="400px"/>
-
+![Image](schema_pipeline.jpg)
+<div align="center">
 :hammer: Tous les fichiers nécessaires (matérialisés par des flèches) transitent par le S3. :hammer:
+</div>
+
 ## Etapes de la donnée 
 
 ### Gestion flux
@@ -81,9 +83,9 @@ Cette partie permet de gérer quelles données ont déjà été vus (donc analys
 Pour ce faire on utilise des clefs de hash. On calcule la clef de hash pour chaque ligne extraite de decpv2.json et on les compare à un historique des clefs de hash déjà mémorisées.
 On ne laisse passer à travers df_flux.pkl que les données correspondant aux nouvelles clefs de hash.
 
-On distingue les lignes avec et sans modifications car elles ne contiennent pas les même informations.
+On distingue les lignes avec et sans modifications, car elles ne contiennent pas les mêmes informations.
 
-<center> :rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light: </center>
+:rotating_light: :rotating_light: :rotating_light: Si la manière de gérer les clefs de hash est modifiée, pensez à réinitialiser sur le S3 les fichiers correspondant et le processus :rotating_light: :rotating_light: :rotating_light:
 
 ### Nettoyage 
 Explication de l'ensemble du traitement réalisé pour la partie nettoyage des données. 
@@ -98,20 +100,20 @@ Au sein des decp on distingue deux types de données: les marchés et les conces
 - On ne conserve que les données ou un titulaire est renseigné.
 
 #### Travail sur les montants
-Dans un soucis de conservation de l'information source, la colonne montant est renomée en <b>montantOriginal</b> et l'ensemble des opérations suivantes seront appliquées à la colonne <b>montantCalcule</b>.
+Dans un souci de conservation de l'information source, la colonne montant est renommée en <b>montantOriginal</b> et l'ensemble des opérations suivantes seront appliquées à la colonne <b>montantCalcule</b>.
 
-- Les valeurs manquantes sont remplacées par 0
-- Les montants inférieurs à 200€ et supérieur à 999 999 999€ sont remis à 0
-- Les montants composés d'au moins 5 fois le même chiffre (hors 0) sont remis à 0.
+- Les valeurs manquantes sont remplacées par `0`
+- Les montants inférieurs à `200€` et supérieur à `999 999 999€` sont remis à `0`
+- Les montants composés d'au moins 5 fois le même chiffre (hors 0) sont remis à `0`.
 - Les floats sont arrondis à l'entier.
 
 #### Travail sur des codes manquants
-Ce qui est appelé code correspond aux variables d'identifications. On parle ici aussi bien de la viariable id (identifiant des lignes de la base), que id.Titulaires (ientifiant des entreprises) ou encore code_CPV permettant l'identification des types de marchés. 
+Ce qui est appelé code correspond aux variables d'identifications. On parle ici aussi bien de la viariable id (identifiant des lignes de la base), que id.Titulaires (identifiant des entreprises) ou encore code_CPV permettant l'identification des types de marchés. 
 
-- Remplacement des valeurs manquantes de <b>id</b> par '0000000000000000' (la colonne id sera retravaillé un peu plus tard dans le processus de nettoyage)
+- Remplacement des valeurs manquantes de <b>id</b> par `0000000000000000` (la colonne id sera retravaillée un peu plus tard dans le processus de nettoyage)
 - Rerait des caractères spéciaux présent dans <b>idTitulaires</b>. On obtient le numéro SIRET
 - Récupération du NIC et stockage dans une colonne <b>nic</b>
-- Création d'une colonne <b>CPV_min</b> composé des deux premiers chiffre du code CPV. Cela permet d'identifier le type de marché (Fournitures/Travaux/Services)
+- Création d'une colonne <b>CPV_min</b> composé des deux premiers chiffres du code CPV. Cela permet d'identifier le type de marché (Fournitures/Travaux/Services)
 
 #### Travail sur les régions
 Récupération des codes de départements des marchés. On en profite pour ajouter les libellés et la région. 
@@ -122,14 +124,14 @@ Récupération des codes de départements des marchés. On en profite pour ajout
 #### Travail sur les dates
 
 - Récupération de l'année et du mois de notification du marché et stockage dans <b>anneeNotification</b> et <b>moisNotification</b>
-- Remplacement par np.NaN des dates lorsque l'années est inférieur à 1980 et supérieur à 2100 ou lorsque le format n'est pas standard.
+- Remplacement par np.NaN des dates lorsque l'année est inférieure à 1980 et supérieur à 2100 ou lorsque le format n'est pas standard.
 
 #### Travail sur la durée du marché
-Au sein des DECP les durées de marché sont exprimées en mois. De même que pour les montants, on conserve les durées initiales et on modifie les durées dans la colonne <b>dureeMoisCalculee</b>. De plus, on ajoute la colonne <b>dureeMoisEstimee</b>: Booléenne, la durée est elle estimée ? <br>
+Au sein des DECP les durées de marché sont exprimées en mois. De même que pour les montants, on conserve les durées initiales et on modifie les durées dans la colonne <b>dureeMoisCalculee</b>. De plus, on ajoute la colonne <b>dureeMoisEstimee</b>: Booléenne, la durée est-elle estimée ? <br>
 Les durées corrigées sont celles :
 - manquantes: corrigées à 0 <br>
 
-Tous les cas suivant seront corrigées en divisant par 30 (conversion en mois)
+Tous les cas suivants seront corrigés en divisant par 30 (conversion en mois)
 - durée égale au montant 
 - montant / durée < <b>100</b>
 - montant / durée < <b>1000</b> pour une durée > <b>12</b> mois
@@ -141,7 +143,7 @@ Un début de travail sur de l'imputation a aussi été réalisé. On se place da
     - Imputation par la médiane des durées de mois pour un <b>CPV_min</b> équivalent.
 
 #### Travail sur la variable qualitative objet. 
-Remplacement du caractère '�' par 'XXXXX' dans la colonne objet
+Remplacement du caractère `�` par `XXXXX` dans la colonne objet
 
 #### Gestion des doublons.
 [ ] En attente des règles côté métiers.
@@ -181,7 +183,7 @@ Il s'agit de 6 caches, qu'on peut trouver sur le S3 avec le prefix cache/cache_ 
     - cache/cache_acheteur_StockUniteLegale_utf8.csv
 
 Ces caches stockent les informations trouvées dans les BDD externes, lors des runs précédents, pour ne plus avoir à les parcourir en entier à chaque fois. 
-Chaque cache est dédoublé. Le cache classique (correspondant aux lignes d'enrichissement trouvées) et le cache NOTIN [not in](correspondant à celles non trouvées).
+Chaque cache est dédoublé. Le cache classique (correspondant aux lignes d'enrichissement trouvées) et le cache NOTIN (correspondant à celles non trouvées).
 On a un cache pour enrichir les titulaires d'un point de vue StockEtablissement (et son NOTIN), d'un point de vue StockUniteLegale.
 Mais également un cache pour les acheteurs d'un point de vue StockUniteLegale.
 
@@ -192,7 +194,7 @@ On concatène ces infos dans la fonction *concat_unduplicate_and_caching_hash*
 Ce cache contient toutes les features que l'on a pu ajouter lors du processus.
 
 #### Choix des données exportées
-Peu de colonnes sont finalement exportés à travers dataeco, la fonction qui gère les colonnes à exporter est *manage_column_final* qui prend comme référence *var_to_export.json* 
+Peu de colonnes sont finalement exportées à travers dataeco, la fonction qui gère les colonnes à exporter est *manage_column_final* qui prend comme référence *var_to_export.json* 
 pour savoir quelles colonnes exporter.
 
 
@@ -212,12 +214,14 @@ Gère tout ce qui est lié au S3.
 
 ## Comment fonctionne la CICD sur ce projet ?
 
-La branche utilisée actuellement pour la CICD est : <br> <center> :last_quarter_moon_with_face: cicd_saagie_pytest. :first_quarter_moon_with_face: 
-</center>
+La branche utilisée actuellement pour la CICD est :
+<div align="center">
+:last_quarter_moon_with_face: cicd_saagie_pytest. :first_quarter_moon_with_face:
+</div>
 
 ### CI
 Lorsqu'on push le code sur Github, on effectue via un workflow CircleCI des tests de non régression (via le job pytest).
-Puis on exécute tout le code sur un échantillon fixe du dataset.
+Puis, on exécute tout le code sur un échantillon fixe du dataset.
 
 ### CD (Saagie)
 Une fois les tests passés on upload les jobs Saagie via le job "update_file" qui met à job les jobs présent sur Saagie. 
@@ -231,9 +235,9 @@ Et un autre spécifique aux tests et la CI.
 
 ### Quelques remarques
 - Si la CI crash pour une erreur lié au S3 il se peut que ce soit simplement une erreur réseau ou que le S3 ou la ressource souhaitée sont indisponibles momentanément.
-- Les tests d'enrichissement dépendent, entre autres, des caches présent dans le bucket test. Si vous modifiez ces derniers, considérez l'influence que cela a sur les tests.
-- Si vous effectuez des modifications sur la gestion des données et que vous souhaitez que ces modifications s'appliquent à toutes les données, même celles déjà traitées il faudra alors au minimum supprimer du S3 les objet au prefix "data/hash_keys" (modifications et non modifications) ainsi que data/cache_df. Puis relancer la pipeline sur Saagie, la pipeline est alors "ré-initialisée" et tournera sur toutes les données, avec les nouveaux traitements.  <br> 
+- Les tests d'enrichissement dépendent, entre autres, des caches présents dans le bucket test. Si vous modifiez ces derniers, considérez l'influence que cela a sur les tests.
+- Si vous effectuez des modifications sur la gestion des données et que vous souhaitez que ces modifications s'appliquent à toutes les données, même celles déjà traitées il faudra alors au minimum supprimer du S3 les objets au prefix "data/hash_keys" (modifications et non modifications) ainsi que data/cache_df. Puis relancer la pipeline sur Saagie, la pipeline est ainsi "ré-initialisée" et tournera sur toutes les données, avec les nouveaux traitements. <br> 
 Pour être sûr que vous avez bien tout ré-initialisé, allez dans les logs du job gestion_flux. Vous devez y trouver que la shape du dataframe déjà processé vaut (0,0) pour les lignes sans modifs et (0,0) également pour les lignes avec modifs.
 
-### Réalisation d'un dashboard 
-   [ ] Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
+### Réalisation d'un tableau de bord 
+   :chart_with_upwards_trend: Un dashboard a été fait et est disponible [ici](https://datavision.economie.gouv.fr/decp/?view=France)
