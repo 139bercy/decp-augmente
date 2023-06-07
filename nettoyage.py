@@ -35,7 +35,7 @@ with open(os.path.join("confs", "var_debug.json")) as f:
 
 path_to_data = conf_data["path_to_data"]
 decp_file_name = conf_data["decp_file_name"]
-path_to_data = conf_data["path_to_data"]  # Ré écris
+path_to_data = conf_data["path_to_data"]  # Réécris
 
 
 def main():
@@ -70,28 +70,9 @@ def main():
         logger.info("Flux vide")
         return df_flux
 
-    # Modification pour un prendre subset de données 
-
-    if conf_debug["subset"]:
-        n_data = len(data["marches"])
-        n_subset = conf_debug["n_subset"]
-        logger.info(
-            "Subset étant True on se restreint à un dataframe de taille n_subset soit  {} lignes choisis aléatoirement".format(
-                n_subset))
-        if conf_debug["debug"]:
-            logger.info("Mode debug, pas d'alea")
-            seed = conf_debug["seed"]
-            np.random.seed(seed)
-            random_i = list(np.random.choice(n_data, n_subset))
-        else:
-            random_i = list(np.random.choice(n_data, n_subset))
-
-        accessed_mapping = map(data['marches'].__getitem__, random_i)
-        accessed_list = list(accessed_mapping)
-        data['marches'] = accessed_list
     logger.info("Début du traitement: Conversion des données en pandas")
-    df = manage_modifications(df_flux)
-    df = manage_data_quality(df)
+    df = manage_data_quality(df_flux)
+    df = manage_modifications(df)
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
@@ -121,12 +102,16 @@ def main():
 
 def manage_data_quality(df: pd.DataFrame):
     """
-    Cette fonction sépare en deux le dataframe d'entrée. Les données ne respectant pas les formats indiquées par les 
+    Cette fonction sépare en deux le dataframe d'entrée. Les données ne respectant pas les formats indiqués par les
     règles de gestion de la DAJ sont mise de côtés. Les règles de gestions sont dans un mail du 15 février 2023.
-    /!\ Dans les règles de gestion, certaines valeur de champ d'identification unique du marché ne sont pas accessibles 
-    dans la donnée brut. On va donc ne traiter dans cette fonction que les variables accessibles de manières brutes
-    et lorsque les règles portent sur des variables non brutzq on appliquera les règles à ce moment là. (ex : idtitulaire)
-    /!\\
+
+    /!\
+    Dans les règles de gestion, certaine valeur de champ d'identification unique du marché ne sont pas accessibles
+    dans la donnée brute. On va donc ne traiter dans cette fonction que les variables accessibles de manières brutes
+    et lorsque les règles portent sur des variables non brutes, on appliquera les règles à ce moment-là. (ex : idtitulaire)
+    /!\
+
+    Les lignes exclues seront publiées sur data.economie.gouv.fr dans un fichier csv.
 
     Arguments
     ----------
@@ -138,6 +123,60 @@ def manage_data_quality(df: pd.DataFrame):
     df (dataFrame) : le dataframe des données à enrichir.
 
     """
+
+    def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
+
+        df_concession_badlines_ = pd.DataFrame(columns=df_concession_.columns)
+        col_name = ["id", "autoriteConcedante.id", "concessionnaires", "objet", "valeurGlobale",
+                    "dureeMois"]  # concessionnaires contient un dict avec des valeurs dont id
+        for col in col_name:
+            df_concession_badlines_ = pd.concat(
+                [df_concession_badlines_, df_concession_[~pd.notna(df_concession_[col])]])
+            df_concession_ = df_concession_[pd.notna(df_concession_[col])]
+
+        # Si la date de début d’exécution et la date de publication est manquante alors le contrat de concession est mis de côté
+        df_concession_badlines_ = pd.concat([df_concession_badlines_, df_concession_[
+            ~pd.notna(df_concession_["dateDebutExecution"]) | ~pd.notna(df_concession_["datePublicationDonnees"])]])
+        df_concession_ = df_concession_[
+            pd.notna(df_concession_["dateDebutExecution"]) | pd.notna(df_concession_["datePublicationDonnees"])]
+
+        return df_concession_, df_concession_badlines_
+
+    def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
+        df_marche_badlines_ = pd.DataFrame(columns=df_marche_.columns)
+        col_name = ["id", "acheteur.id", "titulaires", "montant",
+                    "dureeMois"]  # titulaire contient un dict avec des valeurs dont id
+        for col in col_name:
+            df_marche_badlines_ = pd.concat([df_marche_badlines_, df_marche_[~pd.notna(df_marche_[col])]])
+            df_marche_ = df[pd.notna(df[col])]
+
+        # Si CPV manquant et objet du marché manquant, alors le marché est mis de côté
+        df_marche_badlines_ = pd.concat(
+            [df_marche_badlines_, df_marche_[~pd.notna(df_marche_["codeCPV"]) | ~pd.notna(df_marche_["objet"])]])
+        df_marche_ = df_marche_[pd.notna(df_marche_["codeCPV"]) | pd.notna(df_marche_["objet"])]
+
+        # Si la date de notification et la date de publication est manquante, alors le marché est mis de côté
+        df_marche_badlines_ = pd.concat([df_marche_badlines_, df_marche_[
+            ~pd.notna(df_marche_["dateNotification"]) | ~pd.notna(df_marche_["datePublicationDonnees"])]])
+        df_marche_ = df_marche_[
+            pd.notna(df_marche_["dateNotification"]) | pd.notna(df_marche_["datePublicationDonnees"])]
+
+        return df_marche_, df_marche_badlines_
+
+    # séparation des marchés et des concessions, car traitement différent
+    df_concession = df.loc[df['nature'].str.contains('concession', case=False, na=False)]
+    df_marche = df.loc[~df['nature'].str.contains('concession', case=False, na=False)]
+
+    df_concession, df_concession_badlines = regles_concession(df_concession)
+    df_marche, df_marche_badlines = regles_marche(df_marche)
+
+    # Concaténation des dataframes
+    df = pd.concat([df_concession, df_marche])
+    df_badlines = pd.concat([df_concession_badlines, df_marche_badlines])
+    logging("Pourcentage de mauvaises lignes : " + str((df_badlines.shape[0] / df.shape[0]) * 100))
+
+    # Ecriture des mauvaises lignes dans un csv
+    df_badlines.to_csv(os.path.join(conf_data["path_to_data"], "badlines.csv"), index=False)
 
     return df
 
@@ -202,8 +241,8 @@ def create_columns_titulaires_fast(df, column="titulaires"):
 def deal_with_many_titulaires(df_with_cotitulaires: pd.DataFrame, n_cotit=3):
     """
     Cette fonction renvoie un dictionnaire. Chaque élément du dictionnaire est un dataframe composé des informations du cotitulaires numéro n, n étant la clef du dictionnaire.
-    Cette fonction peut être amélioré temporellement, le .apply(pd.series) est très long. Prendre exemple sur create_columns_titulaires_fast, même si c'est plus compliqué dû au doublon
-    Peut être suffit il simplement de remonter le mask de duplicated.
+    Cette fonction peut être améliorée temporellement, le .apply(pd.series) est très long. Prendre exemple sur create_columns_titulaires_fast, même si c'est plus compliqué dû au doublon
+    Peut-être suffit-il de remonter le mask de duplicated.
 
     Arguments
     ----------
@@ -272,7 +311,7 @@ def manage_titulaires(df: pd.DataFrame):
     df_with_cotitulaires = df[
         df["nbTitulairesSurCeMarche"] > 1].copy()  # On ne garde que les dataframes avec des cotitulaires
     dict_df_with_cotitulaires = deal_with_many_titulaires(
-        df_with_cotitulaires)  # Cette fonction peut être amélioré, cependant comme
+        df_with_cotitulaires)  # Cette fonction peut être améliorée, cependant comme
     df_cotitulaires = pd.concat([x for x in dict_df_with_cotitulaires.values()],
                                 axis=1)  # On recolle les différents co titulaires d'un même marché
 
@@ -286,7 +325,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """
     Permet la suppression des eventuels doublons pour un subset précis du dataframe
 
-    Retour:
+    Retour :
         pd.DataFrame
     """
     logger.info(f"Taille dataframe avant   manage_duplicates{df.shape}")
@@ -295,7 +334,7 @@ def manage_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     df.sort_values(by="source",
                    inplace=True)  # Pourquoi ? La partie métier (Martin Douysset) a demandé à ce qu'en cas de doublon sur plusieurs sources, ceux de l'AIFE
     # (la première en ordre alphabéitque soit conservés).
-    # Donc on sort by source et on drop duplicates en gardant les first.
+    # Donc, on sort by source et ont drop duplicates en gardant les first.
     df.reset_index(drop=True, inplace=True)
     assert df.loc[0, "source"] == "data.gouv.fr_aife"
     df.drop_duplicates(subset=['_type', 'nature', 'procedure', 'dureeMois',
@@ -471,7 +510,7 @@ def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
     # Ecriture dans les logs
     logger.info(f"Nombre d'identifiant titualire ou un traitement sur les caractères spéciaux a été fait: {sum(mask)}")
 
-    # Récupération code NIC: 5 dernier chiffres du Siret <- idTitulaires
+    # Récupération code NIC : 5 derniers chiffres du Siret ← idTitulaires
     logger.info("Récupération du code NIC")
     df.idTitulaires = df.idTitulaires.astype(str)
     df['nic'] = df["idTitulaires"].str[-5:]
@@ -501,7 +540,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
     """
     Ajout des libellés Régions/Département pour le lieu d'execution du marché
 
-    Retour:
+    Retour :
         pd.DataFrame
     """
     logger.info("Début du traitement: Attribution et correction des régions/déprtements (code + libelle). "
@@ -523,7 +562,7 @@ def manage_region(df: pd.DataFrame) -> pd.DataFrame:
                + [str(i) for i in list(np.arange(10, 96, 1))]
     df['codeDepartementExecution'] = np.where(~df['codeDepartementExecution'].isin(liste_cp), np.NaN,
                                               df['codeDepartementExecution'])
-    # Suppression des codes régions (qui sont retenues jusque là comme des codes postaux)
+    # Suppression des codes régions (qui sont retenues jusque-là comme des codes postaux)
     df['lieuExecution.typeCode'] = np.where(df['lieuExecution.typeCode'].isna(), np.NaN, df['lieuExecution.typeCode'])
     df['codeDepartementExecution'] = np.where(df['lieuExecution.typeCode'] == 'Code région', np.NaN,
                                               df['codeDepartementExecution'])
@@ -610,7 +649,7 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
     """
     Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois
 
-    Retour:
+    Retour :
         - pd.DataFrame
     """
     logger.info("Début du traitement: Correction de la variable dureeMois.")
@@ -631,7 +670,7 @@ def correct_date(df: pd.DataFrame) -> pd.DataFrame:
 
     # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
     df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
-    # Comme certaines valeurs atteignent zero, on remplace par un mois
+    # Comme certaines valeurs atteignent zero, on remplace par un mois.
     # Il y a une valeur négative
     df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])
     logger.info(f"Au total, {sum(mask)} duree de marché en mois ont été jugées rentrées en jour et non en mois.")
@@ -656,11 +695,11 @@ def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
     # On cherche à obtenir la médiane par division de CPV
     df_group.columns = ["CPV_min", "listeDureeMois"]
     df_group["mediane_dureeMois_CPV"] = df_group.listeDureeMois.apply(np.median)
-    # La liste des duree exacte est inutile: on supprime
+    # La liste des duree exacte est inutile : on supprime
     df_group.drop("listeDureeMois", axis=1, inplace=True)
     # On ajoute provisoirement la colonne mediane_dureeMois
     df = pd.merge(df, df_group, how="left", left_on="CPV_min", right_on="CPV_min", copy=False)
-    # 120 = 10 ans. duree arbitraire jugée trop longue.
+    # 120 = 10 ans. Duree arbitraire jugée trop longue.
     # En l'etat, on ne touche pas au duree concernant la catégorie Travaux. identifié par le codeCPV_min == 45.
     mask = ((df.dureeMoisCalculee > 120) & (df.CPV_min != '45'))
     logger.info(f"Au total, {sum(mask)} duree en mois sont encore supérieures à 120 "
@@ -668,7 +707,7 @@ def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
     df.dureeMoisCalculee = np.where(mask, df.mediane_dureeMois_CPV, df.dureeMoisCalculee)
     # On modifie au passage la colonne dureeMoisEstimee
     df['dureeMoisEstimee'] = np.where(mask, "True", df.dureeMoisEstimee)
-    # La mediane n'est pas utile dans le df final: on supprime
+    # La mediane n'est pas utile dans le df final : on supprime
     df.drop("mediane_dureeMois_CPV", axis=1, inplace=True)
 
     logger.info("Fin du traitement")
@@ -700,11 +739,11 @@ def create_value_number(x):
 
 
 def regroupement_marche_complet(df):
-    """la colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
-    les marchés en fonction de leur objets/date de publication des données et montant.
+    """La colonne id n'est pas unique. Cette fonction permet de la rendre unique en regroupant
+    les marchés en fonction de leurs objets/date de publication des données et montant.
     Ajoute dans le meme temps la colonne nombreTitulaireSurMarchePresume"""
     logger.info(f"Taille dataframe avant regroupement_marche_complet {df.shape}")
-    # On regroupe selon l objet du marché. Attention, objet pas forcément unique mais idMarche ne l'est pas non plus.
+    # On regroupe selon l'objet du marché. Attention, objet pas forcément unique, mais idMarche ne l'est pas non plus.
     df_group = pd.DataFrame(df[["objet", "datePublicationDonnees", "montant", "id"]].groupby(["objet",
                                                                                               "datePublicationDonnees",
                                                                                               "montant"])["id"])
@@ -715,7 +754,7 @@ def regroupement_marche_complet(df):
         create_value_number)  # On récupère l'ID le plus haut parmis les doublons (au sens objet et datePublicationDonnees)
     flat_indx = list(itertools.chain(*df_group['new_index'].values))
     flat_nbtit = list(itertools.chain(*[[x] * x for x in df_group[
-        "nbTit"].values]))  # On applati la liste, si on a 2 titulaires il faut donc avoir deux 2 à la suite dans la liste d'où le itertools.chain
+        "nbTit"].values]))  # On aplatit la liste, si on a 2 titulaires il faut donc avoir deux 2 à la suite dans la liste d'où le itertools.chain
     flat_id = list(itertools.chain(*[[x] * y for (x, y) in zip(df_group["valid_id"].values, df_group["nbTit"].values)]))
     dict_data = {"nombreTitulaireSurMarchePresume": flat_nbtit, "id": flat_id}
     df_reconstruct = pd.DataFrame(index=flat_indx, data=dict_data)
@@ -736,17 +775,17 @@ def regroupement_marche_complet(df):
 def recuperation_colonne_a_modifier() -> dict:
     """
     Renvoie les noms des differentes colonnes recevant une modification
-    sous la forme d'un dictionnaire: {Nom_avec_modification: Nom_sans_modification}.
-    Les colonnes qui sont concernés ont déjà été détectés dans gestion_flux.
+    sous la forme d'un dictionnaire : {Nom_avec_modification : Nom_sans_modification}.
+    Les colonnes qui sont concernées ont déjà été détectés dans gestion_flux.
 
-    Retour:
+    Retour :
         dict
     """
     colonne_to_modify = dict()
     dict_path = "columns_modifications.pkl"
     if utils.USE_S3:
         utils.download_file(dict_path, dict_path)
-    # On récupère les colonnes détectés dans gestion_flux
+    # On récupère les colonnes détectées dans gestion_flux
     with open(dict_path, "rb") as file_modif:
         columns_modification = pickle.load(file_modif)
     for column in columns_modification:
@@ -769,7 +808,7 @@ def recuperation_colonne_a_modifier() -> dict:
 
 def concat_modifications(dictionaries: list):
     """
-    Parfois, certains marché ont plusieurs modifications (la colonne modification est une liste de dictionnaire).
+    Parfois, certain marché ont plusieurs modifications (la colonne modification est une liste de dictionnaire).
     Jusqu'alors, seul le premier élément de la liste (et donc la première modification) était pris en compte.
     Cette fonction met à jour le premier dictionnaire de la liste. Ainsi les modifications considérées par la suite seront bien les dernières.
 
@@ -783,7 +822,7 @@ def concat_modifications(dictionaries: list):
 
     """
     dict_original = dictionaries[0]
-    for dict in dictionaries:  # C'st une boucle sur quelques éléments seulement, ça devrait pas poser trop de problèmes.
+    for dict in dictionaries:  # C'est une boucle sur quelques éléments seulement, ça ne devrait pas poser trop de problèmes.
         dict_original.update(dict)
     return [dict_original]
 
@@ -814,7 +853,7 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
                 # Formatage du nom de la colonne
                 if "Modification" not in col:
                     col += "Modification"
-                if col not in df.columns:  # Cas ou on tombe sur le premier marche qui modifie un champ
+                if col not in df.columns:  # Cas où on tombe sur le premier marché qui modifie un champ
                     df[col] = ""  # Initialisation dans le df initial
                 df[col][i] = json_modification[0][col_init]
 
@@ -830,13 +869,13 @@ def split_dataframe(df: pd.DataFrame, sub_data: pd.DataFrame, modalite: str) -> 
         :param sub_data: le sous-ensemble correspondant à l'ensemble des marchés avec une modification
         :param modalite: la modalité sur laquelle on veut filtrer
 
-        Retour:
+        Retour :
             tuple (pd.DataFrame, pd.DataFrame)
     """
-    # Premier df: Contenant les lignes d'un marche avec des colonnes modifications non vide
+    # Premier df : Contenant les lignes d'un marché avec des colonnes modifications non vide
     marche = sub_data[sub_data.objet == modalite]
     marche = marche.sort_values(by='id')
-    # Second dataframe: Dans le df complet, récupération des lignes correspondant au marché récupéré
+    # Second dataframe : Dans le df complet, récupération des lignes correspondant au marché récupéré
     date = marche.datePublicationDonnees.iloc[0]
     # A concaténer ?
     marche_init = df[df.objet == modalite]
@@ -848,10 +887,10 @@ def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_m
                                dict_modification: dict) -> pd.DataFrame:
     """
     Permet de fusionner les colonnes xxxModification et sa colonne.
-    raw correspond à une ligne du df_source
+    Raw correspond à une ligne du df_source
     Modifie le df_source
 
-    Retour:
+    Retour :
         pd.DataFrame
     """
     for col in col_modification:
@@ -869,11 +908,11 @@ def fusion_source_modification_whole_dataset(df_source: pd.DataFrame, dict_modif
     # Maintenant toutes les modifications sont uniques.
     for column_modif in dict_modification.keys():
         column_to_change = dict_modification[
-            column_modif]  # Les colonnes auxquelles il y a des modifications à apporter
-        # ont été construites ainsi nomcolonne+"Modification".
-        # Donc on retire Modificaiton pour pointer vers la bonne colonne
+            column_modif]
+        # Les colonnes auxquelles il y a des modifications à apporter, on était construites ainsi nomcolonne+"Modification".
+        # Donc, on retire Modificaiton pour pointer vers la bonne colonne
         mask_raw_to_change = df_source[column_modif].apply(lambda x: x != '').fillna(False)
-        # Les valeurs None ne répondent pas au boolean. On les mets à False pour ne pas y toucher
+        # Les valeurs None ne répondent pas au boolean. On les met à False pour ne pas y toucher
         df_source.loc[mask_raw_to_change, column_to_change] = df_source.loc[mask_raw_to_change, column_modif]
     return df_source
 
@@ -881,9 +920,9 @@ def fusion_source_modification_whole_dataset(df_source: pd.DataFrame, dict_modif
 def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFrame:
     """
     Permet de recoder la variable identifiant.
-    Actuellement: 1 identifiant par déclaration (marché avec ou sans modification)
-    Un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprise. Si 2 entreprises sur
-    En sortie: id correspondra à un identifiant unique pour toutes les lignes composants un marché SI il a eu une
+    Actuellement : 1 identifiant par déclaration (marché avec ou sans modification)
+    Un marché peut être déclaré plusieurs fois en fonction du nombre d'entreprises. Si 2 entreprises sur
+    En sortie : id correspondra à un identifiant unique pour toutes les lignes composant un marché S'il a eu une
     modification.
     Modification inplace du df source
     La variable idtech permet ici d'identifier les marchés qui sont en réalités des doublons causés par la gestion des modifications
@@ -894,16 +933,16 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
         pd.DataFrame
     """
     df["idtech"] = ""
-    subdata_modif = df[df.booleanModification == 1]  # Tout les marchés avec les modifications
+    subdata_modif = df[df.booleanModification == 1]  # Tous les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
     marches_init = []
     for objet_marche in liste_objet:  # C'est du dedoublonnage en fait ça
         # Récupération du dataframe modification et du dataframe source
-        # On créée la colonne "idtech"
+        # On créer la colonne "idtech"
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         marche_init["idtech"] = marche.iloc[-1].id_technique
         marches_init.append(marche_init)
-    if marches_init:  # Si il y a des modifications on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
+    if marches_init:  # S'il y a des modifications, on les gère, sinon on retourne le df tel qu'il est entré dans la fonction
         df_to_concatene = pd.concat([x for x in marches_init], copy=False)
         df.update(df_to_concatene)
         df["idMarche"] = np.where(df.idtech != "", df.idtech, df.id_technique)
@@ -917,7 +956,7 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
     """
     Conversion du json en pandas et incorporation des modifications
 
-    Retour:
+    Retour :
         pd.DataFrame
     """
     logger.info(f"Taille dataframe avant manage_modifications {df.shape}")
@@ -941,18 +980,4 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    if conf_debug["debug"]:
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        with open('df_nettoye_new_regroupement_marche',
-                  'rb') as df_nettoye:  # Forcément du local, pas besoin de gérer ça sur S3
-            df = pickle.load(df_nettoye)
-            init_len = len(df)
-        with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:
-            ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
-            ps.sort_stats('cumulative')
-            ps.print_stats()
-    else:
-        main()
+    main()
