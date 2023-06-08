@@ -76,6 +76,7 @@ def main():
     df = regroupement_marche_complet(df)
     logger.info("Début du traitement: Gestion des titulaires")
     df, df_badlines = (df.pipe(manage_titulaires)
+            .pipe(manage_acheteur_id, df_badlines)
             .pipe(manage_id, df_badlines)
             .pipe(manage_duplicates)
             .pipe(manage_amount, df_badlines)
@@ -220,6 +221,18 @@ def found_values_in_dic(x, name: str):
         return None
 
 
+def manage_acheteur_id(df: pd.DataFrame, df_badlines: pd.DataFrame) -> pd.DataFrame:
+    """
+    Le SIRET comprend 14 caractères (9 pour le SIREN + 5 pour le NIC) – format texte pour ne pas supprimer les « 0 » en début de Siret.
+    L’identifiant acheteur est INEXPLOITABLE s’il ne respecte pas le format.
+    """
+    # Vérification du nombre de caractères
+    df_badlines = pd.concat([df_badlines, df[~df["acheteur.id"].str.len() == 14]])
+    df = df[df["acheteur.id"].str.len() == 14]
+
+    return df, df_badlines
+
+
 def manage_id(df: pd.DataFrame, df_badlines: pd.DataFrame) -> pd.DataFrame:
     """
     L’identifiant du marché public comprend :
@@ -344,7 +357,7 @@ def manage_titulaires(df: pd.DataFrame):
 
     df_with_cotitulaires = pd.concat([df_with_cotitulaires, df_cotitulaires], axis=1)
 
-    ### Reconstruction du datframe final qui est l'aggrégration des df_one_titulaires et dfcotitulaires
+    ### Reconstruction du dataframe final qui est l'aggrégration des df_one_titulaires et dfcotitulaires
     return pd.concat([df_one_titulaires, df_with_cotitulaires], axis=0)
 
 
