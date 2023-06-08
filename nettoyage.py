@@ -6,8 +6,6 @@ import datetime
 import numpy as np
 import pandas as pd
 import itertools
-import cProfile
-import pstats
 import utils
 
 logger = logging.getLogger("main.nettoyage")
@@ -71,22 +69,22 @@ def main():
         return df_flux
 
     logger.info("Début du traitement: Conversion des données en pandas")
-    df = manage_data_quality(df_flux)
+    df, df_badlines = manage_data_quality(df_flux)
     df = manage_modifications(df)
     logger.info("Fin du traitement")
 
     df = regroupement_marche_complet(df)
     logger.info("Début du traitement: Gestion des titulaires")
-    df = (df.pipe(manage_titulaires)
-          .pipe(manage_duplicates)
-          .pipe(manage_amount)
-          .pipe(manage_missing_code)
-          .pipe(manage_region)
-          .pipe(manage_date)
-          .pipe(correct_date)
-          .pipe(data_inputation)
-          .pipe(replace_char)
-          )
+    df, df_badlines = (df.pipe(manage_titulaires)
+            .pipe(manage_id, df_badlines)
+            .pipe(manage_duplicates)
+            .pipe(manage_amount, df_badlines)
+            .pipe(manage_missing_code)
+            .pipe(manage_region)
+            .pipe(manage_date)
+            .pipe(correct_date_dureemois, df_badlines)
+            .pipe(data_inputation)
+            .pipe(replace_char))
     logger.info("Fin du traitement")
     print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
@@ -127,18 +125,28 @@ def manage_data_quality(df: pd.DataFrame):
     def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
         df_concession_badlines_ = pd.DataFrame(columns=df_concession_.columns)
-        col_name = ["id", "autoriteConcedante.id", "concessionnaires", "objet", "valeurGlobale",
-                    "dureeMois"]  # concessionnaires contient un dict avec des valeurs dont id
-        for col in col_name:
-            df_concession_badlines_ = pd.concat(
-                [df_concession_badlines_, df_concession_[~pd.notna(df_concession_[col])]])
-            df_concession_ = df_concession_[pd.notna(df_concession_[col])]
 
-        # Si la date de début d’exécution et la date de publication est manquante alors le contrat de concession est mis de côté
-        df_concession_badlines_ = pd.concat([df_concession_badlines_, df_concession_[
-            ~pd.notna(df_concession_["dateDebutExecution"]) | ~pd.notna(df_concession_["datePublicationDonnees"])]])
-        df_concession_ = df_concession_[
-            pd.notna(df_concession_["dateDebutExecution"]) | pd.notna(df_concession_["datePublicationDonnees"])]
+        def check_empty(df_con: pd.DataFrame, df_bad: pd.DataFrame) -> pd.DataFrame:
+            col_name = ["id", "autoriteConcedante.id", "concessionnaires", "objet", "valeurGlobale",
+                        "dureeMois"]  # concessionnaires contient un dict avec des valeurs dont id
+            for col in col_name:
+                df_bad = pd.concat(
+                    [df_bad, df_con[~pd.notna(df_con[col])]])
+                df_con = df_con[pd.notna(df_con[col])]
+
+            # Si la date de début d’exécution et la date de publication est manquante alors le contrat de concession est mis de côté
+            df_bad = pd.concat([df_bad, df_con[
+                ~pd.notna(df_con["dateDebutExecution"]) | ~pd.notna(df_con["datePublicationDonnees"])]])
+            df_con = df_con[
+                pd.notna(df_con["dateDebutExecution"]) | pd.notna(df_con["datePublicationDonnees"])]
+            return df_con, df_bad
+
+        def check_unusable_value(df_con: pd.DataFrame, df_bad: pd.DataFrame) -> pd.DataFrame:
+            pass
+            return df_con, df_bad
+
+        df_concession_, df_concession_badlines_ = (df_concession.pipe(check_empty, df_concession_badlines_)
+                                                   .pipe(check_unusable_value, df_concession_badlines_))
 
         return df_concession_, df_concession_badlines_
 
@@ -173,7 +181,8 @@ def manage_data_quality(df: pd.DataFrame):
     # Concaténation des dataframes
     df = pd.concat([df_concession, df_marche])
     df_badlines = pd.concat([df_concession_badlines, df_marche_badlines])
-    logging("Pourcentage de mauvaises lignes : " + str((df_badlines.shape[0] / df.shape[0]) * 100))
+
+    logger.info("Pourcentage de mauvaises lignes : " + str((df_badlines.shape[0] / df.shape[0]) * 100))
 
     # Ecriture des mauvaises lignes dans un csv
     df_badlines.to_csv(os.path.join(conf_data["path_to_data"], "badlines.csv"), index=False)
@@ -211,6 +220,19 @@ def found_values_in_dic(x, name: str):
         return None
 
 
+def manage_id(df: pd.DataFrame, df_badlines: pd.DataFrame) -> pd.DataFrame:
+    """
+    L’identifiant du marché public comprend :
+        - 4 caractères pour l’année de notification
+        - 1 à 10 caractères pour le numéro interne
+        - 2 caractères pour le numéro d’ordre de la modification
+    Le numéro d’identification est INEXPLOITABLE s’il ne respecte pas le format.
+    """
+
+    # Vérification des 4 premiers caractères est bien une année
+
+
+    return df, df_badlines
 def create_columns_titulaires_fast(df, column="titulaires"):
     """
     Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
@@ -379,105 +401,56 @@ def is_false_amount(x: float, threshold: int = 5) -> bool:
     return False
 
 
-def manage_amount(df: pd.DataFrame) -> pd.DataFrame:
+def manage_amount(df: pd.DataFrame, df_badlines: pd.DataFrame) -> pd.DataFrame:
     """
-    Travail sur la détection des montants erronés. Ici inférieur à 200, supérieur à 9.99e8 et
-    si la partie entière du montant est composé d'au moins 5 fois le même chiffre hors 0.
-    Exemple de montant érronés:
-        - 999 999
-        - 222 522
+    Le montant est jugé INEXPLOITABLE si :
+    - Le montant est supérieur à 3 000 000 000€ (Remarque : voir si règles des exceptions à transmettre plus tard).
+    - Le montant est inférieur à 1€
+    - Pour un seuil de 100M€, il y a
+        - une succession de mêmes chiffres (ex: 999999999, 888888888, 99999988)
+        - la séquence du montant commençant par 123456789
 
-    Retour:
-        pd.DataFrame
+    Return :
+        pd.DataFrame, pd.DataFrame
     """
 
     logger.info("Début du traitement: Détection et correction des montants aberrants")
-    # Identifier les outliers - travail sur les montants
-    df["montant"] = pd.to_numeric(df["montant"], downcast='float')  # Passage en float32 plutôt que 64
-    df['montantCalcule'] = df["montant"]
-    df['montantCalcule'].fillna(0, inplace=True)
-    # variable témoin pour les logs
+    df["montant"] = pd.to_numeric(df["montant"], downcast='float')
 
-    values_montant_calcul = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
+    # suppérieur à 3 000 000 000€
+    df_badlines = df_badlines.append(df[df["montant"] > 3000000000])
+    df = df[df["montant"] <= 3000000000]
 
-    # Détection des montants "1 chiffre"
-    df["montantCalcule"] = df["montantCalcule"].apply(lambda x: 0 if is_false_amount(x) else abs(x))
+    # inférieur à 1€
+    df_badlines = df_badlines.append(df[df["montant"] < 1])
+    df = df[df["montant"] >= 1]
 
-    values_montant_calcul2 = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
-    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) correspondaient à des"
-                f"suites d'un seul chiffre. Exemple: 9 999 999")
-
-    # Actualisation de la variable après la modification de df
-    values_montant_calcul = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
-
-    # Définition des bornes inf et sup et traitement
-    borne_inf = 200.0
-    borne_sup = 9.99e8
-    df["montantCalcule"] = df["montantCalcule"] / df["nbTitulairesSurCeMarche"]
-    df['montantCalcule'] = np.where(df['montantCalcule'] <= borne_inf, 0, df['montantCalcule'])
-
-    # Actualisation de la variable après la modification de df
-    values_montant_calcul2 = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
-    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero}"
-                f" montant(s) étaient inférieurs à la borne inf {borne_inf}")
-    # Actualisation de la variable après la modification de df
-    values_montant_calcul = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero = values_montant_calcul[0] if (0 in values_montant_calcul.keys()) else 0
-    df['montantCalcule'] = np.where(df['montantCalcule'] >= borne_sup, 0, df['montantCalcule'])
-    # Actualisation de la variable après la modification de df
-    values_montant_calcul2 = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
-    logger.info(f"{n_montant_calcul_equal_zero_2 - n_montant_calcul_equal_zero} montant(s) étaient supérieurs à "
-
-                f"la borne sup: {borne_sup}")
-    # Colonne supplémentaire pour indiquer si la valeur est estimée ou non
-    df['montantEstime'] = np.where(df['montantCalcule'] != df.montant, True, False)
-    # Ecriture dans la log
-
-    values_montant_calcul2 = df.montantCalcule.value_counts()
-    n_montant_calcul_equal_zero_2 = values_montant_calcul2[0] if (0 in values_montant_calcul2.keys()) else 0
-    logger.info(f"Au total, {n_montant_calcul_equal_zero_2} montant(s) "
-
-                f"ont été corrigé (on compte aussi les montants vides).")
-    logger.info("Fin du traitement")
-
-    # On ne veut plus convertir en int. Mais plutôt utiliser round.
-    df['montant'] = df['montant'].apply(
-        lambda x: round(x) if str(x).isdigit() else x)  # Pourquoi on n'utilise pas directement round de pandas ?
-
-    # Car on ne gagne pas beaucoup en rapidité et la méthode pandas laisse le format float. Alors qu'on veut un display int.
-
-    def detect_inexploitable(montant):
+    def is_false_amount(x: float, threshold: int = 5) -> bool:
         """
-        Cette fonction indique si un montant est exploitable ou non selon l'algorithme spécifié par la DAJ
+        On cherche à vérifier si les parties entières des montants sont composées d'au moins 5 fois le meme chiffre (hors 0).
+        Exemple pour threshold = 5: 999 999 ou 222 262.
+        Ces montants seront considérés comme faux
         """
-        # Normalement, on ne devrait plus avoir de Nan car les règles de détection de la DAJ sont en amont de cette fonction. Cependant pour la démonstration d'intégration de nouvelle fonctionnalité avec Djabril ce n'est pas le cas.
-        # On fait juste ce test vite fait
-        try:
-            montant_str = str(int(float(montant)))  # Valeur du int non comprise
-        except:
-            return True
-        if float(montant) > 3000000000 or float(montant) < 1:
-            return True  # True car inexploitable
-        elif montant_str.startswith('123456789'):
-            return True
-        threshold = len(montant_str) - 2
-        for i_caractere in range(len(montant_str)):
-            begin_caract = montant_str[i_caractere]
-            subset = montant_str[i_caractere:i_caractere + threshold]
-            unique_caract_subset = ''.join(set(subset))
-            if (len(unique_caract_subset) == 1) and (begin_caract != '0'):
-                return True
-        else:
+        if x < 1000000:
             return False
+        # Création d'une liste compteur
+        d = [0] * 10
+        str_x = str(abs(int(x)))
+        for c in str_x:
+            # On compte le nombre de fois que chaque chiffre apparait
+            d[int(c)] += 1
+        for counter in d[1:]:
+            if counter > threshold:
+                return True
+        return False
 
-    df['montant_inexploitable'] = df.montant.apply(lambda x: detect_inexploitable(x))
+    # Pour un seuil de 100M€, il y a
+    # une succession de mêmes chiffres (ex: 999999999, 888888888, 99999988)
+    # la séquence du montant commençant par 123456789
+    df_badlines = df_badlines.append(df[df["montant"].apply(is_false_amount)])
+    df = df[df["montant"].apply(lambda x: not is_false_amount(x))]
 
-    return df
+    return df, df_badlines
 
 
 def manage_missing_code(df: pd.DataFrame) -> pd.DataFrame:
@@ -645,38 +618,34 @@ def manage_date(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def correct_date(df: pd.DataFrame) -> pd.DataFrame:
+def correct_date_dureemois(df: pd.DataFrame, df_badlines) -> pd.DataFrame:
     """
-    Travail sur les durées des contrats. Recherche des durées exprimées en Jour et non pas en mois
+    Travail sur les durées des contrats. application des règles suivantes :
+    - durée en mois > 360 ou durée en mois = 0 pour les concessions, alors inexploitable mettre dans le df_badlines
+    - durée en mois > 180 ou durée en mois = 0 pour les marchés, alors inexploitable mettre dans le df_badlines
+
 
     Retour :
         - pd.DataFrame
     """
     logger.info("Début du traitement: Correction de la variable dureeMois.")
-    # On cherche les éventuelles erreurs mois -> jours
-    df['montantCalcule'] = df['montantCalcule'].astype(np.int32)  # 32 au lieu de 64 pour l'espace mémoire
-    df['dureeMois'] = df['dureeMois'].astype(np.int32)  # 32 au lieu de 64
-    mask = ((df['montantCalcule'] == df['dureeMois'])
-            | (df['montantCalcule'] / df['dureeMois'] < 100)
-            | (df['montantCalcule'] / df['dureeMois'] < 1000) & (df['dureeMois'] >= 12)
-            | ((df['dureeMois'] == 30) & (df['montantCalcule'] < 200000))
-            | ((df['dureeMois'] == 31) & (df['montantCalcule'] < 200000))
-            | ((df['dureeMois'] == 360) & (df['montantCalcule'] < 10000000))
-            | ((df['dureeMois'] == 365) & (df['montantCalcule'] < 10000000))
-            | ((df['dureeMois'] == 366) & (df['montantCalcule'] < 10000000))
-            | ((df['dureeMois'] > 120) & (df['montantCalcule'] < 2000000)))
 
-    df['dureeMoisEstimee'] = np.where(mask, "True", "False")
+    # Application des règles pour les concessions
+    logger.info("Application des règles pour les concessions")
+    df['dureeMois'] = np.where(df.loc[df['nature'].str.contains('concession', case=False, na=False)] & (df['dureeMois'] > 360), np.NaN)
 
-    # On corrige pour les colonnes considérées comme aberrantes, on divise par 30 (nombre de jours par mois)
-    df['dureeMoisCalculee'] = np.where(mask, round(df['dureeMois'] / 30, 0), df['dureeMois'])
-    # Comme certaines valeurs atteignent zero, on remplace par un mois.
-    # Il y a une valeur négative
-    df['dureeMoisCalculee'] = np.where(df['dureeMoisCalculee'] <= 0, 1, df['dureeMoisCalculee'])
-    logger.info(f"Au total, {sum(mask)} duree de marché en mois ont été jugées rentrées en jour et non en mois.")
+    # Application des règles pour les marchés
+    logger.info("Application des règles pour les marchés")
+    df['dureeMois'] = np.where(df.loc[~df['nature'].str.contains('concession', case=False, na=False)] & (df['dureeMois'] > 180), np.NaN)
+
+    # mise à l'éccart des lignes avec une durée en mois NaN ou 0.
+    logger.info("Mise à l'écart des lignes avec une durée en mois NaN et = 0")
+    df_badlines = pd.concat([df_badlines, df.loc[df['dureeMois'].isna() | (df['dureeMois'] == 0)]])
+    df = df.loc[~df['dureeMois'].isna() & (df['dureeMois'] != 0)]
+
     logger.info("Fin du traitement")
 
-    return df
+    return df, df_badlines
 
 
 def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
