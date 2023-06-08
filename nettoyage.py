@@ -229,10 +229,15 @@ def manage_id(df: pd.DataFrame, df_badlines: pd.DataFrame) -> pd.DataFrame:
     Le numéro d’identification est INEXPLOITABLE s’il ne respecte pas le format.
     """
 
-    # Vérification des 4 premiers caractères est bien une année
+    # Vérification des 4 premiers caractères est bien une année comprise entre 2010 et aujourd'hui car l'années correspond à l'année ou le marché a été rentré dans la base de données
+    df_badlines = pd.concat([df_badlines, df[~df["id"].str[:4].astype(int).between(2010, datetime.now().year)]])
+    df = df[df["id"].str[:4].astype(int).between(2010, datetime.now().year)]
 
+    # les deux autres règles sont compliqué à vérifier sans plus d'informations des métiers
 
     return df, df_badlines
+
+
 def create_columns_titulaires_fast(df, column="titulaires"):
     """
     Explose le contenu du dataframe d'entrée à le colonne column puis créé une nouvelle colonne pour chaque clef explosée.
