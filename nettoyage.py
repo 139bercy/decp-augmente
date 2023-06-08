@@ -1,8 +1,10 @@
+import cProfile
 import json
 import os
 import pickle
 import logging.handlers
 import datetime
+import pstats
 import numpy as np
 import pandas as pd
 import itertools
@@ -56,7 +58,7 @@ def main():
         with open(flux_file, "rb") as flux_file:
             df_flux = pickle.load(flux_file)
     print('BUCKET visé : ', utils.BUCKET_NAME)
-    # SI il n'y a pas d'ajout de données.
+    # S'il n'y a pas d'ajout de données.
     if df_flux.empty:
         print('Flux vide')
         if utils.USE_S3:
@@ -85,7 +87,7 @@ def main():
             .pipe(manage_date)
             .pipe(correct_date_dureemois, df_badlines)
             .pipe(data_inputation)
-            .pipe(replace_char))
+            .pipe(replace_char, df_badlines))
     logger.info("Fin du traitement")
     print(df.columns)
     logger.info("Creation csv intermédiaire: decp_nettoye.csv")
@@ -96,7 +98,8 @@ def main():
             # Export présent pour faciliter l'utilisation du module enrichissement.py
             pickle.dump(df, df_nettoye)
     df.to_csv("df_nettoye" + "-" + today.strftime("%Y-%m-%d") + ".csv")
-    logger.info("Ecriture du csv terminé")
+    df_badlines.to_csv("df_badlines" + "-" + today.strftime("%Y-%m-%d") + ".csv")
+    logger.info("Ecriture des csv terminé")
 
 
 def manage_data_quality(df: pd.DataFrame):
@@ -142,12 +145,7 @@ def manage_data_quality(df: pd.DataFrame):
                 pd.notna(df_con["dateDebutExecution"]) | pd.notna(df_con["datePublicationDonnees"])]
             return df_con, df_bad
 
-        def check_unusable_value(df_con: pd.DataFrame, df_bad: pd.DataFrame) -> pd.DataFrame:
-            pass
-            return df_con, df_bad
-
-        df_concession_, df_concession_badlines_ = (df_concession.pipe(check_empty, df_concession_badlines_)
-                                                   .pipe(check_unusable_value, df_concession_badlines_))
+        df_concession_, df_concession_badlines_ = check_empty(df_concession_, df_concession_badlines_)
 
         return df_concession_, df_concession_badlines_
 
@@ -188,7 +186,7 @@ def manage_data_quality(df: pd.DataFrame):
     # Ecriture des mauvaises lignes dans un csv
     df_badlines.to_csv(os.path.join(conf_data["path_to_data"], "badlines.csv"), index=False)
 
-    return df
+    return df, df_badlines
 
 
 def check_reference_files():
@@ -701,7 +699,7 @@ def data_inputation(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def replace_char(df: pd.DataFrame) -> pd.DataFrame:
+def replace_char(df: pd.DataFrame, df_badlines) -> pd.DataFrame:
     """
     Fonction pour mettre en qualité le champ objetMarche
 
@@ -712,7 +710,7 @@ def replace_char(df: pd.DataFrame) -> pd.DataFrame:
     # Remplacement brutal du caractère (?) par XXXXX
     df['objet'] = df['objet'].str.replace('�', 'XXXXX')
     logger.info("Fin du traitement")
-    return df
+    return df, df_badlines
 
 
 def create_value_number(x):
@@ -830,11 +828,11 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
         mask_multiples_modifications, col_to_normalize].apply(concat_modifications)
     df["HowManyModification"] = df[col_to_normalize].apply(lambda x: len(x))
     df["booleanModification"] = df["HowManyModification"].apply(lambda x: 1 if x > 0 else 0)
-
+    """
     to_normalize = df[col_to_normalize]
     for i in range(len(to_normalize)):
         json_modification = to_normalize[i]
-        if json_modification:  # dans le cas ou des modifications ont été apportées
+        if len(json_modification) > 0:  # dans le cas ou des modifications ont été apportées
             for col in json_modification[0].keys():
                 col_init = col
                 # Formatage du nom de la colonne
@@ -843,6 +841,7 @@ def prise_en_compte_modifications(df: pd.DataFrame, col_to_normalize: str = 'mod
                 if col not in df.columns:  # Cas où on tombe sur le premier marché qui modifie un champ
                     df[col] = ""  # Initialisation dans le df initial
                 df[col][i] = json_modification[0][col_init]
+    """
 
 
 def split_dataframe(df: pd.DataFrame, sub_data: pd.DataFrame, modalite: str) -> tuple:
@@ -967,4 +966,16 @@ def manage_modifications(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    profiler = cProfile.Profile()
+    profiler.enable()
     main()
+    profiler.disable()
+    if conf_debug["debug"]:
+        with open('df_nettoye_new_regroupement_marche',
+                  'rb') as df_nettoye:  # Forcément du local, pas besoin de gérer ça sur S3
+            df = pickle.load(df_nettoye)
+            init_len = len(df)
+        with open(f"profilingSnettoyage_opti_size{init_len}.txt", "w") as f:
+            ps = pstats.Stats(profiler, stream=f).sort_stats('ncalls')
+            ps.sort_stats('cumulative')
+            ps.print_stats()
