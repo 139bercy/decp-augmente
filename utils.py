@@ -6,6 +6,7 @@ import pickle
 import botocore
 import argparse
 import logging
+from tqdm import tqdm
 
 local_credentials = "saagie_cred.json"
 local_credentials_exist = os.path.exists(local_credentials)
@@ -135,9 +136,7 @@ def retrieve_lastest(client, prefix_object: str):
 def download_datas():
     data_path = "data"
     bucket = s3.Bucket(BUCKET_NAME)
-    data_files = ["data/arrondissement2021.csv", "data/commune2021.csv", "data/StockEtablissement_utf8.csv",
-                  "data/StockUniteLegale_utf8.csv", "data/cpv_2008_ver_2013.xlsx", "data/departement2020.csv",
-                  "data/geoflar-communes-2015.csv", "data/region2020.csv"]
+    data_files = ["data/region2020.csv"]
     most_recents_prefix = ["data/df_cache", "data/hash_keys_modifications", "data/hash_keys_no_modifications"]
     for file in most_recents_prefix:
         last_key = retrieve_lastest(s3.meta.client, file)
@@ -249,13 +248,37 @@ def get_object_content(file_name_s3: str):
         else:
             print(f"L'objet {file_name_s3} existe mais il y a un problème")
             return None
+
+    file_size = object.content_length  # Get the size of the file
+
     if file_name_s3.endswith("json"):
-        object_content = object.get()['Body'].read().decode('utf-8')
-        return json.loads(object_content)
+        object_content = object.get()['Body']
+        with tqdm(total=file_size, unit='B', unit_scale=True, desc=file_name_s3, ncols=80) as pbar:
+            content = b''
+            for chunk in object_content.iter_chunks():
+                content += chunk
+                pbar.update(len(chunk))
+        # save json localy
+        with open("decpv2.json", 'w') as json_file:
+            json.dump(json.loads(content.decode('utf-8')), json_file)
+        return json.loads(content.decode('utf-8'))
+
     if file_name_s3.endswith("pkl"):
-        object_content = object.get()['Body'].read()
-        return pickle.loads(object_content)
+        object_content = object.get()['Body'].read()# Use tqdm to display the progress
+        with tqdm(total=file_size, unit='B', unit_scale=True, desc=file_name_s3, ncols=80) as pbar:
+            content = b''
+            for chunk in object_content.iter_chunks():
+                content += chunk
+                pbar.update(len(chunk))
+        return pickle.loads(content)
+
     else:
         print(f"{file_name_s3} n'est ni un pickle ni un json. On le considère comme un pickle")
         object_content = object.get()['Body'].read()
-        return pickle.loads(object_content)
+        # Use tqdm to display the progress
+        with tqdm(total=file_size, unit='B', unit_scale=True, desc=file_name_s3, ncols=80) as pbar:
+            content = b''
+            for chunk in object_content.iter_chunks():
+                content += chunk
+                pbar.update(len(chunk))
+        return pickle.loads(content)
