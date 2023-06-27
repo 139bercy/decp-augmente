@@ -96,11 +96,11 @@ def manage_data_quality(df: pd.DataFrame):
 
     print("Concession valides : ", str(df_concession.shape[0]))
     print("Concession mauvaises : ", str(df_concession_badlines.shape[0]))
-    print("Concession mal rempli % : ", str((df_concession_badlines.shape[0] / df_concession.shape[0]) * 100))
+    print("Concession mal rempli % : ", str((df_concession_badlines.shape[0] / (df_concession.shape[0] + df_concession_badlines.shape[0]) * 100)))
 
     print("Marchés valides : ", str(df_marche.shape[0]))
     print("Marché mauvais : ", str(df_marche_badlines.shape[0]))
-    print("Marché mal rempli % : ", str((df_marche_badlines.shape[0] / df_marche.shape[0]) * 100))
+    print("Marché mal rempli % : ", str((df_marche_badlines.shape[0] / (df_marche.shape[0] + df_marche_badlines.shape[0]) * 100)))
 
     # save data to csv files
     df_concession.to_csv(os.path.join(conf_data["path_to_data"], "concession.csv"), index=False)
@@ -110,12 +110,6 @@ def manage_data_quality(df: pd.DataFrame):
 
     # Concaténation des dataframes pour l'enrigissement (re-séparation après)
     df = pd.concat([df_concession, df_marche])
-
-    logger.info("Pourcentage de mauvaises lignes : " + str(((df_concession_badlines.shape[0] + df_marche_badlines.shape[0]) / df.shape[0]) * 100))
-
-    # Ecriture des données exclues dans un fichier csv
-    df_concession_badlines.to_csv(os.path.join(conf_data["path_to_data"], "concession_exclu.csv"), index=False)
-    df_marche_badlines.to_csv(os.path.join(conf_data["path_to_data"], "marche_exclu.csv"), index=False)
 
     return df
 
@@ -180,7 +174,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
 
         df = df["titulaires"].apply(extract_values).join(df)
 
-        df.drop(columns=["titulaires"], inplace=True)
+        # df.drop(columns=["titulaires"], inplace=True)
 
         logging.info("dedoublonnage_marche")
         print("df_marché avant dédoublonnage : " + str(df.shape))
@@ -307,10 +301,19 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
                     new_columns[new_col_name] = np.nan
 
             if isinstance(row, list):
+                # how is the list of concessionnaires
+                # if contain a dict where key is exactly : concessionnaire, then the list we want is the value of this dict key
+                if 'concessionnaire' in row[0].keys():
+                    row = [item['concessionnaire'] for item in row]
                 row = row[:3]  # Keep only the first three concession
             else:
                 # if row is not a list, then it is empty and for obscure reason script thinks it's a float so returning nan
                 return pd.Series(new_columns)
+
+            # le traitement ici à lieux car comme on dit : "Garbage in, garbage out" mais on est gentil on corrige leurs formats -_-
+            # check if row is a list of list of dict, if so, keep only the first list
+            if isinstance(row[0], list):
+                row = row[0]
 
             # fill new columns with values from concessionnaires column if exist
             for value, concession in enumerate(row, start=1):
@@ -326,7 +329,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
         df = df["concessionnaires"].apply(extract_values).join(df)
 
-        df.drop(columns=["concessionnaires"], inplace=True)
+        # df.drop(columns=["concessionnaires"], inplace=True)
 
         logging.info("dedoublonnage_concession")
         print("df_concession_ avant dédoublonnage : " + str(df_concession_.shape))
@@ -344,7 +347,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
     def concession_check_empty(df_con: pd.DataFrame, df_bad: pd.DataFrame) -> pd.DataFrame:
         col_name = ["id", "autoriteConcedante.id", "concessionnaire_id_1", "objet", "valeurGlobale",
-                    "dureeMois"]  # concessionnaires contient un dict avec des valeurs dont id
+                    "dureeMois"]
         for col in col_name:
             df_bad = pd.concat(
                 [df_bad, df_con[~pd.notna(df_con[col])]])
