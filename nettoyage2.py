@@ -41,6 +41,7 @@ decp_file_name = conf_data["decp_file_name"]
 path_to_data = conf_data["path_to_data"]  # Réécris
 
 
+
 def main():
     if utils.USE_S3:
         if not (os.path.exists(path_to_data)):  # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
@@ -57,8 +58,8 @@ def main():
             df = pickle.load(f)
 
     logger.info("Nettoyage des données")
-
     df = manage_data_quality(df)
+
 
 
 def manage_data_quality(df: pd.DataFrame):
@@ -93,11 +94,13 @@ def manage_data_quality(df: pd.DataFrame):
     df_concession, df_concession_badlines = regles_concession(df_concession)
     df_marche, df_marche_badlines = regles_marche(df_marche)
 
-    print(df_concession.shape[0])
-    print(df_concession_badlines.shape[0])
+    print("Concession valides : ", str(df_concession.shape[0]))
+    print("Concession mauvaises : ", str(df_concession_badlines.shape[0]))
+    print("Concession mal rempli % : ", str((df_concession_badlines.shape[0] / df_concession.shape[0]) * 100))
 
-    print(df_marche.shape[0])
-    print(df_marche_badlines.shape[0])
+    print("Marchés valides : ", str(df_marche.shape[0]))
+    print("Marché mauvais : ", str(df_marche_badlines.shape[0]))
+    print("Marché mal rempli % : ", str((df_marche_badlines.shape[0] / df_marche.shape[0]) * 100))
 
 
     # Concaténation des dataframes pour l'enrigissement (re-séparation après)
@@ -115,8 +118,79 @@ def manage_data_quality(df: pd.DataFrame):
 def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
     df_marche_badlines_ = pd.DataFrame(columns=df_marche_.columns)
 
+    def dedoublonnage_marche(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Sont considérés comme doublons des marchés ayant les mêmes valeurs aux champs suivants :
+        id,
+        idAcheteur,
+        idTitulaire,
+        dateNotification,
+        Montant
+        En clair cela signifie que c’est bel et bien le même contrat.
+        - Si même (id, idAcheteur, idTitulaire, dateNotification, Montant), regarder datePublicationDonnees, qui correspond à la date d’arrivée de la donnée dans data.gouv. Conserver seulement l’enregistrement ayant la datePublicationDonnees la plus récente.
+        - Si même datePublicationDonnees en plus de même jeu de variable, alors regarder le niveau de complétude de chaque enregistrement avec un score ( : compter le nombre de fois où les variables sont renseignées pour chaque enregistrement. Cela constitue un « score »). Prendre l’enregistrement ayant le score le plus élevé.
+        - Si même (id, idAcheteur, idTitulaire, dateNotification, Montant, datePublicationDonnees ) et même score, alors garder la dernière ligne du groupe par défaut
+        """
+
+        def extract_values(row: list):
+            """
+            create 9 new columns with the values of the titulaires column
+
+            template for new col name : titulaires_ + col name + _ + value
+                - value is number from 1 to 3
+                - col name are : typeIdentifiant, id, denominationSociale
+
+            row contains a list of dict, each dict is a titulaires
+                - can be empty
+                - can contain 1, 2 or 3 titulaires or more keeping only 3 first
+                - if 1 value can be a dict and not a list of dict
+
+            :param row: the dataframe row to extract values from
+            :return: a new dataframe with the values of the titulaires column, new value are nan if not present
+            """
+            new_columns = {}
+
+            # create new columns all with nan value
+            for value in range(1, 4):
+                for col_name in ['denominationSociale', 'id', 'typeIdentifiant']:
+                    new_col_name = f'titulaire_{col_name}_{value}'
+                    new_columns[new_col_name] = np.nan
+
+            if isinstance(row, list):
+                row = row[:3]  # Keep only the first three concession
+            else:
+                # if row is not a list, then it is empty and for obscure reason script thinks it's a float so returning nan
+                return pd.Series(new_columns)
+
+            # fill new columns with values from concessionnaires column if exist
+            for value, concession in enumerate(row, start=1):
+                # replace value in new_columns by corresponding value in concession
+                for col_name in ['denominationSociale', 'id', 'typeIdentifiant']:
+                    col_to_fill = f'titulaire_{col_name}_{value}'
+                    # col_name is key in concession dict, col_to_fill is key in new_columns dict. get key value in col_name and put it in col_to_fill
+                    if concession:
+                        new_columns[col_to_fill] = concession.get(col_name, np.nan)
+
+            return pd.Series(new_columns)
+
+        df = df["titulaires"].apply(extract_values).join(df)
+
+        df.drop(columns=["titulaires"], inplace=True)
+
+        logging.info("dedoublonnage_marche")
+        print("df_marché avant dédoublonnage : " + str(df.shape))
+        # filtre pour mettre la date de publication la plus récente en premier
+        df = df.sort_values(by=["datePublicationDonnees"], ascending=False)
+
+        # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
+        dff = df.drop_duplicates(subset=["id", "acheteur.id", "montant", "dureeMois", "titulaire_id_1"], keep="first")
+
+        print("df_marché après dédoublonnage : " + str(dff.shape))
+        print("% de doublons marché : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
+        return dff
+
     def marche_check_empty(df: pd.DataFrame, dfb: pd.DataFrame) -> pd.DataFrame:
-        col_name = ["id", "acheteur.id", "titulaires", "montant",
+        col_name = ["id", "acheteur.id", "titulaire_id_1", "montant",
                     "dureeMois"]  # titulaire contient un dict avec des valeurs dont id
         for col in col_name:
             dfb = pd.concat([dfb, df[~pd.notna(df[col])]])
@@ -169,6 +243,8 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         dfb = pd.concat([dfb, still_invalid_dates])
         return df, dfb
 
+    df_marche_ = dedoublonnage_marche(df_marche_)
+
     df_marche_, df_marche_badlines_ = marche_check_empty(df_marche_, df_marche_badlines_)
     df_marche_, df_marche_badlines_ = marche_cpv_object(df_marche_, df_marche_badlines_)
     df_marche_, df_marche_badlines_ = marche_date(df_marche_, df_marche_badlines_)
@@ -186,10 +262,82 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
 
 def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
+    def dedoublonnage_concession(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Sont considérés comme doublons des concessions ayant les mêmes valeurs aux champs suivants :
+        id,
+        idautoriteConcedante,
+        idconcessionnaires,
+        dateDebutExecution,
+        valeurGlobale.
+        En clair cela signifie que c’est bel et bien le même contrat.
+        - Si même (id, idautoriteConcedante, idconcessionnaires, dateDebutExecution, valeurGlobale), regarder datePublicationDonnees, qui correspond à la date d’arrivée de la donnée dans data.gouv. Garder datePublicationDonnees la plus récente.
+        - Si même datePublicationDonnees en plus de même jeu de variable, alors regarder le niveau de complétude de chaque enregistrement avec un score ( : compter le nombre de fois où les variables sont renseignées pour chaque enregistrement. Cela constitue un « score »). Prendre l’enregistrement ayant le score le plus élevé.
+        - Si même (id, idautoriteConcedante, idconcessionnaires, dateDebutExecution, valeurGlobale, datePublicationDonnees) et même score, alors garder la dernière ligne du groupe.
+        """
+
+        def extract_values(row: list):
+            """
+            create 9 new columns with the values of the concessionnaires column
+
+            template for new col name : concessionnaire_ + col name + _ + value
+                - value is number from 1 to 3
+                - col name are : denominationSociale, id, typeIdentifiant
+
+            row contains a list of dict, each dict is a concessionnaire
+                - can be empty
+                - can contain 1, 2 or 3 concessionnaires or more keeping only 3 first
+                - if 1 value can be a dict and not a list of dict
+
+            :param row: the dataframe row to extract values from
+            :return: a new dataframe with the values of the concessionnaires column, new value are nan if not present
+            """
+            new_columns = {}
+
+            # create new columns all with nan value
+            for value in range(1, 4):
+                for col_name in ['denominationSociale', 'id', 'typeIdentifiant']:
+                    new_col_name = f'concessionnaire_{col_name}_{value}'
+                    new_columns[new_col_name] = np.nan
+
+            if isinstance(row, list):
+                row = row[:3]  # Keep only the first three concession
+            else:
+                # if row is not a list, then it is empty and for obscure reason script thinks it's a float so returning nan
+                return pd.Series(new_columns)
+
+            # fill new columns with values from concessionnaires column if exist
+            for value, concession in enumerate(row, start=1):
+                # replace value in new_columns by corresponding value in concession
+                for col_name in ['denominationSociale', 'id', 'typeIdentifiant']:
+                    col_to_fill = f'concessionnaire_{col_name}_{value}'
+                    # col_name is key in concession dict, col_to_fill is key in new_columns dict. get key value in col_name and put it in col_to_fill
+                    if concession:
+                        new_columns[col_to_fill] = concession.get(col_name, np.nan)
+
+            return pd.Series(new_columns)
+
+
+        df = df["concessionnaires"].apply(extract_values).join(df)
+
+        df.drop(columns=["concessionnaires"], inplace=True)
+
+        logging.info("dedoublonnage_concession")
+        print("df_concession_ avant dédoublonnage : " + str(df_concession_.shape))
+        # filtre pour mettre la date de publication la plus récente en premier
+        df = df.sort_values(by=["datePublicationDonnees"], ascending=[False])
+
+        # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
+        dff = df.drop_duplicates(subset=["id", "autoriteConcedante.id", "dateDebutExecution", "concessionnaire_id_1","valeurGlobale"],
+                                                            keep="first")
+        print("df_concession_ après dédoublonnage : " + str(df.shape))
+        print("% doublon concession : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
+        return dff
+
     df_concession_badlines_ = pd.DataFrame(columns=df_concession_.columns)
 
     def concession_check_empty(df_con: pd.DataFrame, df_bad: pd.DataFrame) -> pd.DataFrame:
-        col_name = ["id", "autoriteConcedante.id", "concessionnaires", "objet", "valeurGlobale",
+        col_name = ["id", "autoriteConcedante.id", "concessionnaire_id_1", "objet", "valeurGlobale",
                     "dureeMois"]  # concessionnaires contient un dict avec des valeurs dont id
         for col in col_name:
             df_bad = pd.concat(
@@ -204,6 +352,8 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
         df_con = df_con[
             pd.notna(df_con["dateDebutExecution"]) | pd.notna(df_con["datePublicationDonnees"])]
         return df_con, df_bad
+
+    df_concession_ = dedoublonnage_concession(df_concession_)
 
     df_concession_, df_concession_badlines_ = concession_check_empty(df_concession_, df_concession_badlines_)
     df_concession_, df_concession_badlines_ = concession_date(df_concession_, df_concession_badlines_)
