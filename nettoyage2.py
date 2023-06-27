@@ -102,6 +102,11 @@ def manage_data_quality(df: pd.DataFrame):
     print("Marché mauvais : ", str(df_marche_badlines.shape[0]))
     print("Marché mal rempli % : ", str((df_marche_badlines.shape[0] / df_marche.shape[0]) * 100))
 
+    # save data to csv files
+    df_concession.to_csv(os.path.join(conf_data["path_to_data"], "concession.csv"), index=False)
+    df_marche.to_csv(os.path.join(conf_data["path_to_data"], "marche.csv"), index=False)
+    df_marche_badlines.to_csv(os.path.join(conf_data["path_to_data"], "marche_exclu.csv"), index=False)
+    df_concession_badlines.to_csv(os.path.join(conf_data["path_to_data"], "concession_exclu.csv"), index=False)
 
     # Concaténation des dataframes pour l'enrigissement (re-séparation après)
     df = pd.concat([df_concession, df_marche])
@@ -251,6 +256,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
 
     df_marche_, df_marche_badlines_ = check_montant(df_marche_, df_marche_badlines_, "montant")
     df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "acheteur.id")
+    df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "titulaire_id_1")
 
     df_marche_, df_marche_badlines_ = marche_cpv(df_marche_, df_marche_badlines_)
 
@@ -360,6 +366,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
     df_concession_, df_concession_badlines_ = check_montant(df_concession_, df_concession_badlines_, "valeurGlobale")
     df_concession_, df_concession_badlines_ = check_siret(df_concession_, df_concession_badlines_, "autoriteConcedante.id")
+    df_concession_, df_concession_badlines_ = check_siret(df_concession_, df_concession_badlines_, "concessionnaire_id_1")
 
     df_concession_, df_concession_badlines_ = check_duree_contrat(df_concession_, df_concession_badlines_, 360)
 
