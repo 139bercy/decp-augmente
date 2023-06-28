@@ -172,7 +172,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
 
             return pd.Series(new_columns)
 
-        #df = df["titulaires"].apply(extract_values).join(df)
+        df = df["titulaires"].apply(extract_values).join(df)
 
         df.drop(columns=["titulaires"], inplace=True)
 
@@ -182,7 +182,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         df = df.sort_values(by=["datePublicationDonnees"], ascending=False)
 
         # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
-        dff = df.drop_duplicates(subset=["id", "acheteur.id", "montant", "dureeMois", "titulaire_id_1"], keep="first")
+        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dureeMois"], keep="first")
 
         print("df_marché après dédoublonnage : " + str(dff.shape))
         print("% de doublons marché : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
