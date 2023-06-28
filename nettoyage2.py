@@ -174,7 +174,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
 
         df = df["titulaires"].apply(extract_values).join(df)
 
-        # df.drop(columns=["titulaires"], inplace=True)
+        df.drop(columns=["titulaires"], inplace=True)
 
         logging.info("dedoublonnage_marche")
         print("df_marché avant dédoublonnage : " + str(df.shape))
@@ -329,7 +329,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
         df = df["concessionnaires"].apply(extract_values).join(df)
 
-        # df.drop(columns=["concessionnaires"], inplace=True)
+        df.drop(columns=["concessionnaires"], inplace=True)
 
         logging.info("dedoublonnage_concession")
         print("df_concession_ avant dédoublonnage : " + str(df_concession_.shape))
