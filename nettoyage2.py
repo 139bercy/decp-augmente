@@ -202,118 +202,53 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         df = df[pd.notna(df["codeCPV"]) | pd.notna(df["objet"])]
         return df, dfb
 
-    def marche_cpv(df: pd.DataFrame) -> pd.DataFrame:
+    def marche_cpv(df: pd.DataFrame, cpv_2008_df: pd.DataFrame) -> pd.DataFrame:
         """
         Le CPV comprend 10 caractères (8 pour la racine + 1 pour le séparateur « - » et +1 pour la clé) – format texte pour ne pas supprimer les « 0 » en début de CPV.
         Un code CPV est INEXPLOITABLE s’il n’appartient pas à la liste des codes CPV existants dans la nomenclature européenne 2008 des CPV
-
         Les CPV fonctionnent en arborescence. Le CPV le plus générique est le premier de la liste d’une division. Il y a 45 divisions (03, 09, 14, 15, 16,18…).
         En lisant de gauche à droite, le code CPV le plus générique de la division comportera un « 0 » au niveau du 3ᵉ caractère.
         Ex pour la division 45 : CPV le plus générique : 45000000-7 (travaux de construction)
-
         Règles :
             - Si la clé du code CPV est manquante et que la racine du code CPV est correcte (8 premiers caractères) alors il convient de compléter avec la clé correspondante issue de la base CPV 2008.
             - Si la racine du code CPV est complète, mais qu’elle n’existe pas dans la base CPV 2008, alors il convient de prendre le code CPV le plus générique de son arborescence.
             - Si la racine du code CPV est correcte, mais que la clé est incorrecte, alors il convient de remplacer par la clé correspondante à la racine issue de la base CPV 2008.
             - Si la racine du code CPV est incomplète, mais qu’au moins les deux premiers caractères du code CPV (la division) sont renseignées correctement, alors il convient de compléter avec le code CPV le plus générique de la division
             - Si le code CPV n’est pas renseigné, mais qu’il y a un objet de marché, il convient de laisser la donnée initiale et de ne pas mettre de côté le marché.
-
         AUCUN RETRAITEMENT POSSIBLE :
             - Si la racine du code CPV est incomplète, qu’aucun objet de marché n’est présent et que les deux premiers caractères du code CPV sont erronés, alors aucun retraitement n’est possible et l’enregistrement est mis de côté (ex : 111111).
             - Si la racine du code CPV est complète, mais erronée, qu’aucun objet de marché n’est présent et que les deux premiers caractères du code CPV sont erronés, alors aucun retraitement n’est possible et l’enregistrement est mis de côté (ex : 11111111-1).
-
         Parameters :
             df (pd.DataFrame): dataframe to clean
         Returns :
             df (pd.DataFrame): cleaned dataframe
         """
-
         def get_cpv_key(cpv_root):
-            """
-            Get CPV key from CPV root, if CPV root exists in CPV 2008 database (cpv_2008_ver_2013.xlsx) extract the key from the database, otherwise return empty string
-
-            Parameters :
-                cpv_root (str): CPV root 8 characters
-            Returns :
-                str: CPV key
-            """
-            # open cpv_2008_ver_2013.xlsx database as a dataframe
-            df_cpv_2008 = pd.read_excel("data/cpv_2008_ver_2013.xlsx", engine="openpyxl")
-
             # check if CPV root exists in CPV 2008 database column "CODE" and only keep the first 8 characters
-            if cpv_root in df_cpv_2008["CODE"].str[:8].values:
-                # extract CPV key from CPV 2008 database
-                cpv_key = df_cpv_2008[df_cpv_2008["CODE"].str[:8] == cpv_root]["CODE"].values[0][-1]
-            else:
-                cpv_key = ''
-
+            cpv_mask = cpv_2008_df["CODE"].str[:8] == cpv_root
+            cpv_key = cpv_2008_df.loc[cpv_mask, "CODE"].str[-1].values[0] if cpv_mask.any() else ""
             return cpv_key
 
-        def cpv_root_exists(cpv_root):
-            """
-            Check if CPV root exists in CPV 2008 database
+        cpv_2008_df["CPV Root"] = cpv_2008_df["CODE"].str[:8]
 
-            Parameters :
-                cpv_root (str): CPV root
-            Returns :
-                bool: True if CPV root exists in CPV 2008 database, False otherwise
-            """
-            # open cpv_2008_ver_2013.xlsx database as a dataframe
-            df_cpv_2008 = pd.read_excel("data/cpv_2008_ver_2013.xlsx", engine="openpyxl")
+        # Check if CPV is empty string
+        empty_cpv_mask = df['codeCPV'] == ''
+        df.loc[empty_cpv_mask, 'CPV'] = df.loc[empty_cpv_mask, 'codeCPV']
 
-            # check if CPV root exists in CPV 2008 database column "CODE" and only keep the first 8 characters
-            if cpv_root in df_cpv_2008["CODE"].str[:8].values:
-                return True
-            else:
-                return False
+        # Check if CPV root is complete
+        complete_root_mask = df['codeCPV'].str.len() == 8
+        cpv_roots = df.loc[complete_root_mask, 'codeCPV'].str[:8]
+        non_existing_roots_mask = ~cpv_roots.isin(cpv_2008_df["CPV Root"].values)
+        cpv_roots.loc[non_existing_roots_mask] = cpv_roots.loc[non_existing_roots_mask].str[:2] + '000000'
+        df.loc[complete_root_mask, 'CPV'] = cpv_roots + '-' + df.loc[complete_root_mask, 'codeCPV'].str[9:]
 
-        def get_most_generic_cpv_root(cpv_root):
-            """
-            Get the most generic CPV root of a CPV root by looking at the first 2 characters
+        # Check if CPV key is missing only if CPV root is complete
+        missing_key_mask = (df['codeCPV'].str.len() >= 8) & (df['codeCPV'].str[9:].isin(['', None]))
+        df.loc[missing_key_mask, 'CPV'] = (
+            df.loc[missing_key_mask, 'codeCPV'].str[:8].apply(get_cpv_key)
+        )
 
-            Parameters :
-                cpv_root (str): CPV root 2 characters
-            Returns :
-                str: most generic CPV root
-            """
-            # open cpv_2008_ver_2013.xlsx database as a dataframe
-            df_cpv_2008 = pd.read_excel("data/cpv_2008_ver_2013.xlsx", engine="openpyxl")
-
-            # get the most generic CPV root of a CPV root by looking at the first 2 characters
-            most_generic_cpv_root = df_cpv_2008[df_cpv_2008["CODE"].str[:2] == cpv_root]["CODE"].str[:8].values[0]
-
-            return most_generic_cpv_root
-
-        def apply_cleaning(row):
-            cpv = str(row['codeCPV'])
-            cpv_root = cpv[:8]
-            cpv_key = cpv[9:]
-
-            # Check if CPV is empty string
-            if cpv == '':
-                return row
-
-            # Check if CPV root is complete
-            if len(cpv_root) == 8:
-                # Check if CPV root exists in CPV 2008 database
-                if not cpv_root_exists(cpv_root):
-                    cpv_root = get_most_generic_cpv_root(cpv_root[:2])
-            elif len(cpv_root) >= 2:
-                cpv_root = get_most_generic_cpv_root(cpv_root[:2])
-
-            else:
-                return row
-
-            # Check if CPV key is missing only if CPV root is complete
-            if cpv_key == '' or cpv_key is None:
-                cpv_key = get_cpv_key(cpv_root)
-
-            # Apply the cleaned CPV
-            row['CPV'] = cpv_root + '-' + cpv_key
-            return row
-
-        return df.apply(apply_cleaning, axis=1)
-
+        return df
 
     def marche_date(df: pd.DataFrame, dfb: pd.DataFrame) -> pd.DataFrame:
         # Si la date de notification et la date de publication est manquante, alors le marché est mis de côté
@@ -356,7 +291,10 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
     df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "acheteur.id")
     df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "titulaire_id_1")
 
-    df_marche_ = marche_cpv(df_marche_)
+    df_cpv = pd.read_excel("data/cpv_2008_ver_2013.xlsx", engine="openpyxl")
+    df_marche_ = marche_cpv(df_marche_, df_cpv)
+     # delete df_cpv to free memory
+    del df_cpv
 
     df_marche_, df_marche_badlines_ = check_duree_contrat(df_marche_, df_marche_badlines_, 180)
     df_marche_, df_marche_badlines_ = marche_dateNotification(df_marche_, df_marche_badlines_)
