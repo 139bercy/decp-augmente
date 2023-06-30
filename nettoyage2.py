@@ -70,7 +70,6 @@ def main():
     manage_data_quality(df)
 
 
-
 def manage_data_quality(df: pd.DataFrame):
     """
     Cette fonction sépare en deux le dataframe d'entrée. Les données ne respectant pas les formats indiqués par les
@@ -416,6 +415,23 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
         df_con = df_con[
             pd.notna(df_con["dateDebutExecution"]) | pd.notna(df_con["datePublicationDonnees"])]
         return df_con, df_bad
+
+    def concession_dateDebutExecution(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Format AAAA-MM-JJ
+            Si MM<01 ou>12,
+            SI JJ<01 ou >31 (voir si possibilité de vérifier le format jour max en fonction du mois et année)
+        Si la date de début d’exécution du contrat de concession est manquante et qu’il existe une date de publication des données d’exécution, respectant le format AAAA-MM-JJ (ou pouvant être retransformé en ce format) alors il convient d’affecter la date de publication à la date de début d’exécution.
+        """
+
+        # vérification du format de la date de notification (AAAA-MM-JJ) et correction si besoin création d'un dataframe avec les lignes à corriger
+        df["dateDebutExecution"] = pd.to_datetime(df["dateDebutExecution"], format='%Y-%m-%d', errors='ignore')
+        df["datePublication"] = pd.to_datetime(df["datePublication"], format='%Y-%m-%d', errors='ignore')
+
+        # si la date de début d'exécution n'est pas au format AAAA-MM-JJ regarder la date de publication et si elle est au format AAAA-MM-JJ alors mettre la date de publication dans la date de début d'exécution
+        df.loc[(df["dateDebutExecution"].isnull()) & (df["datePublication"].notnull()), "dateDebutExecution"] = df["datePublication"]
+
+        return df
 
     df_concession_ = dedoublonnage_concession(df_concession_)
 
