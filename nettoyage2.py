@@ -3,19 +3,28 @@ import json
 import os
 import pickle
 import logging.handlers
-import datetime
-import pstats
 import re
-
 import numpy as np
 import pandas as pd
-import itertools
 import utils
 import recuperation_data
+import time
 
 logger = logging.getLogger("main.nettoyage2")
 logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
+
+
+def measure_execution_time(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time of {func.__name__}: {execution_time} seconds")
+        return result
+    return wrapper
+
 
 path_to_conf = "confs"
 if not (os.path.exists(path_to_conf)):  # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
@@ -58,7 +67,7 @@ def main():
             df = pickle.load(f)
 
     logger.info("Nettoyage des données")
-    df = manage_data_quality(df)
+    manage_data_quality(df)
 
 
 
@@ -113,10 +122,11 @@ def manage_data_quality(df: pd.DataFrame):
 
     return df
 
-
+@measure_execution_time
 def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
     df_marche_badlines_ = pd.DataFrame(columns=df_marche_.columns)
 
+    @measure_execution_time
     def dedoublonnage_marche(df: pd.DataFrame) -> pd.DataFrame:
         """
         Sont considérés comme doublons des marchés ayant les mêmes valeurs aux champs suivants :
@@ -202,6 +212,7 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         df = df[pd.notna(df["codeCPV"]) | pd.notna(df["objet"])]
         return df, dfb
 
+    @measure_execution_time
     def marche_cpv(df: pd.DataFrame, cpv_2008_df: pd.DataFrame) -> pd.DataFrame:
         """
         Le CPV comprend 10 caractères (8 pour la racine + 1 pour le séparateur « - » et +1 pour la clé) – format texte pour ne pas supprimer les « 0 » en début de CPV.
@@ -302,8 +313,10 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
     return df_marche_, df_marche_badlines_
 
 
+@measure_execution_time
 def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
 
+    @measure_execution_time
     def dedoublonnage_concession(df: pd.DataFrame) -> pd.DataFrame:
         """
         Sont considérés comme doublons des concessions ayant les mêmes valeurs aux champs suivants :
