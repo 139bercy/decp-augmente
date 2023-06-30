@@ -80,6 +80,7 @@ def main():
     manage_data_quality(df)
 
 
+@measure_execution_time
 def manage_data_quality(df: pd.DataFrame):
     """
     Cette fonction sépare en deux le dataframe d'entrée. Les données ne respectant pas les formats indiqués par les
