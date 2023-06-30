@@ -4,6 +4,8 @@ import os
 import pickle
 import logging.handlers
 import re
+
+import argparse
 import numpy as np
 import pandas as pd
 import utils
@@ -63,8 +65,16 @@ def main():
         df = recuperation_data.main()
     else:
         # load data from local
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+        args = parser.parse_args()
+
         with open(os.path.join(path_to_data, "decpv2.pkl"), 'rb') as f:
             df = pickle.load(f)
+
+        if args.test:
+            df = df.sample(n=10000, random_state=1)
+            logger.info("Mode test activé")
 
     logger.info("Nettoyage des données")
     manage_data_quality(df)
