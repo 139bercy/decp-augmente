@@ -397,7 +397,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
         df.drop(columns=["concessionnaires"], inplace=True)
 
         logging.info("dedoublonnage_concession")
-        print("df_concession_ avant dédoublonnage : " + str(df_concession_.shape))
+        print("df_concession_ avant dédoublonnage : " + str(df.shape))
         # filtre pour mettre la date de publication la plus récente en premier
         df = df.sort_values(by=["datePublicationDonnees"], ascending=[False])
 
