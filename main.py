@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 def main():
     logger.info("Application règles métier")
-    nettoyage2.main()
+    nettoyage.main()
     logger.info("csv généré dans le dossier data")
 
 if __name__ == "__main__":
