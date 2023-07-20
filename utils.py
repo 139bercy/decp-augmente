@@ -31,7 +31,7 @@ else:  # Sur la CI ou Saagie
     PROJECT_NAME = os.environ.get("PROJECT_NAME")
     BUCKET_NAME = os.environ.get("BUCKET_NAME")
 USE_S3 = os.environ.get("USE_S3")  # Boolean pour savoir si l'on va utiliser S3 ou non.
-USE_S3 = True
+USE_S3 = False
 s3 = boto3.resource(service_name='s3',
                     aws_access_key_id=ACCESS_KEY,
                     aws_secret_access_key=SECRET_KEY,
@@ -45,7 +45,9 @@ parser.add_argument("-t", "--test", help="run script in test mode with a small s
 args = parser.parse_args()
 if args.test:  # Dans le cas de la CI
     print("On est dans une phase de test")
-    BUCKET_NAME = os.environ.get("BUCKET_NAME_TEST")
+    #BUCKET_NAME = os.environ.get("BUCKET_NAME_TEST")
+    #pour test local
+    BUCKET_NAME = credentials["BUCKET_NAME"]
 
 logger.info(f"Le nom du Bucket utilisé est : {BUCKET_NAME}")
 
@@ -73,17 +75,6 @@ def download_data_nettoyage(path_json_needed="confs/config_data.json",
         os.replace(path_base_to_download, os.path.join(path_data, path_base_to_download))
         # /!\ Ne pas modifier le téléchargement à la racine puis le déplacement du fichier, sinon S3 créé des temp files qui bug le téléchargement.
         print(f"{base} est téléchargé.")
-
-    return True
-
-
-def download_data_enrichissement():
-    """
-    Cette fonction télécharge les bases de données utiles pour enrichissement.py
-
-    """
-    download_datas()  # Toutes les bases présentes dans data/ sont utiles. Data comporte égale le cache du df d'un traitement de flux à l'autre.
-    download_cache()  # les caches également
 
     return True
 
