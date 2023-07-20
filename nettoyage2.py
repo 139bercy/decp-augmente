@@ -458,7 +458,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
     return df_concession_, df_concession_badlines_
 
 
-def check_montant(df: pd.DataFrame, dfb: pd.DataFrame, col: str) -> pd.DataFrame:
+def check_montant(df: pd.DataFrame, dfb: pd.DataFrame, col: str, montant : int = 3000000000) -> pd.DataFrame:
     """
     La valeur est jugée INEXPLOITABLE
     si :
@@ -484,8 +484,8 @@ def check_montant(df: pd.DataFrame, dfb: pd.DataFrame, col: str) -> pd.DataFrame
     df[col] = df[col].astype(float)
 
     # 1
-    dfb = pd.concat([dfb, df[df[col] > 3000000000]])
-    df = df[df[col] <= 3000000000]
+    dfb = pd.concat([dfb, df[df[col] > montant]])
+    df = df[df[col] <= montant]
 
     # 2
     dfb = pd.concat([dfb, df[df[col] < 1]])
