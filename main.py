@@ -1,6 +1,4 @@
 import nettoyage
-import enrichissement
-import gestion_flux
 import logging.config
 import argparse
 
@@ -23,15 +21,9 @@ args = parser.parse_args()
 
 
 def main():
-    logger.info("Début du script de gestion de flux")
-    gestion_flux.main()
-    logger.info("Début du script de nettoyage")
-    nettoyage.main()
-    logger.info("Fin du script de nettoyage")
-    logger.info("Début du script d'enrichissement des données")
-    enrichissement.main()
-    logger.info("Fin du script d'enrichissement")
-
+    logger.info("Application règles métier")
+    nettoyage2.main()
+    logger.info("csv généré dans le dossier data")
 
 if __name__ == "__main__":
     main()
