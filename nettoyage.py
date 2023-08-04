@@ -31,13 +31,6 @@ def compute_execution_time(func):
 path_to_conf = "confs"
 if not (os.path.exists(path_to_conf)):  # Si le chemin confs n'existe pas (dans le cas de la CI et de Saagie)
     os.mkdir(path_to_conf)
-if utils.USE_S3:
-    res = utils.download_confs()
-    if res:
-        logger.info("Chargement des fichiers confs depuis le S3")
-else:
-    logger.info("ERROR Les fichiers de confs n'ont pas pu être chargés")
-
 with open(os.path.join("confs", "config_data.json")) as f:
     conf_data = json.load(f)
 
@@ -107,8 +100,17 @@ def manage_data_quality(df: pd.DataFrame):
     """
 
     # séparation des marchés et des concessions, car traitement différent
-    df_concession = df.loc[df['nature'].str.contains('concession', case=False, na=False)]
     df_marche = df.loc[~df['nature'].str.contains('concession', case=False, na=False)]
+
+    df_concession1 = df.loc[df['nature'].str.contains('concession', case=False, na=False)]
+    # df_concession prend aussi en compte les lignes restantes ou la colonne "_type" contient "concession" dans le df_marche et concatène les deux dataframes
+    df_concession = pd.concat([df_concession1, df_marche.loc[df_marche['_type'].str.contains('concession', case=False, na=False)]])
+    # remove old df for memory
+    del df_concession1
+    df_marche = df_marche.loc[~df_marche['_type'].str.contains('concession', case=False, na=False)]
+
+    utils.save_csv(df_concession, "concession.csv")
+    utils.save_csv(df_marche, "marche.csv")
 
     df_concession, df_concession_badlines = regles_concession(df_concession)
     df_marche, df_marche_badlines = regles_marche(df_marche)
@@ -201,8 +203,15 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         # filtre pour mettre la date de publication la plus récente en premier
         df = df.sort_values(by=["datePublicationDonnees"], ascending=False)
 
+        # dureeMois est en format aléatoire entre int et float donc on le convertit en float
+        df["dureeMois"] = df["dureeMois"].astype(float)
+        df["acheteur.id"] = df["acheteur.id"].astype(str)
+        df["id"] = df["id"].astype(str)
+        df["titulaire_id_1"] = df["titulaire_id_1"].astype(str)
+        df["montant"] = df["montant"].astype(str)
+
         # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
-        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dureeMois"], keep="first")
+        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dureeMois"])
 
         print("df_marché après dédoublonnage : " + str(dff.shape))
         print("% de doublons marché : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
@@ -303,6 +312,8 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         return df, dfb
 
     df_marche_ = dedoublonnage_marche(df_marche_)
+
+    utils.save_csv(df_marche_, "df_marche_dedoublonnage.csv")
 
     df_marche_, df_marche_badlines_ = marche_check_empty(df_marche_, df_marche_badlines_)
     df_marche_, df_marche_badlines_ = marche_cpv_object(df_marche_, df_marche_badlines_)
@@ -445,7 +456,7 @@ def regles_concession(df_concession_: pd.DataFrame) -> pd.DataFrame:
         return df
 
     df_concession_ = dedoublonnage_concession(df_concession_)
-
+    utils.save_csv(df_concession_, "df_concession_dedoublonnage.csv")
     df_concession_, df_concession_badlines_ = concession_check_empty(df_concession_, df_concession_badlines_)
     df_concession_, df_concession_badlines_ = concession_date(df_concession_, df_concession_badlines_)
 
