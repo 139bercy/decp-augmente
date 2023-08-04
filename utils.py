@@ -7,6 +7,7 @@ import botocore
 import argparse
 import logging
 from tqdm import tqdm
+import pandas as pd
 
 local_credentials = "saagie_cred.json"
 local_credentials_exist = os.path.exists(local_credentials)
@@ -273,3 +274,21 @@ def get_object_content(file_name_s3: str):
                 content += chunk
                 pbar.update(len(chunk))
         return pickle.loads(content)
+
+
+def save_csv(df: pd.DataFrame, file_name: str):
+    """
+    Cette fonction permet de sauvegarder un dataframe en csv
+
+    Arguments
+    -------------
+    df : dataframe à sauvegarder
+    file_name : nom du fichier à sauvegarder
+    """
+    path = "data_eclatees"
+
+    if not (os.path.exists(path)):  # Si le chemin data n'existe pas
+        os.mkdir(path)
+
+    df.to_csv(os.path.join(path, file_name), index=False, sep=";")
+    return None
