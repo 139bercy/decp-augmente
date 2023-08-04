@@ -1,4 +1,3 @@
-import cProfile
 import json
 import os
 import pickle
@@ -9,7 +8,6 @@ import argparse
 import numpy as np
 import pandas as pd
 import utils
-import recuperation_data
 import time
 
 logger = logging.getLogger("main.nettoyage2")
@@ -45,29 +43,19 @@ decp_file_name = conf_data["decp_file_name"]
 path_to_data = conf_data["path_to_data"]  # Réécris
 
 
-
 def main():
-    if utils.USE_S3:
-        if not (os.path.exists(path_to_data)):  # Si le chemin data n'existe pas (dans le cas de la CI et de Saagie)
-            os.mkdir(path_to_data)
-        utils.download_data_nettoyage()
-
     logger.info("Chargement des données")
-    if utils.USE_S3:
-        # download data from S3
-        df = recuperation_data.main()
-    else:
-        # load data from local
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
-        args = parser.parse_args()
+    # load data from local
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
+    args = parser.parse_args()
 
-        with open(os.path.join(path_to_data, "decpv2.pkl"), 'rb') as f:
-            df = pickle.load(f)
+    with open(os.path.join(path_to_data, "decpv2.pkl"), 'rb') as f:
+        df = pickle.load(f)
 
-        if args.test:
-            df = df.sample(n=10000, random_state=1)
-            logger.info("Mode test activé")
+    if args.test:
+        df = df.sample(n=10000, random_state=1)
+        logger.info("Mode test activé")
 
     logger.info("Nettoyage des données")
     manage_data_quality(df)
