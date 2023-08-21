@@ -185,15 +185,13 @@ def regles_marche(df_marche_: pd.DataFrame) -> pd.DataFrame:
         # filtre pour mettre la date de publication la plus récente en premier
         df = df.sort_values(by=["datePublicationDonnees"], ascending=False)
 
-        # dureeMois est en format aléatoire entre int et float donc on le convertit en float
-        df["dureeMois"] = df["dureeMois"].astype(float)
         df["acheteur.id"] = df["acheteur.id"].astype(str)
         df["id"] = df["id"].astype(str)
         df["titulaire_id_1"] = df["titulaire_id_1"].astype(str)
         df["montant"] = df["montant"].astype(str)
 
         # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
-        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dureeMois"])
+        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dateNotification"], keep="first")
 
         print("df_marché après dédoublonnage : " + str(dff.shape))
         print("% de doublons marché : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
