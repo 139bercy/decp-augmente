@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import utils
 import time
+import convert_json_to_pandas
+
 
 logger = logging.getLogger("main.nettoyage2")
 logger.setLevel(logging.DEBUG)
@@ -44,8 +46,9 @@ def main():
     parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
     args = parser.parse_args()
 
-    with open(os.path.join(path_to_data, "decpv2.pkl"), 'rb') as f:
-        df = pickle.load(f)
+    with open(os.path.join(path_to_data, "decpv2.json"), 'rb') as f:
+        # c'est long de charger le json (4h sur mon pc), je conseille de le faire une fois et de sauvegarder le df en pickle pour les tests
+        df = convert_json_to_pandas.manage_modifications(json.load(f))
 
     if args.test:
         df = df.sample(n=10000, random_state=1)
