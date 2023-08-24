@@ -47,7 +47,7 @@ def main():
     args = parser.parse_args()
 
     with open(os.path.join(path_to_data, "decpv2.json"), 'rb') as f:
-        # c'est long de charger le json (4h sur mon pc), je conseille de le faire une fois et de sauvegarder le df en pickle pour les tests
+        # c'est long de charger le json, je conseille de le faire une fois et de sauvegarder le df en pickle pour les tests
         df = convert_json_to_pandas.manage_modifications(json.load(f))
 
     if args.test:

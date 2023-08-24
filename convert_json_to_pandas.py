@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from tqdm import tqdm  # Import tqdm
 
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
@@ -21,8 +22,10 @@ def manage_modifications(data: dict) -> pd.DataFrame:
     # Replace empty strings with NaN (Not a Number) and convert to float
     df = df.replace(r'^\s*$', np.nan, regex=True)
     df = df.astype(conf_glob["nettoyage"]['type_col_nettoyage'], copy=False)
-    #prise_en_compte_modifications(df)
-    df = regroupement_marche(df, dict_modification)
+    prise_en_compte_modifications(df)
+    #df = regroupement_marche(df, dict_modification)
+    # save df to pickle
+    df.to_pickle(os.path.join("data", "dfafterconvertsmall.pkl"))
     return df
 
 
@@ -109,7 +112,7 @@ def regroupement_marche(df: pd.DataFrame, dict_modification: dict) -> pd.DataFra
     subdata_modif = df[df.booleanModification == 1]  # Tout les marchés avec les modifications
     liste_objet = list(subdata_modif.objet.unique())
     df_to_concatene = pd.DataFrame()  # df vide pour la concaténation
-    for objet_marche in liste_objet:
+    for objet_marche in tqdm(liste_objet, desc="Processing objet marchés"):
         # Récupération du dataframe modification et du dataframe source
         marche, marche_init = split_dataframe(df, subdata_modif, objet_marche)
         for j in range(len(marche)):
@@ -160,3 +163,32 @@ def fusion_source_modification(raw: pd.DataFrame, df_source: pd.DataFrame, col_m
         if raw[col] != '':
             df_source[col_init].loc[raw.name] = raw[col]
     return df_source
+
+
+def regroupement_marche_(df: pd.DataFrame, dict_modification: dict) -> pd.DataFrame:
+    # Assuming you've generated the 'booleanModification' column in df
+
+    # Create a dictionary to store the modified marché dataframes
+    modified_marches = {}
+
+    # Group data by "objet" and loop through each group
+    for objet_marche, group in tqdm(df[df["booleanModification"] == 1].groupby("objet"), desc="Processing objet marchés"):
+        # Initialize the modified marché dataframe with the last row of the group
+        modified_marche = group.iloc[-1].copy()
+
+        # Apply modifications from the dict_modification
+        modified_marche = fusion_source_modification(modified_marche, group, dict_modification.keys(),
+                                                     dict_modification)
+
+        # Store the modified marché dataframe
+        modified_marches[objet_marche] = modified_marche
+
+    # Update the original dataframe with the modified marché dataframes
+    for objet_marche, modified_marche in tqdm(modified_marches.items(), desc="Updating original dataframe"):
+        mask = df["objet"] == objet_marche
+        df.loc[mask] = modified_marche
+
+    # Update idMarche based on idtech or id_technique
+    df["idMarche"] = np.where(df["idtech"] != "", df["idtech"], df["id_technique"])
+
+    return df
