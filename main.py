@@ -1,6 +1,8 @@
 import nettoyage
 import logging.config
 import argparse
+import utils
+import data_management
 
 logger = logging.getLogger("main")
 logger.setLevel(logging.DEBUG)
@@ -15,15 +17,28 @@ logger.addHandler(ch)
 logger.addHandler(fh)
 
 # Initialize parser
-parser = argparse.ArgumentParser()
-parser.add_argument("-t", "--test", help="run script in test mode with a small sample of data")
-args = parser.parse_args()
+args = utils.parse_args()
 
+def main(data_format:str = '2022'):
+    
+    logger.info(f"Téléchargement des fichiers de données")
+    data_management.main()
+    logger.info("Fichiers mis à jour dans le dossier data")
 
-def main():
-    logger.info("Application règles métier")
-    nettoyage.main()
+    logger.info(f"Application règles métier format {data_format}")
+    nettoyage.main(data_format)
     logger.info("csv généré dans le dossier data")
 
+    # logger.info("Enrichissement des données")
+    # enrichissement2.main()
+    # logger.info("csv enrichi dans le dossier data")
+    if not args.test and not args.local:
+        utils.export_all_csv(data_format,args.local)
+
 if __name__ == "__main__":
-    main()
+    all_data_format = ['2022']
+    for data_format in all_data_format:
+        try:
+            main(data_format)
+        except ValueError as e:
+            print(f"Erreur lors du traitement du format {data_format}: {e}")

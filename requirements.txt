@@ -1,5 +1,5 @@
-pip==23.1.2
-pandas==1.4.3
+pip
+pandas == 2.2.2
 numpy
 lxml
 requests
@@ -17,3 +17,6 @@ boto3
 saagieapi
 pytest
 argparse 
+python-stdnum
+xlrd
+tqdm
