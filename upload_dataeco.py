@@ -10,6 +10,7 @@ import logging
 
 import ftplib
 def upload_dataeco(file_to_upload : str, remote_path : str) -> None : 
+    print(f"Upload {file_to_upload} to data.eco")
 
     path_file_to_upload = "data/" + file_to_upload
     # PATH_FILE_CONFIG = "confs/config_data.json"
@@ -24,6 +25,10 @@ def upload_dataeco(file_to_upload : str, remote_path : str) -> None :
         USER_DATAECO = credentials["USER_DATAECO"]
         PWD_DATAECO = credentials["PASSWORD_DATAECO"]
         HOST_DATAECO = credentials["HOST_DATAECO"]
+    else:
+        USER_DATAECO = os.environ.get("DECP_USER_DATAECO")
+        PWD_DATAECO = os.environ.get("DECP_PWD_DATAECO")
+        HOST_DATAECO = os.environ.get("DECP_HOST_DATAECO")
     # else :  # Sur la CI ou Saagie
     #     ACCESS_KEY = os.environ.get("ACCESS_KEY")
     #     SECRET_KEY = os.environ.get("SECRET_KEY")

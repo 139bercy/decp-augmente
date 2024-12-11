@@ -21,7 +21,7 @@ args = utils.parse_args()
 
 def main(data_format:str = '2022'):
     
-    logger.info(f"Téléchargement des fichiers de données")
+    logger.info("Téléchargement des fichiers de données")
     data_management.main()
     logger.info("Fichiers mis à jour dans le dossier data")
 
@@ -29,7 +29,7 @@ def main(data_format:str = '2022'):
     nettoyage.main(data_format)
     logger.info("csv généré dans le dossier data")
 
-    # logger.info("Enrichissement des données")
+    # Partie désactivé logger.info("Enrichissement des données")
     # enrichissement2.main()
     # logger.info("csv enrichi dans le dossier data")
     if not args.test and not args.local:

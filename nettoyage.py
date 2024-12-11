@@ -18,6 +18,9 @@ from stdnum.exceptions import *
 from stdnum.fr import siren
 from stdnum.util import clean
 
+from reporting.Report import Report
+
+
 PATTERN_DATE = r'^20[0-9]{2}-[0-1]{1}[0-9]{1}-[0-3]{1}[0-9]{1}$'
 light_errors = []
 
@@ -25,6 +28,8 @@ light_errors = []
 logger = logging.getLogger("main.nettoyage2")
 logger.setLevel(logging.DEBUG)
 pd.options.mode.chained_assignment = None  # default='warn'
+
+report = Report('augmente')
 
 with open(os.path.join("confs", "var_glob.json")) as f:
     conf_glob = json.load(f)
@@ -62,7 +67,7 @@ def main(data_format:str = '2022'):
     json_source = f"../decp-rama/results/decp-daily.json"
     #if not os.path.isfile("data/decpv2.json"):
     #    print("Load file from S3 repositary")
-    if not args.local:
+    if not args.test:
         utils.download_file("data/"+json_source,"data/"+json_source)
         utils.download_file("data/cpv_2008_fr.xls","data/cpv_2008_fr.xls")
 
@@ -81,11 +86,12 @@ def main(data_format:str = '2022'):
 
     maintenant = datetime.now() 
     date = maintenant.strftime("%Y-%m-%d")
-    files_to_upload = [(f"{date}-marche-2022.csv","decp/2022/marches-valides"),(f"{date}-concession-2022.csv","decp/2022/concessions-valides"),(f"{date}-marche-exclu-2022.csv","decp/2022/marches-invalides"),(f"{date}-concession-exclu-2022.csv","decp/2022/concessions-invalides")]
-    for f in files_to_upload :
-        up.upload_dataeco(f[0],f[1])
 
- 
+    if not args.local:
+        files_to_upload = [(f"{date}-marche-2022.csv","decp/2022/marches-valides"),(f"{date}-concession-2022.csv","decp/2022/concessions-valides"),(f"{date}-marche-exclu-2022.csv","decp/2022/marches-invalides"),(f"{date}-concession-exclu-2022.csv","decp/2022/concessions-invalides")]
+        for f in files_to_upload :
+            up.upload_dataeco(f[0],f[1])
+    report.db_end_session('OK')
 
 @compute_execution_time
 def manage_data_quality(df: pd.DataFrame,data_format:str):
@@ -145,6 +151,10 @@ def manage_data_quality(df: pd.DataFrame,data_format:str):
     else:
         df_marche = pd.DataFrame([])
         df_marche_badlines = pd.DataFrame([])
+    
+    # Reporting
+    report.nb_out_bad_marches = len(df_marche_badlines)
+    # deja reporté report.add('Regles marchés','BAD_MARCHE','Marchés inconsistants',df_marche_badlines)
 
     if data_format=="2022":
         if not df_concession.empty:
@@ -154,12 +164,15 @@ def manage_data_quality(df: pd.DataFrame,data_format:str):
             stabilize_columns(df_marche,"marche_"+data_format)
             df_marche = marche_mark_fields(df_marche)
 
+    # Reporting
+    report.nb_out_bad_concessions = len(df_concession_badlines)
+    # deja reporté report.add('Regles concessions','P_BAD_CONCESSION','Concessions inconsistantes',df_concession_badlines)
+
     if not df_concession.empty:
         print("Concession valides : ", str(df_concession.shape[0]))
         print("Concession mauvaises : ", str(df_concession_badlines.shape[0]))
         print("Concession mal rempli % : ", str((df_concession_badlines.shape[0] / (df_concession.shape[0] + df_concession_badlines.shape[0]) * 100)))
     else:
-        #df_concession_badlines = df_concession.empty
         print("Aucune concession traitée")
         
     if not df_marche.empty:
@@ -169,11 +182,14 @@ def manage_data_quality(df: pd.DataFrame,data_format:str):
     else:
         #df_marche_badlines = df_marche.empty
         print("Aucun marché traité")
-   
+
     # Formater la date sous le format "YYYY-MM-DD"
     maintenant = datetime.now() 
     date = maintenant.strftime("%Y-%m-%d")
-   
+
+    report.fix_statistics('all sources')
+    report.save()
+
     # save data to csv files
     df_concession.to_csv(os.path.join(conf_data["path_to_data"], f'{date}-concession-{data_format}.csv'), index=False, header=True)
     df_marche.to_csv(os.path.join(conf_data["path_to_data"], f'{date}-marche-{data_format}.csv'), index=False, header=True)
@@ -191,9 +207,15 @@ def delete_columns(df:pd.DataFrame,set:str):
         if column in df.columns:
             del df[column]
 
-def populate_error(dfb:pd.DataFrame,error_message:str):
+def populate_error(dfb:pd.DataFrame,error_message:str,message_for_all:bool=False):
     bool_nan_errors = dfb.loc[:, "Erreurs"].isna()
     dfb.loc[bool_nan_errors, "Erreurs"] = error_message
+    
+    if message_for_all:
+        report.add_forced('nettoyage',report.D_DATA,error_message,dfb)
+    else:
+        report.add_forced('nettoyage',report.D_DATA,error_message,dfb.loc[bool_nan_errors])
+
     return dfb
 
 def reorder_columns(dfb:pd.DataFrame):
@@ -340,7 +362,7 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
     df_marche_.drop(columns=suppression_colonnes, inplace=True)
 
     @compute_execution_time
-    def dedoublonnage_marche(df: pd.DataFrame) -> pd.DataFrame:
+    def dedoublonnage_marche(df: pd.DataFrame, feature_doublons_marche) -> pd.DataFrame:
         
         """
         Sont considérés comme doublons des marchés ayant les mêmes valeurs aux champs suivants :
@@ -419,7 +441,6 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
             df["marcheInnovant"] = df["marcheInnovant"].astype(str)
             df["attributionAvance"] = df["attributionAvance"].astype(str)
             df["sousTraitanceDeclaree"] = df["sousTraitanceDeclaree"].astype(str)
-           
             
             df["offresRecues"] = df["offresRecues"].fillna(0).astype(int).astype(str)
             if 'tauxAvance' in df.columns:
@@ -427,9 +448,9 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
             if 'origineUE' in df.columns:
                 df["origineUE"] = df["origineUE"].astype(str)
             if 'origineFrance' in df.columns:
-                 df["origineFrance"] = df["origineFrance"].astype(str)
+                df["origineFrance"] = df["origineFrance"].astype(str)
             if ('origineUE' in df.columns) and ('origineFrance' in df.columns) :
-                 df.astype({"dureeMois": 'str', "origineUE": 'str', "origineFrance": 'str'}) 
+                df.astype({"dureeMois": 'str', "origineUE": 'str', "origineFrance": 'str'}) 
             if 'idActeSousTraitance' in df.columns:
                 df["idActeSousTraitance"] = pd.to_numeric(df["idActeSousTraitance"], downcast='signed')
             #if 'lieuExecution.code' in df.columns:
@@ -453,8 +474,16 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
             if 'montantModificationActeSousTraitance' in df.columns:
                 df["montantModificationActeSousTraitance"] = df["montantModificationActeSousTraitance"].astype(str)      
 
+        # Only for reporting
+        index_to_keep = df.drop_duplicates(subset=feature_doublons_marche).index.tolist()
+        # Mémoriser la nombre de marchés avant et après dédoublonnage
+        report.nb_in_good_marches = len(df)
+        report.nb_duplicated_marches = len(df)-len(index_to_keep)
+        # Ajouter au reporting les doublons supprimés
+        report.add('Dédoublonnage marchés','E_DUPLICATE_MARCHE','Marchés en doublon',df[df.duplicated(feature_doublons_marche)])
+
         # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
-        dff = df.drop_duplicates(subset=["id", "acheteur.id", "titulaire_id_1", "montant", "dateNotification"], keep="first")
+        dff = df.drop_duplicates(subset=feature_doublons_marche, keep="first")
 
         print("df_marché après dédoublonnage : " + str(dff.shape))
         print("% de doublons marché : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
@@ -481,21 +510,21 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
     def marche_check_type(df: pd.DataFrame, dfb: pd.DataFrame) -> pd.DataFrame:
         dfb = pd.concat(
             [dfb, df[~((df['titulaire_typeIdentifiant_1'].str[0:] == "SIRET") 
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "TVA")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "TAHITI")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "RIDET")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "FRWF")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "IREP")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
-                       )]])
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "TVA")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "TAHITI")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "RIDET")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "FRWF")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "IREP")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
+                )]])
         df = df[((df['titulaire_typeIdentifiant_1'].str[0:] == "SIRET") 
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "TVA")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "TAHITI")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "RIDET")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "FRWF")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "IREP")
-                       | (df['titulaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
-                       )]
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "TVA")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "TAHITI")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "RIDET")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "FRWF")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "IREP")
+                | (df['titulaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
+                )]
         dfb = populate_error(dfb,f"Type erroné pour la colonne titulaire_typeIdentifiant_1")
         return df, dfb
 
@@ -685,9 +714,10 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
             dfb = populate_error(dfb,f"Champ dateNotification ou datePublicationDonnees erroné")
 
         return df, dfb    
-    
-    df_marche_ = dedoublonnage_marche(df_marche_)
 
+    feature_doublons_marche = ["id", "acheteur.id", "titulaire_id_1", "montant", "dateNotification"] 
+
+    df_marche_ = dedoublonnage_marche(df_marche_,feature_doublons_marche)
 
     utils.save_csv(df_marche_, "df_marche_dedoublonnage.csv")
 
@@ -695,22 +725,21 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
 
     df_marche_badlines_["Erreurs"] = pd.NA
     
-    df_marche_, df_marche_badlines_ = marche_check_empty(df_marche_, df_marche_badlines_)
-    df_marche_, df_marche_badlines_ = marche_check_type(df_marche_, df_marche_badlines_)
-    df_marche_, df_marche_badlines_ = marche_cpv_object(df_marche_, df_marche_badlines_)
-    df_marche_, df_marche_badlines_ = marche_date(df_marche_, df_marche_badlines_)
+    df_marche_tmp, df_marche_badlines_ = marche_check_empty(df_marche_, df_marche_badlines_)
+    df_marche_tmp, df_marche_badlines_ = marche_check_type(df_marche_, df_marche_badlines_)
+    df_marche_tmp, df_marche_badlines_ = marche_cpv_object(df_marche_, df_marche_badlines_)
+    df_marche_tmp, df_marche_badlines_ = marche_date(df_marche_, df_marche_badlines_)
 
-    df_marche_, df_marche_badlines_ = check_montant(df_marche_, df_marche_badlines_, "montant",3000000000)
-    df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "acheteur.id")
-    #df_marche_, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "titulaire_id_1")
-
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'SIRET')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'TVA')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'TAHITI')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'RIDET')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'FRWF')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'IREP')
-    df_marche_, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'HORS-UE')
+    df_marche_tmp, df_marche_badlines_ = check_montant(df_marche_, df_marche_badlines_, "montant",3000000000)
+    df_marche_tmp, df_marche_badlines_ = check_siret(df_marche_, df_marche_badlines_, "acheteur.id")
+    
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'SIRET')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'TVA')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'TAHITI')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'RIDET')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'FRWF')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'IREP')
+    df_marche_tmp, df_marche_badlines_ = check_siret_ext(df_marche_, df_marche_badlines_, "titulaire",'HORS-UE')
 
     df_cpv = pd.read_excel("data/cpv_2008_fr.xls", engine="xlrd")  #engine=openpyxl   xlrd
 
@@ -725,13 +754,18 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
     # delete df_cpv to free memory
     del df_cpv
 
-    df_marche_, df_marche_badlines_ = check_duree_contrat(df_marche_, df_marche_badlines_, 180)
-    df_marche_, df_marche_badlines_ = marche_dateNotification(df_marche_, df_marche_badlines_, data_format)
+    df_marche_tmp, df_marche_badlines_ = check_duree_contrat(df_marche_, df_marche_badlines_, 180)
+    df_marche_tmp, df_marche_badlines_ = marche_dateNotification(df_marche_, df_marche_badlines_, data_format)
 
-    df_marche_, df_marche_badlines_ = check_id_format(df_marche_, df_marche_badlines_)
+    df_marche_tmp, df_marche_badlines_ = check_id_format(df_marche_, df_marche_badlines_)
+
+    df_marche_badlines_ = df_marche_badlines_.groupby(feature_doublons_marche, as_index=False).agg({'Erreurs': ', '.join})
 
     df_marche_badlines_ = reorder_columns(df_marche_badlines_)
     df_marche_ = order_columns_marches(df_marche_)
+    
+    df_marche_tmp = df_marche_.merge(df_marche_badlines_, on=feature_doublons_marche, how='left', indicator=True)
+    df_marche_ = df_marche_tmp[df_marche_tmp['_merge'] == 'left_only'].drop(columns=['_merge'])
 
     return df_marche_, df_marche_badlines_
 
@@ -823,11 +857,11 @@ def regles_concession(df_concession_: pd.DataFrame,data_format:str) -> pd.DataFr
                     #Comparaison de date pour sélectionner le dictionnaire le plus récent
                     if date1 is None or (date1 < date2):
                         dico_le_plus_recent = element
-                          
+
             datePublication = dico_le_plus_recent.get("datePublicationDonneesExecution", None)
             depensesInvestissement = dico_le_plus_recent.get("depensesInvestissement", None)
 
-           # Gestion du champ "tarifs" pour obtenir le dernier tarif et son intitulé
+            # Gestion du champ "tarifs" pour obtenir le dernier tarif et son intitulé
             derniers_tarifs = dico_le_plus_recent.get("tarifs", [])
             if derniers_tarifs: 
                 dernier_tarif_info = derniers_tarifs[-1].get("tarif", {})
@@ -859,8 +893,18 @@ def regles_concession(df_concession_: pd.DataFrame,data_format:str) -> pd.DataFr
         # filtre pour mettre la date de publication la plus récente en premier
         df = df.sort_values(by=["datePublicationDonnees"], ascending=[False])
 
+        feature_doublons_concession = ["id", "autoriteConcedante.id", "dateDebutExecution", "concessionnaire_id_1","valeurGlobale"]
+
+        # Only for reporting
+        index_to_keep = df.drop_duplicates(subset=feature_doublons_concession).index.tolist()
+        # Mémoriser la nombre de concessions avant et après dédoublonnage
+        report.nb_in_good_concessions = len(df)
+        report.nb_duplicated_concessions = len(df) - len(index_to_keep)
+        # Ajouter au reporting les doublons supprimés
+        report.add('Dédoublonnage concessions','E_DUPLICATE_CONCESSION','Concessions en doublon',df[df.duplicated(feature_doublons_concession)])
+
         # suppression des doublons en gardant la première ligne donc datePublicationDonnees la plus récente
-        dff = df.drop_duplicates(subset=["id", "autoriteConcedante.id", "dateDebutExecution", "concessionnaire_id_1","valeurGlobale"],
+        dff = df.drop_duplicates(subset=feature_doublons_concession,
                                                             keep="first")
         print("df_concession_ après dédoublonnage : " + str(df.shape))
         print("% doublon concession : ", str((df.shape[0] - dff.shape[0]) / df.shape[0] * 100))
@@ -880,21 +924,21 @@ def regles_concession(df_concession_: pd.DataFrame,data_format:str) -> pd.DataFr
     def concession_check_type(df: pd.DataFrame, dfb: pd.DataFrame) -> pd.DataFrame:
         dfb = pd.concat(
             [dfb, df[~((df['concessionnaire_typeIdentifiant_1'].str[0:] == "SIRET") 
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TVA")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TAHITI")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "RIDET")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "FRWF")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "IREP")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
-                       )]])
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TVA")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TAHITI")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "RIDET")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "FRWF")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "IREP")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
+                )]])
         df = df[((df['concessionnaire_typeIdentifiant_1'].str[0:] == "SIRET") 
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TVA")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TAHITI")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "RIDET")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "FRWF")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "IREP")
-                       | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
-                       )]
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TVA")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "TAHITI")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "RIDET")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "FRWF")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "IREP")
+                | (df['concessionnaire_typeIdentifiant_1'].str[0:] == "HORS-UE")
+                )]
         
         dfb = populate_error(dfb,f"Champ concessionnaire_typeIdentifiant_1 erroné")
         
@@ -1165,6 +1209,8 @@ def check_montant(df: pd.DataFrame, dfb: pd.DataFrame, col: str, montant : int =
 
     dfb = populate_error(dfb,f"Champ {col} probablement erroné")
 
+    dfb[col] = dfb[col].astype(float)
+
     return df, dfb
 
 
@@ -1291,8 +1337,8 @@ def mark_mixed_field(df:pd.DataFrame, field_name:str) -> pd.DataFrame:
     """
     # Transformation de la colonne CPV      
     df_cpv = pd.read_excel("data/cpv_2008_fr.xls", engine="xlrd")
-    df_cpv['CODE'] = df_cpv['CODE'].astype(str).str.replace("-", ".")  #On souhaite  réaliser ue conversion numérique. Donc 
-                                                                       #on remplace les "-" par les points.
+    df_cpv['CODE'] = df_cpv['CODE'].astype(str).str.replace("-", ".")   #On souhaite  réaliser ue conversion numérique. Donc 
+                                                                        #on remplace les "-" par les points.
     df_cpv['CODE'] = pd.to_numeric(df_cpv['CODE'], errors='coerce')
 
     #Liste des intervalles de codes 
@@ -1339,7 +1385,7 @@ def mark_optional_field(df: pd.DataFrame,field_name:str) -> pd.DataFrame:
     """
     if field_name in df.columns:
         empty_optional  = ~pd.notna(df[field_name]) | pd.isnull(df[field_name]) | \
-         (df[field_name]=='') | (df[field_name]=='<NA>') | (df[field_name]=='nan')
+            (df[field_name]=='') | (df[field_name]=='<NA>') | (df[field_name]=='nan')
         if not empty_optional.empty:
             df[field_name] = df[field_name].astype('str')
             df.loc[empty_optional,field_name] = 'CDL'
@@ -1381,9 +1427,15 @@ def has_at_least_one(data:list):
 def evaluate_field_value(data:list,pattern:str):
     if isinstance(data,list):
         for num, value in enumerate(data, start=0):
-            if not re.match(pattern, value, re.IGNORECASE):
-                data[num] = "INX "+data[num]
-                return False
+            if isinstance(value,list):
+                for num, value in enumerate(value, start=0):
+                    if not re.match(pattern, value, re.IGNORECASE):
+                        data[num] = "INX "+data[num]
+                        return False
+            else:
+                if not re.match(pattern, value[0], re.IGNORECASE):
+                    data[num] = "INX "+data[num]
+                    return False
     else:
         if not re.match(pattern, data, re.IGNORECASE):
             data = "INX "+data
@@ -1457,8 +1509,8 @@ def mark_bad_insee_field(df: pd.DataFrame,field_name:str,field_type:str = None) 
             empty_mandatory = pd.notna(df[field_name]) & ~pd.isnull(df[field_name]) &  \
                 ~df[field_name].astype(str).str.match(r'^(?:MQ|CDL)$', na=False, case=False) & \
                 ((~df[field_type].astype(str).str.match('SIRET')) & (~df[field_type].astype(str).str.match('TVA')) \
-                 & (~df[field_name].astype(str).str.match(pattern, na=False)) | \
-                 ((df[field_type].astype(str).str.match('SIRET')) & (~df[field_name].apply(check_insee_field))) )
+                & (~df[field_name].astype(str).str.match(pattern, na=False)) | \
+                ((df[field_type].astype(str).str.match('SIRET')) & (~df[field_name].apply(check_insee_field))) )
             if not empty_mandatory.empty:
                 df.loc[empty_mandatory,field_name] = 'INX '+df.loc[empty_mandatory,field_name].astype(str)
     return df
