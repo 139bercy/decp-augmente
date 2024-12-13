@@ -38,7 +38,7 @@ def main(data_format:str = '2022'):
 if __name__ == "__main__":
     all_data_format = ['2022']
     for data_format in all_data_format:
-        try:
+        #try:
             main(data_format)
-        except ValueError as e:
-            print(f"Erreur lors du traitement du format {data_format}: {e}")
+        #except ValueError as e:
+        #    print(f"Erreur lors du traitement du format {data_format}: {e}")

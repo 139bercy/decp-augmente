@@ -71,6 +71,7 @@ def main(data_format:str = '2022'):
         utils.download_file("data/"+json_source,"data/"+json_source)
         utils.download_file("data/cpv_2008_fr.xls","data/cpv_2008_fr.xls")
 
+    logger.info(f"Opening {json_source}")
     with open(json_source, 'rb') as f:
         # c'est long de charger le json, je conseille de le faire une fois et de sauvegarder le df en pickle pour les tests
         df = convert_json_to_pandas.manage_modifications(json.load(f),data_format)
@@ -92,6 +93,9 @@ def main(data_format:str = '2022'):
         for f in files_to_upload :
             up.upload_dataeco(f[0],f[1])
     report.db_end_session('OK')
+
+def restore_nc(df,field):
+    df[field] = df.apply(lambda row: row['backup__'+field] if pd.isna(row[field]) and row['backup__'+field] == 'NC' else row[field], axis=1)
 
 @compute_execution_time
 def manage_data_quality(df: pd.DataFrame,data_format:str):
@@ -142,11 +146,21 @@ def manage_data_quality(df: pd.DataFrame,data_format:str):
     utils.save_csv(df_marche, "marche.csv")
 
     if not df_concession.empty:
+        replace_nc_colonne(df_concession,'dureeMois')
         df_concession, df_concession_badlines = regles_concession(df_concession,data_format)
     else:
         df_concession = pd.DataFrame([])
         df_concession_badlines = pd.DataFrame([])
+
     if not df_marche.empty:
+        # Replace NC with NA
+        replace_nc_colonne(df_marche,'offresRecues')
+        replace_nc_colonne(df_marche,'marcheInnovant')
+        replace_nc_colonne(df_marche,'attributionAvance')
+        replace_nc_colonne(df_marche,'sousTraitanceDeclaree')
+        replace_nc_colonne(df_marche,'dureeMois')
+        replace_nc_colonne(df_marche,'variationPrixActeSousTraitance')
+        replace_nc_colonne(df_marche,'dureeMoisActeSousTraitance')
         df_marche, df_marche_badlines = regles_marche(df_marche,data_format)
     else:
         df_marche = pd.DataFrame([])
@@ -158,9 +172,18 @@ def manage_data_quality(df: pd.DataFrame,data_format:str):
 
     if data_format=="2022":
         if not df_concession.empty:
+            restore_nc(df_concession,'dureeMois')
             stabilize_columns(df_concession,"concession_"+data_format)
             df_concession = concession_mark_fields(df_concession)
         if not df_marche.empty:
+            restore_nc(df_marche,'offresRecues')
+            restore_nc(df_marche,'marcheInnovant')
+            restore_nc(df_marche,'attributionAvance')
+            restore_nc(df_marche,'sousTraitanceDeclaree')
+            restore_nc(df_marche,'dureeMois')
+            restore_nc(df_marche,'dureeMoisActeSousTraitance')
+            restore_nc(df_marche,'variationPrixActeSousTraitance')
+
             stabilize_columns(df_marche,"marche_"+data_format)
             df_marche = marche_mark_fields(df_marche)
 
@@ -291,7 +314,14 @@ def order_columns_marches(df: pd.DataFrame):
     "dureeMoisModificationActeSousTraitance",
     "dateNotificationModificationSousTraitanceModificationActeSousTraitance",
     "montantModificationActeSousTraitance",
-    "datePublicationDonneesModificationActeSousTraitance"
+    "datePublicationDonneesModificationActeSousTraitance",
+    "backup__offresRecues",
+    "backup__marcheInnovant",
+    "backup__attributionAvance",
+    "backup__sousTraitanceDeclaree",
+    "backup__dureeMois",
+    "backup__dureeMoisActeSousTraitance",
+    "backup__variationPrixActeSousTraitance"
 ]
     #On garde que les colonnes présentes dans le dataframe
     colonnes_presentes = [col for col in liste_col_ordonnes if col in df.columns]
@@ -333,7 +363,8 @@ def order_columns_concessions(df: pd.DataFrame):
     "donneesExecution.datePublicationDonneesExecution",
     "donneesExecution.depensesInvestissement",
     "donneesExecution.intituleTarif",
-    "donneesExecution.tarif"
+    "donneesExecution.tarif",
+    "backup__dureeMois"
     ]
 
     #On garde que les colonnes présentes dans le dataframe
@@ -343,6 +374,10 @@ def order_columns_concessions(df: pd.DataFrame):
     return df
 
 def stabilize_columns(df:pd.DataFrame,set:str):
+    """
+    On ajoute des colonnes vides si celles-ci doivent exister et on supprimer les colonnes en trop
+    """
+
     columns_reference = conf_glob["df_"+set]
     for column in columns_reference:
         if column not in df.columns:
@@ -675,7 +710,7 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
         df = df[
             pd.notna(df["dateNotification"]) | pd.notna(df["datePublicationDonnees"])]
 
-        dfb = populate_error(dfb,f"Champ dateNotification ou datePublicationDonnees manquant")
+        dfb = populate_error(dfb,"Champ dateNotification ou datePublicationDonnees manquant")
 
         return df, dfb
 
@@ -711,7 +746,7 @@ def regles_marche(df_marche_: pd.DataFrame,data_format:str) -> pd.DataFrame:
             df = pd.concat([df, no_more_invalide_dates])
             dfb = pd.concat([dfb, still_invalid_dates])
         else:
-            dfb = populate_error(dfb,f"Champ dateNotification ou datePublicationDonnees erroné")
+            dfb = populate_error(dfb,"Champ dateNotification ou datePublicationDonnees erroné")
 
         return df, dfb    
 
@@ -1720,6 +1755,29 @@ def concession_mark_fields(df: pd.DataFrame) -> pd.DataFrame:
     df = mark_bad_format_field(df,"donneesExecution.intituleTarif",r'^.{0,256}$')
     df = mark_bad_format_field(df,"datePublicationDonneesExecutionDonneeExecution",PATTERN_DATE)  
 
+    return df
+
+def replace_nc_colonne(df: pd.DataFrame,nom_colonne:str) -> pd.DataFrame:
+    if nom_colonne in df.columns:
+        df['backup__' + nom_colonne] = df[nom_colonne]
+        #probleme de reimport si ajout de colonne df[nom_colonne+'_source'] = df[nom_colonne]
+        df[nom_colonne] = df[nom_colonne].replace("NC",np.nan)
+    
+    return df
+
+def replace_nc_colonne_inside(df: pd.DataFrame,nom_colonne:str,nom_noeud:str,nom_element:str) -> pd.DataFrame:
+    def replace_nc (content,noeud:str,sous_element:str,colonne:str):
+        if isinstance(content,list):
+            for element in content:
+                if sous_element in element and isinstance(element[sous_element],dict) \
+                    and colonne in element[sous_element] and element[sous_element][colonne] == "NC":
+                        element[sous_element]['backup__'+colonne] = element[sous_element][colonne]
+                        element[sous_element][colonne] = None
+        return content
+    if nom_noeud in df.columns:
+        #probleme de reimport si ajout de colonne df[nom_colonne+'_source'] = df[nom_colonne]
+        df[nom_noeud] = df[nom_noeud].apply(replace_nc,noeud=nom_noeud,sous_element=nom_element,colonne=nom_colonne)
+    
     return df
 
 if __name__ == '__main__':

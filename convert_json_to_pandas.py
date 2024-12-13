@@ -36,6 +36,7 @@ def extract_values(row: list,name:str):
 
     return pd.Series(new_columns)
 
+
 def manage_modifications(data: dict,data_format:str) -> pd.DataFrame:
     """
     Conversion du json en pandas et incorporation des modifications
