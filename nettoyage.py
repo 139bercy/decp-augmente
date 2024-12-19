@@ -1072,8 +1072,10 @@ def regles_concession(df_concession_: pd.DataFrame,data_format:str) -> pd.DataFr
 
     df_concession_ = concession_replace_concessionnaire_type(df_concession_)
     
+    df_concession_badlines_ = pd.DataFrame(columns=df_concession_.columns)
     df_concession_badlines_['Erreurs'] = pd.NA
     df_concession_['Erreurs'] = pd.NA
+    
     df_concession_, df_concession_badlines_ = concession_check_empty(df_concession_, df_concession_badlines_)
     df_concession_, df_concession_badlines_ = concession_check_type(df_concession_, df_concession_badlines_)
     if data_format=='2019':

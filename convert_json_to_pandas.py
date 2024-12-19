@@ -65,6 +65,7 @@ def manage_modifications(data: dict,data_format:str) -> pd.DataFrame:
         if 'sousTraitantActeSousTraitance' in df.columns:
             prise_en_compte_modifications(df,'sousTraitantActeSousTraitance','SousTraitant')
         if "typesPrix.typePrix" in df.columns:
+            del df["typesPrix"]
             df = df.rename(columns={
                 "typesPrix.typePrix": "typesPrix", 
                 })
